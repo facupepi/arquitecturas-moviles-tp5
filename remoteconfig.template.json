@@ -1,0 +1,31 @@
+{
+  "conditions": [],
+  "parameters": {
+    "leyenda_prototipo": {
+      "defaultValue": { "value": "Prototipo académico UTN FRSF, sin vínculo oficial con la Municipalidad de San Francisco" },
+      "description": "Leyenda del marco. Vacía o con menos de 20 caracteres, la app usa este mismo texto: la leyenda no se puede quitar.",
+      "valueType": "STRING"
+    },
+    "banner_emergencia": {
+      "defaultValue": { "value": "" },
+      "description": "Banner de emergencia (FUN-09). Vacío = sin banner. Formato: {\"texto\":\"…\",\"nivel\":\"alerta\"|\"peligro\",\"destino\":\"#/alarmas\"}",
+      "valueType": "STRING"
+    },
+    "radio_alarma_km": {
+      "defaultValue": { "value": "1" },
+      "description": "Radio en km para considerar cercana una alarma (A3). La app lo limita entre 0,1 y 20.",
+      "valueType": "NUMBER"
+    },
+    "intervalo_cercania_min": {
+      "defaultValue": { "value": "30" },
+      "description": "Vigencia en minutos de la cercanía guardada en el perfil. La app la limita a 60.",
+      "valueType": "NUMBER"
+    },
+    "mensaje_bienvenida": {
+      "defaultValue": { "value": "Tu ciudad, a un toque." },
+      "description": "Título de la pantalla de Inicio.",
+      "valueType": "STRING"
+    }
+  },
+  "parameterGroups": {}
+}

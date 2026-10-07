@@ -1,0 +1,66 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { dinero, fecha, fechaHora, hora, tiempoRelativo, duracion } from '../../shared/formato.mjs';
+
+const MIN = 60 * 1000;
+const HORA = 60 * MIN;
+const DIA = 24 * HORA;
+const cordoba = (iso) => Date.parse(`${iso}-03:00`);
+// Intl separa el símbolo con un espacio duro: se normaliza para comparar.
+const plano = (s) => s.replace(/\s/g, ' ');
+
+test('dinero: pesos enteros con separador de miles de es-AR', () => {
+  assert.equal(plano(dinero(18500)), '$ 18.500');
+  assert.equal(plano(dinero(1234567)), '$ 1.234.567');
+  assert.equal(plano(dinero(0)), '$ 0');
+  assert.equal(plano(dinero(200.4)), '$ 200', 'sin decimales');
+  assert.match(plano(dinero(-1500)), /^-\s?\$ 1\.500$/);
+  assert.equal(dinero(null), '—');
+  assert.equal(dinero(NaN), '—');
+  assert.equal(dinero('18500'), '—');
+});
+
+test('fecha, hora y fechaHora en la zona horaria de Córdoba', () => {
+  const ms = cordoba('2026-10-09T14:05:00');
+  assert.equal(fecha(ms), '09/10/2026');
+  assert.equal(hora(ms), '14:05');
+  assert.equal(fechaHora(ms), '09/10/2026 14:05');
+  // 01:00 UTC del 9 es todavía el 8 a las 22:00 en Córdoba
+  assert.equal(fecha(Date.parse('2026-10-09T01:00:00Z')), '08/10/2026');
+  assert.equal(hora(Date.parse('2026-10-09T01:00:00Z')), '22:00');
+  assert.equal(hora(Date.parse('2026-10-09T03:00:00Z')), '00:00', 'medianoche en 24 h');
+  for (const malo of [null, undefined, NaN, '2026-10-09']) {
+    assert.equal(fecha(malo), '—');
+    assert.equal(hora(malo), '—');
+    assert.equal(fechaHora(malo), '—');
+  }
+});
+
+test('tiempoRelativo en pasado y futuro', () => {
+  const ahora = cordoba('2026-10-07T12:00:00');
+  assert.equal(tiempoRelativo(ahora, ahora), 'recién');
+  assert.equal(tiempoRelativo(ahora - 30 * 1000, ahora), 'recién');
+  assert.equal(tiempoRelativo(ahora - 3 * MIN, ahora), 'hace 3 min');
+  assert.equal(tiempoRelativo(ahora - 3 * MIN - 50 * 1000, ahora), 'hace 3 min');
+  assert.equal(tiempoRelativo(ahora - 59 * MIN, ahora), 'hace 59 min');
+  assert.equal(tiempoRelativo(ahora - 2 * HORA, ahora), 'hace 2 h');
+  assert.equal(tiempoRelativo(ahora - DIA, ahora), 'hace 1 día');
+  assert.equal(tiempoRelativo(ahora - 40 * DIA, ahora), 'hace 40 días');
+  assert.equal(tiempoRelativo(ahora + 20 * 1000, ahora), 'en menos de 1 min');
+  assert.equal(tiempoRelativo(ahora + 5 * MIN, ahora), 'en 5 min');
+  assert.equal(tiempoRelativo(ahora + 2 * DIA, ahora), 'en 2 días');
+  assert.equal(tiempoRelativo(ahora + 2 * DIA - 10 * MIN, ahora), 'en 2 días', 'redondea los días');
+  assert.equal(tiempoRelativo(ahora + 23.6 * HORA, ahora), 'en 1 día', 'sin "24 h"');
+  assert.equal(tiempoRelativo(null, ahora), '');
+  assert.ok(tiempoRelativo(Date.now() - 5 * MIN).startsWith('hace'), 'ahora por defecto');
+});
+
+test('duracion: HH:MM:SS para el temporizador', () => {
+  assert.equal(duracion(0), '00:00:00');
+  assert.equal(duracion(59), '00:00:59');
+  assert.equal(duracion(15 * 60), '00:15:00');
+  assert.equal(duracion(4 * 3600), '04:00:00');
+  assert.equal(duracion(3661.9), '01:01:01', 'trunca');
+  assert.equal(duracion(-5), '00:00:00');
+  assert.equal(duracion(NaN), '00:00:00');
+});

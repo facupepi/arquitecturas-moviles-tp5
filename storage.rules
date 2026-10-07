@@ -1,8 +1,0 @@
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    // Los adjuntos se cargan y descargan mediante API, después de verificar dueño,
-    // tamaño, firma del archivo y su pertenencia al reclamo. No hay URLs públicas.
-    match /{path=**} { allow read, write: if false; }
-  }
-}

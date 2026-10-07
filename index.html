@@ -2,23 +2,54 @@
 <html lang="es-AR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#009ee2" />
     <meta
       name="description"
-      content="San Francisco Conecta: bicicletas, tributos, reclamos, atención al vecino, alarmas, estacionamiento y avisos."
+      content="San Francisco Conecta: bicicletas, tributos, reclamos, contactos, alarmas, estacionamiento y avisos. Prototipo académico UTN FRSF, sin vínculo oficial con la Municipalidad."
     />
     <title>San Francisco Conecta</title>
-    <link
-      rel="preload"
-      href="/fonts/quicksand-variable.ttf"
-      as="font"
-      type="font/ttf"
-      crossorigin
-    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="preload" href="/fonts/quicksand-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <style>
+      @font-face {
+        font-family: 'Quicksand';
+        font-style: normal;
+        font-weight: 300 700;
+        font-display: swap;
+        src: url('/fonts/quicksand-latin.woff2') format('woff2');
+      }
+      html, body, #root { height: 100%; }
+      body { margin: 0; background: #f4f7fa; -webkit-text-size-adjust: 100%; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <div id="root">
+      <!-- Pantalla de inicio estática: se pinta sin esperar al JavaScript y React Native Web la reemplaza al montar. -->
+      <div
+        id="arranque"
+        style="min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 32px 16px; box-sizing: border-box; font-family: Quicksand, system-ui, Arial, sans-serif; color: #1e2939; text-align: center;"
+      >
+        <img src="/icons/icono.svg" width="72" height="72" alt="" style="display: block; border-radius: 18px;" />
+        <div>
+          <p style="margin: 0; font-size: 13px; line-height: 18px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #526174;">San Francisco</p>
+          <h1 style="margin: 4px 0 0; font-size: 40px; line-height: 46px; font-weight: 700; color: #1e2939;">Conecta</h1>
+          <p style="margin: 8px 0 0; font-size: 16px; line-height: 24px; font-weight: 500; color: #526174;">Tus servicios municipales, a un toque.</p>
+        </div>
+        <p
+          style="margin: 0; max-width: 360px; padding: 8px 12px; border-radius: 10px; background: #fff6cd; color: #7a5e00; font-size: 13px; line-height: 18px; font-weight: 600;"
+        >
+          Prototipo académico UTN FRSF, sin vínculo oficial con la Municipalidad de San Francisco
+        </p>
+        <p role="status" style="margin: 0; font-size: 14px; line-height: 20px; font-weight: 500; color: #526174;">Cargando…</p>
+      </div>
+    </div>
+    <noscript>
+      <p style="margin: 16px; font-family: system-ui, Arial, sans-serif; font-size: 16px; line-height: 24px; color: #1e2939;">
+        San Francisco Conecta necesita JavaScript para funcionar. Para hacer un trámite o un reclamo, llamá al 147 (atención al vecino).
+      </p>
+    </noscript>
+    <script type="module" src="/src/index.web.js"></script>
   </body>
 </html>

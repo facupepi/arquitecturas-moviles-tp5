@@ -1,0 +1,18 @@
+# Configuración de la CLI de Supabase para San Francisco Conecta (WP6).
+# El proyecto remoto es qsxwsbdhlwyshqjfxaxw (se vincula con `npx supabase link`).
+# El bucket adjuntos-reclamos se declara solo en la migración 20261007120000_adjuntos.sql.
+project_id = "san-francisco-conecta-tp5"
+
+# La identidad es Firebase Auth: la pasarela de Supabase solo entiende JWT propios,
+# así que se desactiva su verificación y cada función valida el ID token de Firebase.
+[functions.vecino]
+verify_jwt = false
+
+[functions.adjuntos]
+verify_jwt = false
+
+[functions.despachar]
+verify_jwt = false
+
+[functions.tareas]
+verify_jwt = false

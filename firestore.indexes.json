@@ -1,1 +1,50 @@
-{ "indexes": [], "fieldOverrides": [] }
+{
+  "indexes": [
+    {
+      "collectionGroup": "tributos",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "pagadoEn", "order": "ASCENDING" },
+        { "fieldPath": "vence", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "reclamos",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "actualizadoEn", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "eventos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado", "order": "ASCENDING" },
+        { "fieldPath": "creadoEn", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "reclamos",
+      "fieldPath": "creadoEn",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION" },
+        { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    },
+    {
+      "collectionGroup": "estacionamiento",
+      "fieldPath": "fin",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION" },
+        { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
+    }
+  ]
+}

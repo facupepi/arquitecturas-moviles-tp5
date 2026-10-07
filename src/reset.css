@@ -1,0 +1,62 @@
+/* Único CSS propio de la app (WP5, sección 7.1). Todo lo demás se escribe con StyleSheet de react-native.
+   El CSS de Leaflet lo importa solo src/ui/MapaLeaflet.web.jsx. */
+
+@font-face {
+  font-family: 'Quicksand';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('/fonts/quicksand-latin.woff2') format('woff2');
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #f4f7fa;
+  color: #1e2939;
+  font-family: Quicksand, system-ui, Arial, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Foco visible para teclado en todos los controles (Pressable, TextInput, enlaces de Leaflet). */
+:focus-visible {
+  outline: 3px solid #0077ae;
+  outline-offset: 3px;
+}
+
+/* El título de cada pantalla recibe el foco por programa al navegar: no necesita el contorno. */
+[data-foco-titulo]:focus,
+[data-foco-titulo]:focus-visible {
+  outline: none;
+}
+
+@media print {
+  [data-no-imprimir] {
+    display: none !important;
+  }
+}
+
+/* Sin "animation: none": los Modal de React Native Web esperan el evento animationend para
+   abrirse y cerrarse, así que las animaciones se acortan en lugar de quitarse. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

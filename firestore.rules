@@ -1,17 +1,435 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function owner(uid) { return request.auth != null && request.auth.uid == uid; }
-    // El catálogo municipal es público. Sus cambios se realizan en el servidor.
-    match /municipal/{document} { allow read: if true; allow write: if false; }
-    // También el dueño tiene las escrituras cerradas: las APIs validan cada operación.
+
+    // ===================== Utilidades =====================
+    function autenticado() { return request.auth != null; }
+    function esDueno(uid) { return request.auth != null && request.auth.uid == uid; }
+    // Mismo criterio que exigirAdmin de Supabase (6.4): cuenta no anónima y documento en administradores.
+    function esAdmin() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous'
+        && exists(/databases/$(database)/documents/administradores/$(request.auth.uid));
+    }
+    function nuevo() { return request.resource.data; }
+    function viejo() { return resource.data; }
+    function claves(lista) {
+      return request.resource.data.keys().hasAll(lista) && request.resource.data.keys().hasOnly(lista);
+    }
+    function soloCambian(lista) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(lista);
+    }
+    function texto(v, min, max) { return v is string && v.size() >= min && v.size() <= max; }
+    function textoOpcional(v, max) { return v == null || (v is string && v.size() <= max); }
+    function entero(v, min, max) { return v is int && v >= min && v <= max; }
+    function idSolicitud(id) { return id is string && id.matches('^[A-Za-z0-9_-]{8,80}$'); }
+    function destinoValido(d) { return d == null || (d is string && d.matches('^#/[a-z]+(/[A-Za-z0-9_-]+)?$')); }
+    // Córdoba es UTC-3 todo el año. dayOfWeek(): 1 = lunes ... 7 = domingo (probado en el emulador).
+    function ahoraLocal() { return request.time - duration.value(3, 'h'); }
+    function config() { return get(/databases/$(database)/documents/municipal/config).data; }
+
+    // Deben coincidir con shared/constantes.mjs (hay una prueba que lo controla).
+    function zonas() { return ['centro', 'parque', 'norte', 'sur']; }
+    function categorias() { return ['alumbrado', 'bacheo', 'limpieza', 'bicicletas', 'otros']; }
+    function tiposAvisoPanel() { return ['obras', 'cortes', 'eventos', 'emergencias', 'servicios']; }
+    function tiposNotificacion() {
+      return ['obras', 'cortes', 'eventos', 'emergencias', 'servicios', 'alarmas',
+              'tributos', 'estacionamiento', 'reclamos'];
+    }
+    function frecuencias() { return ['inmediata', 'resumen_diario', 'solo_historial']; }
+    function tiposArchivo() { return ['image/jpeg', 'image/png', 'application/pdf']; }
+
+    // Evento de la bandeja escrito en el mismo lote: UNA sola llamada getAfter.
+    // Quien la llama comprueba antes que id sea string.
+    function eventoDelLote(id, tipo, refId) {
+      let e = getAfter(/databases/$(database)/documents/eventos/$(id));
+      return e != null && e.data.tipo == tipo && e.data.refId == refId;
+    }
+
+    // ===================== Catálogo público =====================
+    match /municipal/info {
+      allow read: if true;
+      allow write: if esAdmin();
+    }
+    match /municipal/config {
+      allow read: if true;
+      allow create: if esAdmin();
+      allow update: if esAdmin()
+        && soloCambian(['simuladorActivo', 'simuladorCadaMin', 'horarioEstricto',
+                        'avisoEstacionamientoMin', 'actualizadoEn'])
+        && nuevo().simuladorActivo is bool
+        && nuevo().horarioEstricto is bool
+        && entero(nuevo().simuladorCadaMin, 1, 30)
+        && entero(nuevo().get('avisoEstacionamientoMin', 5), 1, 14)
+        && nuevo().actualizadoEn == request.time;
+    }
+    match /estaciones/{id} {
+      allow read: if true;
+      allow create, delete: if esAdmin();
+      allow update: if esAdmin()
+        && soloCambian(['bicicletas', 'estado', 'actualizadoEn'])
+        && entero(nuevo().bicicletas, 0, viejo().capacidad)
+        && nuevo().estado in ['operativa', 'fuera_de_servicio']
+        && nuevo().actualizadoEn == request.time;
+    }
+    match /alarmas/{id} {
+      allow read: if true;
+      allow create, delete: if esAdmin();
+      allow update: if esAdmin()
+        && soloCambian(['activa', 'activadaEn', 'activacionId', 'actualizadoEn'])
+        && nuevo().activa is bool
+        && nuevo().actualizadoEn == request.time
+        && (
+          nuevo().activa == false
+          || (viejo().activa == false
+              && nuevo().activadaEn == request.time
+              && nuevo().activacionId is string
+              && eventoDelLote(nuevo().activacionId, 'alarma', id))
+        );
+    }
+    match /zonasEstacionamiento/{id} {
+      allow read: if true;
+      allow write: if esAdmin();
+    }
+    match /contactos/{id} {
+      allow read: if true;
+      allow write: if esAdmin();
+    }
+    match /avisos/{id} {
+      allow read: if true;
+      allow create: if esAdmin()
+        && claves(['titulo', 'cuerpo', 'detalle', 'tipo', 'zona', 'destino', 'enlace',
+                   'creadoEn', 'autor', 'eventoId', 'vigenteHasta'])
+        && texto(nuevo().titulo, 3, 100)
+        && texto(nuevo().cuerpo, 10, 500)
+        && texto(nuevo().detalle, 0, 3000)
+        && nuevo().tipo in tiposAvisoPanel()
+        && (nuevo().zona in zonas() || nuevo().zona == 'todas')
+        && destinoValido(nuevo().destino)
+        && (nuevo().enlace == null || (nuevo().enlace is string && nuevo().enlace.matches('^https://.{4,300}$')))
+        && nuevo().creadoEn == request.time
+        && nuevo().autor == 'municipalidad'
+        && (nuevo().vigenteHasta == null || nuevo().vigenteHasta is timestamp)
+        && nuevo().eventoId is string
+        && eventoDelLote(nuevo().eventoId, 'aviso', id);
+      allow update: if esAdmin() && soloCambian(['vigenteHasta'])
+        && (nuevo().vigenteHasta == null || nuevo().vigenteHasta is timestamp);
+      allow delete: if esAdmin();
+    }
+
+    // ===================== Administración =====================
+    match /administradores/{uid} {
+      allow get: if esDueno(uid);
+      allow list, write: if false;           // se edita desde la consola
+    }
+    match /eventos/{id} {
+      allow read: if esAdmin();
+      allow create: if esAdmin()
+        && claves(['tipo', 'refId', 'uid', 'origen', 'estado', 'intentos', 'creadoEn'])
+        && nuevo().tipo in ['aviso', 'alarma', 'reclamo']
+        && texto(nuevo().refId, 1, 120)
+        && (nuevo().uid == null || texto(nuevo().uid, 1, 128))
+        && (nuevo().tipo != 'reclamo' || nuevo().uid is string)
+        && nuevo().origen == 'panel'
+        && nuevo().estado == 'pendiente'
+        && nuevo().intentos == 0
+        && nuevo().creadoEn == request.time;
+      allow update, delete: if false;        // solo la cuenta de servicio
+    }
+
+    // ===================== Bloqueo de patente (sin uid: protección de datos) =====================
+    // Libre, vencido, o de una sesión que YA existía (exists, no existsAfter) bajo el uid de quien escribe.
+    function bloqueoDisponible() {
+      return resource == null
+        || viejo().fin <= request.time
+        || (viejo().sesionId == nuevo().sesionId
+            && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)/estacionamiento/$(viejo().sesionId)));
+    }
+    function sesionDelLoteCoincide(sesionId, patente, fin) {
+      let s = getAfter(/databases/$(database)/documents/usuarios/$(request.auth.uid)/estacionamiento/$(sesionId));
+      return s != null && s.data.patente == patente && s.data.fin == fin;
+    }
+    match /bloqueosPatente/{patente} {
+      allow get: if autenticado();
+      allow list, delete: if false;
+      allow create, update: if autenticado()
+        && claves(['sesionId', 'fin'])
+        && idSolicitud(nuevo().sesionId)
+        && nuevo().fin is timestamp
+        && bloqueoDisponible()
+        && sesionDelLoteCoincide(nuevo().sesionId, patente, nuevo().fin);
+    }
+
+    // ===================== Datos del vecino =====================
     match /usuarios/{uid} {
-      allow read: if owner(uid); allow write: if false;
-      match /{collection}/{document} {
-        allow read: if owner(uid) && collection in ['reclamos', 'tributos', 'estacionamiento', 'notificaciones', 'configuracion'];
-        allow write: if false;
+      function preferenciasValidas(p) {
+        return p is map
+          && p.keys().hasAll(['tipos', 'zonas', 'frecuencia', 'push'])
+          && p.keys().hasOnly(['tipos', 'zonas', 'frecuencia', 'push'])
+          && p.tipos is list && p.tipos.size() <= 9 && p.tipos.hasOnly(tiposNotificacion())
+          && p.zonas is list && p.zonas.size() <= 4 && p.zonas.hasOnly(zonas())
+          && p.frecuencia in frecuencias()
+          && p.push is bool;
+      }
+      function cercaniaValida(c) {
+        return c == null || (c is map
+          && c.keys().hasAll(['alarmas', 'vence']) && c.keys().hasOnly(['alarmas', 'vence'])
+          && c.alarmas is list && c.alarmas.size() <= 20
+          && c.vence is timestamp
+          && c.vence <= request.time + duration.value(61, 'm'));
+      }
+      function perfilValido(d) {
+        return d.keys().hasOnly(['nombre', 'anonimo', 'creadoEn', 'actualizadoEn', 'altaEn',
+                                 'preferencias', 'cercania', 'privacidadAceptadaEn'])
+          && texto(d.nombre, 0, 80)
+          && d.anonimo is bool
+          && preferenciasValidas(d.preferencias)
+          && cercaniaValida(d.get('cercania', null))
+          && (d.get('privacidadAceptadaEn', null) == null || d.privacidadAceptadaEn is timestamp);
+      }
+
+      allow get: if esDueno(uid);
+      allow list: if false;
+      allow create: if esDueno(uid) && perfilValido(nuevo())
+        && !('altaEn' in nuevo())
+        && nuevo().creadoEn == request.time
+        && nuevo().actualizadoEn == request.time;
+      allow update: if esDueno(uid) && perfilValido(nuevo())
+        && soloCambian(['nombre', 'anonimo', 'preferencias', 'cercania', 'privacidadAceptadaEn', 'actualizadoEn'])
+        && nuevo().actualizadoEn == request.time;
+      allow delete: if false;                // la baja la hace vecino/baja (Supabase)
+
+      function rutaPropia(col, id) {
+        return /databases/$(database)/documents/usuarios/$(uid)/$(col)/$(id);
+      }
+
+      // ---------- Tributos (T1-T3) ----------
+      function pagoDelTributo(tributoId, pagoId, importe, comprobante) {
+        let p = getAfter(rutaPropia('pagos', pagoId));
+        return p != null && p.data.tipo == 'tributo' && p.data.refId == tributoId
+          && p.data.importe == importe && p.data.comprobante == comprobante;
+      }
+      match /tributos/{tributoId} {
+        allow read: if esDueno(uid);
+        allow create, delete: if false;
+        allow update: if esDueno(uid)
+          && viejo().pagadoEn == null
+          && soloCambian(['pagadoEn', 'comprobante', 'pagoId'])
+          && nuevo().pagadoEn == request.time
+          && idSolicitud(nuevo().pagoId)
+          && pagoDelTributo(tributoId, nuevo().pagoId, viejo().importe, nuevo().comprobante);
+      }
+
+      // ---------- Pagos (T2, E2, E4). Idempotencia: id = requestId, solo create ----------
+      function pagoTributoValido(pagoId, d) {
+        let antes = get(rutaPropia('tributos', d.refId));
+        let despues = getAfter(rutaPropia('tributos', d.refId));
+        return d.comprobante.matches('^REC-[A-Z0-9]{8}$')
+          && antes != null && antes.data.pagadoEn == null
+          && d.importe == antes.data.importe
+          && despues.data.pagoId == pagoId;
+      }
+      function pagoSesionValido(pagoId, d) {
+        let s = getAfter(rutaPropia('estacionamiento', pagoId));
+        return d.comprobante.matches('^EST-[A-Z0-9]{8}$')
+          && d.refId == pagoId
+          && s != null && s.data.importe == d.importe && s.data.ultimoPagoId == pagoId;
+      }
+      function pagoExtensionValido(pagoId, d) {
+        let antes = get(rutaPropia('estacionamiento', d.refId));
+        let despues = getAfter(rutaPropia('estacionamiento', d.refId));
+        return d.comprobante.matches('^EXT-[A-Z0-9]{8}$')
+          && antes != null && despues != null
+          && despues.data.ultimoPagoId == pagoId
+          && d.importe == despues.data.importe - antes.data.importe;
+      }
+      match /pagos/{pagoId} {
+        allow read: if esDueno(uid);
+        allow update, delete: if false;
+        allow create: if esDueno(uid) && idSolicitud(pagoId)
+          && claves(['tipo', 'refId', 'importe', 'comprobante', 'proveedor', 'creadoEn'])
+          && nuevo().proveedor == 'pasarela-simulada'
+          && nuevo().creadoEn == request.time
+          && entero(nuevo().importe, 1, 10000000)
+          && texto(nuevo().refId, 1, 80)
+          && nuevo().comprobante is string
+          && (
+            (nuevo().tipo == 'tributo' && pagoTributoValido(pagoId, nuevo()))
+            || (nuevo().tipo == 'estacionamiento' && pagoSesionValido(pagoId, nuevo()))
+            || (nuevo().tipo == 'extension' && pagoExtensionValido(pagoId, nuevo()))
+          );
+      }
+
+      // ---------- Estacionamiento medido (E1-E4) ----------
+      function minutosValidos(m) { return m is int && m >= 15 && m <= 240 && m % 15 == 0; }
+      function zonaEst(zonaId) {
+        return get(/databases/$(database)/documents/zonasEstacionamiento/$(zonaId)).data;
+      }
+      function finCercano(fin, m) {   // tolerancia de 2 minutos por diferencia de reloj del teléfono
+        return fin is timestamp
+          && fin > request.time + duration.value(m - 2, 'm')
+          && fin < request.time + duration.value(m + 2, 'm');
+      }
+      function enHorarioZona(z, c) {
+        return c.horarioEstricto == false
+          || (ahoraLocal().dayOfWeek() in z.horario.dias
+              && ahoraLocal().hours() >= z.horario.desde
+              && ahoraLocal().hours() < z.horario.hasta);
+      }
+      function bloqueoTomado(sesionId, patente, fin) {
+        let b = getAfter(/databases/$(database)/documents/bloqueosPatente/$(patente));
+        return b != null && b.data.sesionId == sesionId && b.data.fin == fin;
+      }
+      function inicioValido(sesionId, d) {
+        let z = zonaEst(d.zonaId);
+        let c = config();
+        return d.importe * 60 == z.tarifaHora * d.minutos
+          && d.zonaNombre == z.nombre
+          && d.zona == z.zona
+          && enHorarioZona(z, c)
+          && bloqueoTomado(sesionId, d.patente, d.fin)
+          && existsAfter(rutaPropia('pagos', sesionId));
+      }
+      function extensionValida(sesionId, a, d) {
+        let z = zonaEst(a.zonaId);
+        return soloCambian(['minutos', 'importe', 'fin', 'extensiones', 'ultimoPagoId', 'avisoPorVencer', 'actualizadoEn'])
+          && minutosValidos(d.minutos)
+          && d.minutos > a.minutos
+          && d.fin == a.fin + duration.value(d.minutos - a.minutos, 'm')
+          && (d.importe - a.importe) * 60 == z.tarifaHora * (d.minutos - a.minutos)
+          && d.extensiones == a.extensiones + 1
+          && d.avisoPorVencer == false
+          && idSolicitud(d.ultimoPagoId)
+          && d.ultimoPagoId != a.ultimoPagoId
+          && existsAfter(rutaPropia('pagos', d.ultimoPagoId))
+          && bloqueoTomado(sesionId, a.patente, d.fin);
+      }
+      // Terminar antes de tiempo (sin reintegro): fin = hora del servidor, y el bloqueo igual.
+      function finalizacionValida(sesionId, a, d) {
+        return soloCambian(['fin', 'actualizadoEn'])
+          && d.fin == request.time
+          && bloqueoTomado(sesionId, a.patente, d.fin);
+      }
+      match /estacionamiento/{sesionId} {
+        allow read: if esDueno(uid);
+        allow delete: if false;
+        allow create: if esDueno(uid) && idSolicitud(sesionId)
+          && claves(['patente', 'zonaId', 'zonaNombre', 'zona', 'minutos', 'importe', 'inicio', 'fin',
+                     'extensiones', 'ultimoPagoId', 'avisoPorVencer', 'avisoFinalizado', 'actualizadoEn'])
+          && nuevo().patente is string
+          && nuevo().patente.matches('^([A-Z]{3}[0-9]{3}|[A-Z]{2}[0-9]{3}[A-Z]{2})$')
+          && texto(nuevo().zonaId, 1, 40)
+          && minutosValidos(nuevo().minutos)
+          && nuevo().importe is int
+          && nuevo().inicio == request.time
+          && nuevo().actualizadoEn == request.time
+          && finCercano(nuevo().fin, nuevo().minutos)
+          && nuevo().extensiones == 0
+          && nuevo().ultimoPagoId == sesionId
+          && nuevo().avisoPorVencer == false
+          && nuevo().avisoFinalizado == false
+          && inicioValido(sesionId, nuevo());
+        allow update: if esDueno(uid)
+          && viejo().fin > request.time
+          && nuevo().actualizadoEn == request.time
+          && (extensionValida(sesionId, viejo(), nuevo())
+              || finalizacionValida(sesionId, viejo(), nuevo()));
+      }
+
+      // ---------- Reclamos (R1-R4) ----------
+      function adjuntoValido(reclamoId, a) {
+        return a is map
+          && a.keys().hasAll(['ruta', 'nombre', 'tipo', 'tamano'])
+          && a.keys().hasOnly(['ruta', 'nombre', 'tipo', 'tamano'])
+          && a.ruta is string
+          && a.ruta.matches('^' + uid + '/' + reclamoId + '/[0-2]-[a-f0-9]{12}[.](jpg|png|pdf)$')
+          && texto(a.nombre, 1, 100)
+          && a.tipo in tiposArchivo()
+          && entero(a.tamano, 1, 2097152);
+      }
+      function adjuntosValidos(reclamoId, l) {
+        return l is list && l.size() <= 3
+          && (l.size() < 1 || adjuntoValido(reclamoId, l[0]))
+          && (l.size() < 2 || adjuntoValido(reclamoId, l[1]))
+          && (l.size() < 3 || adjuntoValido(reclamoId, l[2]));
+      }
+      function transicionValida(a, b) {
+        return (a == 'recibido' && b == 'en_proceso') || (a == 'en_proceso' && b == 'resuelto');
+      }
+      function eventoDelReclamo(eventoId, reclamoId) {
+        let e = getAfter(/databases/$(database)/documents/eventos/$(eventoId));
+        return e != null && e.data.tipo == 'reclamo' && e.data.refId == reclamoId && e.data.uid == uid;
+      }
+      match /reclamos/{reclamoId} {
+        allow read: if esDueno(uid) || esAdmin();
+        allow delete: if false;
+        allow create: if esDueno(uid) && idSolicitud(reclamoId)
+          && claves(['codigo', 'categoria', 'direccion', 'descripcion', 'estacionId', 'adjuntos', 'estado',
+                     'cronologia', 'notaMunicipal', 'creadoEn', 'actualizadoEn', 'ultimoEventoId'])
+          && nuevo().codigo.matches('^R-[A-Z0-9]{6}$')
+          && nuevo().categoria in categorias()
+          && texto(nuevo().direccion, 5, 160)
+          && texto(nuevo().descripcion, 10, 1500)
+          && (nuevo().estacionId == null || texto(nuevo().estacionId, 1, 40))
+          && adjuntosValidos(reclamoId, nuevo().adjuntos)
+          && nuevo().estado == 'recibido'
+          && nuevo().cronologia.keys().hasOnly(['recibido'])
+          && nuevo().cronologia.recibido == request.time
+          && nuevo().notaMunicipal == null
+          && nuevo().ultimoEventoId == null
+          && nuevo().creadoEn == request.time
+          && nuevo().actualizadoEn == request.time;
+        allow update: if esAdmin()
+          && soloCambian(['estado', 'cronologia', 'notaMunicipal', 'actualizadoEn', 'ultimoEventoId'])
+          && transicionValida(viejo().estado, nuevo().estado)
+          && nuevo().cronologia.diff(viejo().cronologia).affectedKeys().hasOnly([nuevo().estado])
+          && nuevo().cronologia[nuevo().estado] == request.time
+          && textoOpcional(nuevo().notaMunicipal, 300)
+          && nuevo().actualizadoEn == request.time
+          && nuevo().ultimoEventoId is string
+          && eventoDelReclamo(nuevo().ultimoEventoId, reclamoId);
+      }
+
+      // ---------- Notificaciones personales (N3) ----------
+      match /notificaciones/{notifId} {
+        allow read: if esDueno(uid);
+        allow create: if esDueno(uid)
+          && claves(['titulo', 'cuerpo', 'tipo', 'zona', 'destino', 'enlace', 'creadoEn', 'leida', 'leidaEn', 'origen'])
+          && nuevo().tipo in ['tributos', 'estacionamiento', 'reclamos']
+          && texto(nuevo().titulo, 3, 100)
+          && texto(nuevo().cuerpo, 3, 500)
+          && nuevo().zona == null
+          && nuevo().enlace == null
+          && destinoValido(nuevo().destino)
+          && nuevo().creadoEn == request.time
+          && nuevo().leida == false
+          && nuevo().leidaEn == null
+          && nuevo().origen == 'vecino';
+        allow update: if esDueno(uid)
+          && soloCambian(['leida', 'leidaEn'])
+          && nuevo().leida == true
+          && nuevo().leidaEn == request.time;
+        allow delete: if esDueno(uid);
+      }
+      // set() sobre un documento existente se evalúa como update: se permite para que marcar sea idempotente.
+      match /avisosLeidos/{avisoId} {
+        allow read, delete: if esDueno(uid);
+        allow create, update: if esDueno(uid) && claves(['leidoEn']) && nuevo().leidoEn == request.time;
+      }
+      match /dispositivos/{dispositivoId} {
+        allow read, delete: if esDueno(uid);
+        allow create, update: if esDueno(uid)
+          && dispositivoId.matches('^[a-f0-9]{32}$')
+          && claves(['token', 'plataforma', 'actualizadoEn'])
+          && texto(nuevo().token, 20, 4096)
+          && texto(nuevo().plataforma, 1, 40)
+          && nuevo().actualizadoEn == request.time;
       }
     }
-    match /{document=**} { allow read, write: if false; }
+
+    // Lectura administrativa por grupo de colecciones (panel municipal).
+    match /{ruta=**}/reclamos/{reclamoId} {
+      allow read: if esAdmin();
+    }
   }
 }

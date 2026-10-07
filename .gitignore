@@ -1,10 +1,32 @@
+# Dependencias y cachés
 node_modules/
-dist/
 .npm-cache/
-server/data/
-test-results/
-*.log
-.firebase/
+
+# Compilación
+dist/
+dist-e2e/
+dist-test/
+
+# Configuración local y secretos (nunca se versionan)
 .env.local
 .env.*.local
-dist-test/
+.tp5-secretos/
+credenciales/
+*-firebase-adminsdk-*.json
+supabase/.temp/
+supabase/.branches/
+supabase/.secretos.env
+supabase/functions/_shared/compartido/
+
+# Emuladores y registros
+.firebase/
+*.log
+
+# Pruebas
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Restos de la versión heredada
+server/data/
