@@ -193,10 +193,11 @@ const estilos = StyleSheet.create({
   tanaResaltada: { backgroundColor: colores.blanco },
   columnas: { flexDirection: 'row', gap: espacio.xl },
   columna: { flex: 1, gap: espacio.s },
-  enlaces: { gap: 2 },
+  enlaces: { gap: 0 },
   enlace: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', cursor: 'pointer' },
   enlaceTactil: { minHeight: medidas.toqueMinimo },
-  enlaceCompacto: { minHeight: 32 },
+  // 44 px también en escritorio (mínimo táctil pedido; con mouse alcanzaba 24 px de WCAG 2.5.8).
+  enlaceCompacto: { minHeight: 44 },
   subrayado: { textDecorationLine: 'underline' },
   inferior: {
     flexDirection: 'row',

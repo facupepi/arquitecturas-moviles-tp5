@@ -50,28 +50,36 @@ function ServiciosDiferidos() {
   return null;
 }
 
-/** Ingreso sin sesión, con la leyenda arriba (una pantalla que la repita no la duplica). */
+/**
+ * Ingreso sin sesión. La leyenda la dibuja Ingreso debajo de su banda de marca (en el mismo lugar
+ * que en el resto de la app, debajo del encabezado); mientras carga o si falla, va arriba de todo.
+ */
 function SinSesion() {
   const Ingreso = cargarPantalla('Ingreso');
+  const conLeyenda = (contenido) => (
+    <View style={estilos.flexible}>
+      <LeyendaPrototipo />
+      <ContextoLeyenda.Provider value>{contenido}</ContextoLeyenda.Provider>
+    </View>
+  );
   return (
     <ProveedorAvisos>
       <View style={estilos.raiz}>
-        <LeyendaPrototipo />
-        <ContextoLeyenda.Provider value>
-          <View style={estilos.flexible}>
-            <LimiteError clave="ingreso">
-              <Suspense fallback={<Cargando pantallaCompleta />}>
-                {Ingreso ? (
-                  <Ingreso />
-                ) : (
+        <View style={estilos.flexible}>
+          <LimiteError clave="ingreso">
+            <Suspense fallback={conLeyenda(<Cargando pantallaCompleta />)}>
+              {Ingreso ? (
+                <Ingreso />
+              ) : (
+                conLeyenda(
                   <Pantalla titulo="Ingresá a San Francisco Conecta" testID="pantalla-pendiente">
                     <Vacio icono="usuario" titulo="El ingreso todavía no está disponible" />
-                  </Pantalla>
-                )}
-              </Suspense>
-            </LimiteError>
-          </View>
-        </ContextoLeyenda.Provider>
+                  </Pantalla>,
+                )
+              )}
+            </Suspense>
+          </LimiteError>
+        </View>
       </View>
     </ProveedorAvisos>
   );

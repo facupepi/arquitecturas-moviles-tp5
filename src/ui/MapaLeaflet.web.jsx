@@ -18,6 +18,21 @@ const CENTRO_POR_DEFECTO = [-31.429, -62.082]; // municipal/info.centroMapa
 const ATRIBUCION =
   '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>';
 
+// Botones de zoom de 44 × 44 (Leaflet los trae de 30 px, debajo del mínimo táctil). Se inyecta una
+// sola vez desde este archivo .web: el resto de la app no escribe CSS.
+let estiloInyectado = false;
+function inyectarEstilo() {
+  if (estiloInyectado || typeof document === 'undefined') return;
+  estiloInyectado = true;
+  const estilo = document.createElement('style');
+  estilo.setAttribute('data-mapa-conecta', '');
+  estilo.textContent = [
+    '.leaflet-bar a, .leaflet-touch .leaflet-bar a { width: 44px; height: 44px; line-height: 44px; font-size: 22px; }',
+    '.leaflet-control-attribution a { display: inline-block; min-height: 24px; line-height: 24px; }',
+  ].join(' ');
+  document.head.appendChild(estilo);
+}
+
 function colorDe(punto, elegido) {
   if (elegido) return coloresMapa.seleccionado;
   return coloresMapa[punto.tono] ?? coloresMapa.normal;
@@ -65,6 +80,7 @@ export default function MapaLeaflet({ puntos = [], seleccionado, onSeleccionar, 
 
   // Montaje: una sola vez.
   useEffect(() => {
+    inyectarEstilo();
     const anfitrion = contenedor.current;
     const nodo = document.createElement('div');
     nodo.style.width = '100%';
@@ -118,20 +134,23 @@ export default function MapaLeaflet({ puntos = [], seleccionado, onSeleccionar, 
     for (const punto of puntos) {
       const elegido = punto.id === seleccionado;
       const color = colorDe(punto, elegido);
-      if (Array.isArray(punto.tramo) && punto.tramo.length > 1) {
+      const conTramo = Array.isArray(punto.tramo) && punto.tramo.length > 1;
+      // El elegido lleva un anillo oscuro además del color: se distingue de cualquier tono.
+      const marcador = L.circleMarker([punto.lat, punto.lng], {
+        radius: conTramo ? (elegido ? 8 : 6) : elegido ? 12 : 9,
+        color: elegido ? colores.texto : '#ffffff',
+        weight: elegido ? 4 : 3,
+        fillColor: color,
+        fillOpacity: 1,
+      }).addTo(grupo);
+      if (conTramo) {
+        // El tramo va encima del marcador (que es más chico): así la calle se ve entera.
         const linea = punto.tramo.map((p) => [p.lat, p.lng]);
-        L.polyline(linea, { color, weight: elegido ? 11 : 7, opacity: 0.75 })
+        L.polyline(linea, { color, weight: elegido ? 11 : 7, opacity: 0.8 })
           .on('click', () => alSeleccionar.current?.(punto.id))
           .addTo(grupo);
         limites.push(...linea);
       }
-      const marcador = L.circleMarker([punto.lat, punto.lng], {
-        radius: elegido ? 12 : 9,
-        color: '#ffffff',
-        weight: 3,
-        fillColor: color,
-        fillOpacity: 1,
-      }).addTo(grupo);
       const rotulo = document.createElement('span');
       rotulo.textContent = punto.titulo ?? '';
       marcador.bindTooltip(rotulo, { direction: 'top' });

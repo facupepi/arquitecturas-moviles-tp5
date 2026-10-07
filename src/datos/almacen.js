@@ -20,6 +20,7 @@ const MIN = 60_000;
 const PASO_PAGINA = 20;
 const LIMITES_INICIALES = { avisos: 50, pagos: 20, reclamos: 20, estacionamiento: 20, notificaciones: 50 };
 const MAX_TIMEOUT = 2 ** 31 - 1;
+const GRACIA_ALTA_MS = 5000;
 
 function estadoInicial(usuario) {
   return {
@@ -85,6 +86,11 @@ export function crearAlmacen(usuarioInicial) {
   let temporizadorSesiones = null;
   let temporizadorCercania = null;
   let sesionesRevisadas = false;
+  // Las notificaciones que crea vecino/alta (bienvenida y recordatorios T4) llegan apenas después de
+  // la carga inicial: se registran sin aviso flotante mientras el alta corre y unos segundos después
+  // (pedido de integración de S2, S4, S6 y S7: el aviso tapaba la parte de abajo al entrar).
+  let altaTerminadaEn = 0;
+  const enGraciaAlta = () => !estado.altaTerminada || Date.now() - altaTerminadaEn < GRACIA_ALTA_MS;
 
   // Seguimiento de cercanía (A3): la posición vive solo en memoria.
   const cerca = { detener: null, posicion: null, ids: new Set(), ultimoConjunto: null, ultimaEscritura: 0, refresco: null, reanudada: false };
@@ -189,7 +195,7 @@ export function crearAlmacen(usuarioInicial) {
   const describir = {
     personal: (n) => ({
       clave: claveSegura({ fuente: 'personal', notificacion: n }, n.id),
-      silenciosa: n.pendiente || n.origen === 'vecino' || n.leida,
+      silenciosa: n.pendiente || n.origen === 'vecino' || n.leida || enGraciaAlta(),
       notif: { tipo: n.tipo, zona: n.zona ?? null },
       cercano: String(n.id).startsWith('alarma-'),
       titulo: n.titulo, cuerpo: n.cuerpo, destino: n.destino ?? null, tono: tonoDe(n.tipo),
@@ -362,10 +368,14 @@ export function crearAlmacen(usuarioInicial) {
   // ---------- Alta del vecino ----------
   function asegurar(perfil) {
     const usuario = estado.usuario;
-    repositorio.asegurarAlta(usuario, perfil).then(
-      () => { if (activo && estado.usuario.uid === usuario.uid) actualizar({ altaTerminada: true }); },
-      () => { if (activo) actualizar({ altaTerminada: true }); },
-    );
+    // Solo hay gracia si esta vez el alta escribió datos (perfil sin altaEn o que cambió de tipo).
+    const escribeDatos = !perfil?.altaEn || perfil.anonimo !== Boolean(usuario.anonimo);
+    const terminar = () => {
+      if (!activo || estado.usuario.uid !== usuario.uid || estado.altaTerminada) return;
+      if (escribeDatos) altaTerminadaEn = Date.now();
+      actualizar({ altaTerminada: true });
+    };
+    repositorio.asegurarAlta(usuario, perfil).then(terminar, terminar);
   }
 
   // ---------- Cercanía (A3) ----------

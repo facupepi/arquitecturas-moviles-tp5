@@ -1,5 +1,7 @@
 // Aviso flotante (toast) (WP5, 7.2).
-//   <ProveedorAvisos margenInferior?> … </ProveedorAvisos>
+//   <ProveedorAvisos margenInferior? arriba?> … </ProveedorAvisos>
+// Con `arriba` se dibuja sobre el encabezado (en el celular no tapa la acción principal ni la
+// barra inferior); si no, abajo, a `margenInferior` del borde.
 //   const aviso = useAvisoFlotante();
 //   aviso.mostrar(mensaje, tono = 'exito', destino?)   // destino: hash interno → botón "Ver"
 //   aviso.ocultar()
@@ -10,6 +12,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { colores, espacio, medidas, radios, sombras } from '../tema/tokens';
 import { leerHash } from '../plataforma/hash';
 import { useRutaOpcional } from '../navegacion/ProveedorNavegacion';
+import { rellenoSuperiorSeguro } from './areaSegura';
 import Icono from './Icono';
 import Texto from './Texto';
 
@@ -36,7 +39,7 @@ export function useAvisoFlotante() {
   return useContext(ContextoAvisos) ?? SIN_PROVEEDOR;
 }
 
-export function ProveedorAvisos({ children, margenInferior = espacio.xl }) {
+export function ProveedorAvisos({ children, margenInferior = espacio.xl, arriba = false }) {
   const [aviso, setAviso] = useState(null);
   const temporizador = useRef(null);
   const pausado = useRef(false);
@@ -105,7 +108,11 @@ export function ProveedorAvisos({ children, margenInferior = espacio.xl }) {
         <View
           role="status"
           aria-live="polite"
-          style={[estilos.region, { bottom: margenInferior, pointerEvents: 'box-none' }]}
+          style={[
+            estilos.region,
+            arriba ? { top: espacio.s, paddingTop: rellenoSuperiorSeguro } : { bottom: margenInferior },
+            { pointerEvents: 'box-none' },
+          ]}
           dataSet={{ noImprimir: true }}
         >
           {aviso ? (

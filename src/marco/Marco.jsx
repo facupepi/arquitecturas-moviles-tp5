@@ -69,7 +69,9 @@ export default function Marco({ children }) {
   const { width } = useWindowDimensions();
   const escritorio = width >= cortes.escritorio;
   return (
-    <ProveedorAvisos margenInferior={escritorio ? espacio.xl : ALTO_BARRA + espacio.xl}>
+    // En el celular el aviso va arriba, sobre el encabezado: abajo tapaba la acción principal
+    // de la pantalla (por ejemplo, "Extender 15 min" recién iniciado el estacionamiento).
+    <ProveedorAvisos margenInferior={escritorio ? espacio.xl : ALTO_BARRA + espacio.xl} arriba={!escritorio}>
       <MarcoInterno escritorio={escritorio}>{children}</MarcoInterno>
     </ProveedorAvisos>
   );

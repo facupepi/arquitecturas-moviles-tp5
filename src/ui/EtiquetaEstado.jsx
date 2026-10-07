@@ -1,4 +1,6 @@
 // Píldora de estado (WP5, 7.2): siempre con texto, nunca solo color.
+// `sobreColor`: dentro de una tarjeta del mismo tono (alerta, peligro) el fondo de la píldora se
+// perdería; con esta opción va en blanco y conserva su forma.
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { colores, espacio, radios } from '../tema/tokens';
@@ -13,10 +15,10 @@ export const TONOS_ESTADO = {
   neutro: { fondo: '#eef2f6', texto: colores.textoSuave },
 };
 
-export default function EtiquetaEstado({ texto, tono = 'neutro', icono, testID }) {
+export default function EtiquetaEstado({ texto, tono = 'neutro', icono, sobreColor = false, testID }) {
   const t = TONOS_ESTADO[tono] ?? TONOS_ESTADO.neutro;
   return (
-    <View testID={testID} style={[estilos.pildora, { backgroundColor: t.fondo }]}>
+    <View testID={testID} style={[estilos.pildora, { backgroundColor: sobreColor ? colores.superficie : t.fondo }]}>
       {icono ? <Icono nombre={icono} tamano={14} color={t.texto} /> : null}
       <Texto variante="chico" color={t.texto} peso="700">
         {texto}

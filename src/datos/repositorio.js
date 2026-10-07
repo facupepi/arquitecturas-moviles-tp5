@@ -765,7 +765,7 @@ export async function configurarDemo({ simuladorActivo, simuladorCadaMin, horari
 }
 
 // Vuelve bicicletas, alarmas y config a los valores de shared/catalogo.mjs con updates
-// permitidos por las reglas (un solo lote: 6 estaciones + 4 alarmas + config).
+// permitidos por las reglas (un solo lote: las 7 estaciones + las 5 alarmas del catálogo + config).
 // El catálogo se importa recién acá para no sumarlo al paquete inicial (solo lo usa el panel).
 export async function restablecerDemo() {
   uidActual();

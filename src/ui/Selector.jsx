@@ -4,7 +4,9 @@
 // opciones: [{ valor, etiqueta, deshabilitada?, testID? }]. `valor` es un string, o un array si `multiple`.
 // testID: el contenedor lo recibe tal cual y cada opción recibe `${testID}-${valor}`
 // (por ejemplo testID="minutos" da "minutos-15"), salvo que la opción traiga su propio testID.
-import React, { useState } from 'react';
+// `ref` apunta al primer control (la primera opción, o el botón en la variante lista): sirve para
+// llevar el foco al selector cuando tiene un error.
+import React, { forwardRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { colores, espacio, medidas, radios } from '../tema/tokens';
 import Dialogo from './Dialogo';
@@ -26,10 +28,11 @@ function idOpcion(testID, opcion) {
   return opcion.testID ?? (testID ? `${testID}-${opcion.valor}` : undefined);
 }
 
-function Opcion({ opcion, elegida, multiple, onPress, testID, enLista = false }) {
+const Opcion = forwardRef(function Opcion({ opcion, elegida, multiple, onPress, testID, enLista = false }, ref) {
   const deshabilitada = !!opcion.deshabilitada;
   return (
     <Pressable
+      ref={ref}
       role={multiple ? 'checkbox' : 'radio'}
       aria-checked={elegida}
       aria-disabled={deshabilitada || undefined}
@@ -55,9 +58,9 @@ function Opcion({ opcion, elegida, multiple, onPress, testID, enLista = false })
       </Texto>
     </Pressable>
   );
-}
+});
 
-export default function Selector({
+const Selector = forwardRef(function Selector({
   etiqueta,
   valor,
   opciones = [],
@@ -66,7 +69,7 @@ export default function Selector({
   variante = 'chips',
   error,
   testID,
-}) {
+}, ref) {
   const idEtiqueta = useIdAccesible('selector');
   const idError = error ? `${idEtiqueta}-error` : undefined;
   const [abierto, setAbierto] = useState(false);
@@ -88,6 +91,7 @@ export default function Selector({
       {variante === 'lista' ? (
         <>
           <Pressable
+            ref={ref}
             role="button"
             aria-haspopup="dialog"
             aria-label={`${etiqueta}: ${resumen || 'sin elegir'}`}
@@ -138,8 +142,9 @@ export default function Selector({
           testID={testID}
           style={estilos.chips}
         >
-          {opciones.map((o) => (
+          {opciones.map((o, i) => (
             <Opcion
+              ref={i === 0 ? ref : undefined}
               key={String(o.valor)}
               opcion={o}
               elegida={estaElegida(valor, o, multiple)}
@@ -151,15 +156,23 @@ export default function Selector({
         </View>
       )}
       {error ? (
-        <Texto id={idError} role="alert" variante="chico" color={colores.peligro} peso="600">
-          {error}
-        </Texto>
+        // Con el mismo ícono que Campo, para que todos los errores se vean iguales (pedido de S5).
+        <View style={estilos.filaError}>
+          <Icono nombre="alerta" tamano={16} color={colores.peligro} />
+          <Texto id={idError} role="alert" variante="chico" color={colores.peligro} peso="600" estilo={estilos.textoError}>
+            {error}
+          </Texto>
+        </View>
       ) : null}
     </View>
   );
-}
+});
+
+export default Selector;
 
 const estilos = StyleSheet.create({
+  filaError: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.xs, paddingTop: 2 },
+  textoError: { flex: 1, minWidth: 0 },
   contenedor: { gap: espacio.s, alignSelf: 'stretch' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.s },
   chip: {

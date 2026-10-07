@@ -2,6 +2,7 @@
 import './reset.css';
 import './firebase/appCheck'; // antes que cualquier uso de Firestore
 import { registrarServiceWorker } from './plataforma/registroSW';
+import './plataforma/instalacion'; // escucha beforeinstallprompt desde la carga (llega una sola vez; pedido de S1)
 import { AppRegistry } from 'react-native';
 import App from './App';
 

@@ -44,11 +44,14 @@ const MARCA_REDIRECCION = 'conecta:redireccion';
 /** Usuario = { uid, nombre, email, anonimo, proveedor: 'anonymous' | 'google.com' } */
 function aUsuario(u) {
   if (!u) return null;
-  const google = u.providerData?.some((p) => p?.providerId === 'google.com');
+  const datosGoogle = u.providerData?.find((p) => p?.providerId === 'google.com') ?? null;
+  const google = !!datosGoogle;
   return {
     uid: u.uid,
-    nombre: u.displayName || null,
-    email: u.email || null,
+    // Al vincular un invitado, displayName y email pueden quedar vacíos en el usuario aunque los
+    // traiga la cuenta de Google: se usan los del proveedor (pedido de S1).
+    nombre: u.displayName || datosGoogle?.displayName || null,
+    email: u.email || datosGoogle?.email || null,
     anonimo: u.isAnonymous,
     proveedor: u.isAnonymous ? 'anonymous' : google ? 'google.com' : (u.providerData?.[0]?.providerId || 'anonymous'),
   };

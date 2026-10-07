@@ -67,6 +67,20 @@ export function tiempoRelativo(ms, ahora = Date.now()) {
   return conSentido(dias === 1 ? '1 día' : `${dias} días`);
 }
 
+// Para algo que ya pasó (creado, activado, actualizado): si el reloj del servidor va unos segundos
+// adelantado al del teléfono, dice "recién" y no "en menos de 1 min".
+export function tiempoPasado(ms, ahora = Date.now()) {
+  if (!valido(ms) || !valido(ahora)) return '';
+  return tiempoRelativo(Math.min(ms, ahora), ahora);
+}
+
+// Código corto de un vecino (últimos 4 caracteres del uid, "…A3F2"): lo ve el vecino en Mi cuenta
+// y la Municipalidad en el panel, para saber de quién es cada reclamo sin mostrar datos personales.
+export function codigoVecino(uid) {
+  const corto = String(uid ?? '').replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase();
+  return corto ? `…${corto}` : '';
+}
+
 // "HH:MM:SS" para el temporizador del estacionamiento. Negativo o inválido → "00:00:00".
 export function duracion(segundos) {
   const total = valido(segundos) && segundos > 0 ? Math.floor(segundos) : 0;

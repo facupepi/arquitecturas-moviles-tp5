@@ -5,7 +5,10 @@
 // acciones: [{ titulo, onPress, variante, cargando, deshabilitado, testID }]
 // Con cerrable = false no hay botón de cerrar, ni Escape, ni cierre tocando el fondo
 // (por ejemplo, mientras se procesa un pago).
-import React from 'react';
+// `pie`: lo que va fijo arriba de los botones, fuera del área desplazable. Es el lugar de los
+// errores de la acción ("No se pudo completar el pago"): si fueran al final del contenido, en un
+// celular quedarían tapados por el pie y el vecino solo vería que el botón cambió.
+import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { colores, cortes, espacio, medidas, radios, sombras } from '../tema/tokens';
 import Boton from './Boton';
@@ -13,10 +16,15 @@ import Icono from './Icono';
 import Texto from './Texto';
 import { useDevolverFoco, useEscape, useIdAccesible } from './comun';
 
-export default function Dialogo({ visible, titulo, children, onCerrar, acciones = [], cerrable = true, testID }) {
+export default function Dialogo({ visible, titulo, children, onCerrar, acciones = [], cerrable = true, pie, testID }) {
   const { width, height } = useWindowDimensions();
   const idTitulo = useIdAccesible('dialogo-titulo');
   useDevolverFoco(!!visible);
+  // Si el contenido no entra, el área desplazable tiene que poder enfocarse con el teclado
+  // (axe: scrollable-region-focusable; pedido de S4).
+  const [altoVisible, setAltoVisible] = useState(0);
+  const [altoContenido, setAltoContenido] = useState(0);
+  const desborda = altoVisible > 0 && altoContenido > altoVisible + 1;
   const angosto = width < cortes.tableta;
   const cerrar = () => {
     if (cerrable) onCerrar?.();
@@ -65,11 +73,20 @@ export default function Dialogo({ visible, titulo, children, onCerrar, acciones 
               </Pressable>
             ) : null}
           </View>
-          <ScrollView style={estilos.desplazable} contentContainerStyle={estilos.contenido}>
+          <ScrollView
+            style={estilos.desplazable}
+            contentContainerStyle={estilos.contenido}
+            onLayout={(e) => setAltoVisible(e.nativeEvent.layout.height)}
+            onContentSizeChange={(_, alto) => setAltoContenido(alto)}
+            tabIndex={desborda ? 0 : undefined}
+            role={desborda ? 'group' : undefined}
+            aria-labelledby={desborda ? idTitulo : undefined}
+          >
             {children}
           </ScrollView>
+          {pie ? <View style={estilos.pie}>{pie}</View> : null}
           {acciones.length ? (
-            <View style={[estilos.acciones, angosto ? estilos.accionesAngosto : null]}>
+            <View style={[estilos.acciones, angosto ? estilos.accionesAngosto : null, pie ? estilos.accionesConPie : null]}>
               {acciones.map((a, i) => (
                 <Boton
                   key={a.testID ?? `${a.titulo}-${i}`}
@@ -153,5 +170,14 @@ const estilos = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colores.borde,
   },
-  accionesAngosto: { flexDirection: 'column-reverse', alignItems: 'stretch' },
+  pie: {
+    paddingHorizontal: espacio.xl,
+    paddingTop: espacio.m,
+    borderTopWidth: 1,
+    borderTopColor: colores.borde,
+    gap: espacio.s,
+  },
+  accionesConPie: { borderTopWidth: 0, paddingTop: espacio.m },
+  // Sin wrap: con flexWrap cada línea toma el ancho de su contenido y los botones no se estiran.
+  accionesAngosto: { flexDirection: 'column-reverse', flexWrap: 'nowrap', alignItems: 'stretch' },
 });

@@ -24,6 +24,7 @@ function esExcepcion(ruta) {
 
 function listar(carpeta) {
   if (!existsSync(carpeta)) return [];
+  if (!statSync(carpeta).isDirectory()) return [carpeta]; // también acepta archivos sueltos (pedido de S3)
   const salida = [];
   for (const nombre of readdirSync(carpeta)) {
     const ruta = join(carpeta, nombre);

@@ -1,14 +1,17 @@
 // Campo de texto (WP5, 7.2). Etiqueta visible arriba (no solo placeholder, UIX-06).
 // El error va DEBAJO del campo con role="alert"; el campo recibe aria-invalid y borde de peligro.
 // `ayuda` se muestra debajo cuando no hay error.
-import React, { useState } from 'react';
+// `ref` llega al TextInput (para llevar el foco al primer campo con error). `teclaEnter` es la
+// etiqueta de la tecla Enter del teclado virtual ('next', 'done', 'go', 'search', 'send') y
+// `onEnviar` lo que hace al tocarla.
+import React, { forwardRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { colores, espacio, medidas, radios, tipografia } from '../tema/tokens';
 import Icono from './Icono';
 import Texto from './Texto';
 import { unirIds } from './comun';
 
-export default function Campo({
+const Campo = forwardRef(function Campo({
   etiqueta,
   valor,
   onCambio,
@@ -21,7 +24,9 @@ export default function Campo({
   maxLargo,
   id,
   testID,
-}) {
+  teclaEnter,
+  onEnviar,
+}, ref) {
   const [enfocado, setEnfocado] = useState(false);
   const idEtiqueta = `${id}-etiqueta`;
   const idError = error ? `${id}-error` : null;
@@ -35,6 +40,7 @@ export default function Campo({
         {etiqueta}
       </Texto>
       <TextInput
+        ref={ref}
         id={id}
         testID={testID}
         value={valor ?? ''}
@@ -47,6 +53,8 @@ export default function Campo({
         autoCapitalize={mayusculas ? 'characters' : 'sentences'}
         autoCorrect={!mayusculas}
         maxLength={maxLargo}
+        enterKeyHint={teclaEnter ?? (multilinea ? undefined : 'done')}
+        onSubmitEditing={multilinea ? undefined : onEnviar}
         aria-labelledby={idEtiqueta}
         aria-describedby={unirIds(idError, idAyuda)}
         aria-invalid={error ? true : undefined}
@@ -78,7 +86,9 @@ export default function Campo({
       ) : null}
     </View>
   );
-}
+});
+
+export default Campo;
 
 const estilos = StyleSheet.create({
   contenedor: { gap: espacio.xs, alignSelf: 'stretch' },

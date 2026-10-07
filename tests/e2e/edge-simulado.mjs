@@ -7,7 +7,8 @@
 //   POST vecino/baja     borra subcolecciones, bloqueos propios, adjuntos, perfil y el usuario de Auth
 //   POST adjuntos/subir  un archivo por solicitud; valida con shared/dominio.mjs; guarda en una carpeta temporal
 //   POST adjuntos/url    { ruta } → { url, venceEn }; la URL la sirve este mismo servidor (GET /archivos/…)
-//   POST despachar       admin; marca el evento (o la bandeja) como enviado, sin push
+//   POST despachar       admin; escribe en el historial lo mismo que entrega.ts (aviso de alarma,
+//                        notificación de reclamo y de alarma cercana) y marca el evento enviado, sin push
 //   GET  tareas          { ok: true, version }
 //   POST tareas          admin; diaria y resumen devuelven conteos; simulador aplica planificarPaso
 //
@@ -33,7 +34,8 @@ import { documentosVecino } from '../../scripts/sembrar.mjs';
 import { recordatoriosTributos } from '../../shared/recordatorios.mjs';
 import { planificarPaso } from '../../shared/simulador.mjs';
 import { recortarNombreArchivo, tipoPorFirma } from '../../shared/dominio.mjs';
-import { COLECCIONES as C, EXTENSION_ARCHIVO, LIMITES } from '../../shared/constantes.mjs';
+import { COLECCIONES as C, ETIQUETAS, EXTENSION_ARCHIVO, LIMITES } from '../../shared/constantes.mjs';
+import { decidirEntrega } from '../../shared/notificaciones.mjs';
 
 export const VERSION = '2.0.0-e2e';
 const PROYECTO_POR_DEFECTO = process.env.GCLOUD_PROJECT || 'demo-conecta-tp5';
@@ -316,7 +318,93 @@ async function marcarEnviado(ref) {
   await ref.update({ estado: 'enviado', procesadoEn: FieldValue.serverTimestamp(), enviados: 0 });
 }
 
-async function despachar(db, { eventoId } = {}) {
+// Lo mismo que supabase/functions/_shared/entrega.ts escribe en Firestore, sin el push: así, con
+// emuladores, las alarmas y los avances de reclamos también quedan en el historial de Notificaciones.
+function notificacionPersonal({ titulo, cuerpo, tipo, zona = null, destino = null }) {
+  return {
+    titulo: String(titulo).slice(0, 100),
+    cuerpo: String(cuerpo).slice(0, 500),
+    tipo,
+    zona,
+    destino,
+    enlace: null,
+    creadoEn: FieldValue.serverTimestamp(),
+    leida: false,
+    leidaEn: null,
+    origen: 'servidor',
+  };
+}
+
+async function crearSiNoExiste(ref, datos) {
+  try {
+    await ref.create(datos);
+  } catch (e) {
+    if (e?.code !== 6) throw e; // 6 = ALREADY_EXISTS: idempotente, como soloSiNoExiste
+  }
+}
+
+async function historialAlarma(db, eventoId, ev) {
+  const snap = await db.doc(`${C.alarmas}/${ev.refId}`).get();
+  const a = snap.data();
+  if (!a || a.activa !== true || (a.activacionId && a.activacionId !== eventoId)) return;
+  const destino = `#/alarmas/${ev.refId}`;
+  const nombre = String(a.nombre ?? 'comunitaria');
+  const titulo = `Alarma activada: ${nombre}`.slice(0, 100);
+  const cuerpo = `Se activó la alarma ${nombre}${a.referencia ? ` (${a.referencia})` : ''}. `
+    + 'Mantené la calma y seguí las indicaciones de las autoridades.';
+  await crearSiNoExiste(db.doc(`${C.avisos}/alarma-${eventoId}`), {
+    titulo,
+    cuerpo,
+    detalle: 'Aviso de demostración generado por la activación de una alarma comunitaria.',
+    tipo: 'alarmas',
+    zona: a.zona ?? 'todas',
+    destino,
+    enlace: null,
+    creadoEn: FieldValue.serverTimestamp(),
+    autor: ev.origen === 'simulador' ? 'simulador' : 'municipalidad',
+    eventoId,
+    vigenteHasta: null,
+  });
+  const ahora = Date.now();
+  const cercanos = await db.collection('usuarios').where('cercania.alarmas', 'array-contains', ev.refId).limit(1000).get();
+  const notif = { tipo: 'alarmas', zona: a.zona };
+  for (const d of cercanos.docs) {
+    const vence = aMs(d.get('cercania.vence')) ?? 0;
+    if (vence <= ahora) continue;
+    if (decidirEntrega(notif, d.get('preferencias') ?? {}).historial) continue; // ya lo ve por su zona
+    await crearSiNoExiste(
+      db.doc(`usuarios/${d.id}/${C.notificaciones}/alarma-${eventoId}`),
+      notificacionPersonal({ titulo, cuerpo, tipo: 'alarmas', zona: a.zona ?? null, destino }),
+    );
+  }
+}
+
+async function historialReclamo(db, eventoId, ev) {
+  if (typeof ev.uid !== 'string' || !ev.uid) return;
+  const r = (await db.doc(`usuarios/${ev.uid}/${C.reclamos}/${ev.refId}`).get()).data();
+  if (!r) return;
+  const estado = String(r.estado ?? '');
+  const titulo = `Tu reclamo ${r.codigo ?? ''} pasó a ${ETIQUETAS.estadosReclamo?.[estado] ?? estado}`.replace(/\s+/g, ' ');
+  const nota = typeof r.notaMunicipal === 'string' && r.notaMunicipal.trim() ? r.notaMunicipal.trim() : '';
+  const cuerpo = nota ? `Nota de la Municipalidad: ${nota}` : 'Podés ver el detalle y la línea de tiempo en Reclamos.';
+  await crearSiNoExiste(
+    db.doc(`usuarios/${ev.uid}/${C.notificaciones}/reclamo-${eventoId}`),
+    notificacionPersonal({ titulo, cuerpo, tipo: 'reclamos', destino: `#/reclamos/${ev.refId}` }),
+  );
+}
+
+async function procesarEvento(db, ref) {
+  const ev = (await ref.get()).data() ?? {};
+  try {
+    if (ev.tipo === 'alarma') await historialAlarma(db, ref.id, ev);
+    else if (ev.tipo === 'reclamo') await historialReclamo(db, ref.id, ev);
+  } catch (e) {
+    console.warn(`[edge-simulado] No se pudo escribir el historial del evento ${ref.id}:`, e?.message ?? e);
+  }
+  await marcarEnviado(ref);
+}
+
+export async function despachar(db, { eventoId } = {}) {
   if (eventoId !== undefined && eventoId !== null && typeof eventoId !== 'string') {
     throw new ErrorHttp(400, 'validacion', 'El evento no es válido.');
   }
@@ -328,7 +416,7 @@ async function despachar(db, { eventoId } = {}) {
     const snap = await db.collection(C.eventos).where('estado', 'in', ['pendiente', 'error']).limit(50).get();
     refs = snap.docs.filter((d) => Number(d.get('intentos') ?? 0) < 3).slice(0, 20).map((d) => d.ref);
   }
-  for (const ref of refs) await marcarEnviado(ref);
+  for (const ref of refs) await procesarEvento(db, ref);
   return { procesados: refs.length, enviados: 0 };
 }
 

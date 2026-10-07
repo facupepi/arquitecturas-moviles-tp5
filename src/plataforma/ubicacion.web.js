@@ -2,7 +2,8 @@
 // nunca se guarda: solo se usa en memoria para ordenar estaciones y calcular alarmas cercanas.
 import { ErrorApp } from '../datos/errores';
 
-const MENSAJE_PERMISO = 'No se pudo obtener tu ubicación. Permití el acceso o elegí una estación en el mapa.';
+// Textos generales: los usan Bicicletas y Alarmas, cada una agrega su propia alternativa.
+const MENSAJE_PERMISO = 'No se pudo obtener tu ubicación. Permití el acceso a la ubicación en el navegador y probá de nuevo.';
 
 function opciones(precision) {
   const alta = precision === 'alta';
@@ -12,7 +13,7 @@ function opciones(precision) {
 function convertirError(e) {
   if (e?.code === 1) return new ErrorApp('permiso', MENSAJE_PERMISO, { causa: e });
   if (e?.code === 3) return new ErrorApp('desconocido', 'La ubicación tardó demasiado. Probá de nuevo.', { causa: e });
-  return new ErrorApp('desconocido', 'No pudimos obtener tu ubicación. Probá de nuevo o elegí una estación en el mapa.', { causa: e });
+  return new ErrorApp('desconocido', 'No pudimos obtener tu ubicación. Probá de nuevo en unos segundos.', { causa: e });
 }
 
 function sinGeolocalizacion() {

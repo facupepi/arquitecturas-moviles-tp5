@@ -12,7 +12,8 @@ import { conFoco } from './comun';
 const VARIANTES = {
   primario: { fondo: colores.accion, fondoActivo: colores.accionOscuro, texto: colores.blanco, borde: colores.accion },
   secundario: { fondo: colores.celesteClaro, fondoActivo: '#c9e7f8', texto: colores.accionOscuro, borde: colores.celesteClaro },
-  texto: { fondo: 'transparent', fondoActivo: colores.celesteClaro, texto: colores.accion, borde: 'transparent' },
+  // Fondo al pasar el puntero más claro que celesteClaro: con texto accion queda en 4,55:1 (AA; pedido de S7).
+  texto: { fondo: 'transparent', fondoActivo: '#eef7fd', texto: colores.accion, borde: 'transparent' },
   peligro: { fondo: colores.peligro, fondoActivo: '#86132c', texto: colores.blanco, borde: colores.peligro },
 };
 
