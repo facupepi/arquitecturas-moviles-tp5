@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+    // El catálogo municipal es público. Sus cambios se realizan en el servidor.
+    match /municipal/{document} { allow read: if true; allow write: if false; }
+    // También el dueño tiene las escrituras cerradas: las APIs validan cada operación.
+    match /usuarios/{uid} {
+      allow read: if owner(uid); allow write: if false;
+      match /{collection}/{document} {
+        allow read: if owner(uid) && collection in ['reclamos', 'tributos', 'estacionamiento', 'notificaciones', 'configuracion'];
+        allow write: if false;
+      }
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

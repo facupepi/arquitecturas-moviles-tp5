@@ -1,0 +1,20 @@
+{
+  "functions": [
+    { "source": "functions", "codebase": "municipal", "runtime": "nodejs22" }
+  ],
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": { "rules": "storage.rules" },
+  "emulators": {
+    "auth": { "host": "127.0.0.1", "port": 9098 },
+    "functions": { "host": "127.0.0.1", "port": 5002 },
+    "firestore": { "host": "127.0.0.1", "port": 8086 },
+    "storage": { "host": "127.0.0.1", "port": 9198 },
+    "ui": { "enabled": false },
+    "hub": { "host": "127.0.0.1", "port": 4406 },
+    "logging": { "host": "127.0.0.1", "port": 4506 },
+    "singleProjectMode": true
+  }
+}
