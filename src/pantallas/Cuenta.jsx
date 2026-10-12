@@ -3,8 +3,8 @@
 // - Lo que tenemos guardado del vecino (cantidades).
 // - Avisos en este dispositivo e instalación de la app.
 // - Privacidad completa (aceptarPrivacidad), "Borrar mis datos" con confirmación y "Cerrar sesión".
-// - Escritorio ancho (≥ 1200 px): dos columnas parejas que ocupan todo el ancho del contenido, como el
-//   resto de las pantallas. En el celular, una sola columna en el orden de siempre.
+// - Desde 760 px de contenido (medido, no la ventana): dos columnas parejas que ocupan todo el ancho
+//   de <Pantalla>, como el resto de las pantallas. En el celular, una sola columna en el orden de siempre.
 import React, { useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSesion } from '../firebase/auth';
@@ -25,6 +25,7 @@ import {
   Seccion,
   Tarjeta,
   Texto,
+  anchoContenidoEstimado,
 } from '../ui';
 import { version } from '../../package.json';
 import Avisos from './cuenta/Avisos';
@@ -104,7 +105,12 @@ export default function Cuenta() {
   const datos = useMunicipal(seleccionarDatos);
   const { navegar } = useRuta();
   const { width } = useWindowDimensions();
-  const dosColumnas = width >= ANCHO_DOS_COLUMNAS;
+  const [anchoMedido, setAnchoMedido] = useState(null);
+  const dosColumnas = (anchoMedido ?? anchoContenidoEstimado(width)) >= ANCHO_DOS_COLUMNAS;
+  const medir = (e) => {
+    const w = Math.round(e.nativeEvent.layout.width);
+    if (w > 0 && w !== anchoMedido) setAnchoMedido(w);
+  };
 
   const [dialogo, setDialogo] = useState(null); // 'borrar' | null
 
@@ -136,20 +142,18 @@ export default function Cuenta() {
   );
 
   const perfil = (
-    <Tarjeta>
-      <Perfil usuario={usuario} />
-      <Texto variante="chico" color={colores.textoSuave}>
-        Tus datos quedan asociados a tu cuenta de Google: podés entrar desde cualquier celular o computadora.
-      </Texto>
-    </Tarjeta>
+    <Seccion titulo="Tu perfil">
+      <Tarjeta>
+        <Perfil usuario={usuario} />
+      </Tarjeta>
+    </Seccion>
   );
 
   const avisoAdmin = datos.esAdmin ? (
     <Aviso
       tono="info"
-      titulo="Sos administrador de la demostración"
-      mensaje="Desde el panel municipal podés mover bicicletas, activar alarmas, responder reclamos y publicar avisos."
-      accion={{ titulo: 'Abrir el panel municipal', onPress: () => navegar('panel'), testID: 'cuenta-ir-panel' }}
+      titulo="Sos personal municipal"
+      accion={{ titulo: 'Abrir el panel municipal', icono: 'panel', onPress: () => navegar('panel'), testID: 'cuenta-ir-panel' }}
     />
   ) : null;
 
@@ -202,8 +206,7 @@ export default function Cuenta() {
         <View style={estilos.separador} />
         <View style={estilos.bloque}>
           <Texto variante="chico" color={colores.textoSuave}>
-            Borra para siempre tu perfil, tus cedulones, pagos, reclamos con sus adjuntos, estacionamientos y
-            notificaciones, y también tu usuario.
+            Borra para siempre tu usuario y todo lo que guardamos de vos, incluidos los adjuntos de tus reclamos.
           </Texto>
           <Boton
             titulo="Borrar mis datos"
@@ -222,19 +225,20 @@ export default function Cuenta() {
       testID="pantalla-cuenta"
       antetitulo="TU CUENTA"
       titulo="Mi cuenta"
-      bajada="Tu perfil, tus avisos, la instalación de la app y el control de tus datos."
     >
+      {/* Columnas de alto parecido: a la izquierda lo de la cuenta, a la derecha avisos y privacidad. */}
+      <View onLayout={medir}>
       {dosColumnas ? (
         <View style={estilos.columnas}>
           <View style={estilos.columnaDoble}>
             {perfil}
             {avisoAdmin}
             {guardado}
+            {instalar}
             {sesionYDatos}
           </View>
           <View style={estilos.columnaDoble}>
             {notificaciones}
-            {instalar}
             {privacidad}
           </View>
         </View>
@@ -249,6 +253,7 @@ export default function Cuenta() {
           {sesionYDatos}
         </View>
       )}
+      </View>
 
       <Texto variante="chico" color={colores.textoSuave} alineacion="center" testID="cuenta-version">
         San Francisco Conecta · versión {version}
@@ -277,7 +282,7 @@ export default function Cuenta() {
           notificaciones y tu usuario. No se puede deshacer.
         </Texto>
         <Texto variante="chico" color={colores.textoSuave}>
-          Después vas a volver a la pantalla de ingreso. Podés entrar de nuevo cuando quieras, empezando de cero.
+          Podés volver a entrar cuando quieras, empezando de cero.
         </Texto>
         {borrado.error ? <Aviso tono="peligro" rol="alert" mensaje={borrado.error.message} testID="error-borrar" /> : null}
       </Dialogo>
@@ -286,10 +291,10 @@ export default function Cuenta() {
   );
 }
 
-const ANCHO_DOS_COLUMNAS = 1200;
+const ANCHO_DOS_COLUMNAS = 760;
 
 const estilos = StyleSheet.create({
-  columna: { gap: espacio.l, width: '100%', maxWidth: 760 },
+  columna: { gap: espacio.l },
   columnas: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.xl },
   columnaDoble: { flex: 1, minWidth: 0, gap: espacio.l },
   bloque: { gap: espacio.m },

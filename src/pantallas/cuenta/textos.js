@@ -36,14 +36,14 @@ export const PRIVACIDAD_COMPLETA = [
   {
     titulo: 'Qué no guardamos',
     texto:
-      'Tu ubicación: la usamos solo en el momento. Para avisarte de alarmas cercanas registramos qué alarmas '
+      'Tu ubicación, que usamos solo en el momento. Para avisarte de alarmas cercanas registramos qué alarmas '
       + 'están cerca durante 30 minutos, nunca tus coordenadas. Tampoco guardamos tu correo en nuestra base '
-      + 'ni datos de tarjetas: los pagos son simulados.',
+      + 'ni datos de tarjetas, porque los pagos son simulados.',
   },
   {
     titulo: 'Quién puede verlo',
     texto:
-      'Solo vos. El personal municipal de la demostración ve los reclamos para poder responderlos. '
+      'Solo vos. El personal municipal ve los reclamos para poder responderlos. '
       + 'La patente de un estacionamiento activo queda bloqueada sin tu identidad, para que nadie más la use al mismo tiempo.',
   },
   {

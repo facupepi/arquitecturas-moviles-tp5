@@ -48,7 +48,7 @@ export default function DialogoComprobante({ visible, pago, tributo, recien = fa
         <Aviso
           tono="aviso"
           titulo={TEXTO_SIN_CARGOS}
-          mensaje="Comprobante de demostración, sin validez fiscal. Queda guardado en Pagados."
+          mensaje="Comprobante sin validez fiscal. Queda guardado en Pagados."
           testID="aviso-comprobante"
         />
       </ContenidoDialogo>

@@ -1,4 +1,4 @@
-// Raíz de cada pantalla (WP5, 7.2). ScrollView con ancho máximo 1120, margen lateral 16 y fondo
+// Raíz de cada pantalla (WP5, 7.2). ScrollView con ancho máximo 1440 (medidas.anchoMaximo), margen lateral 16 y fondo
 // claro; dibuja el Encabezado, fija el título del documento y, dentro del marco, termina con el
 // pie institucional. testID obligatorio: "pantalla-<ruta>".
 import React, { useContext } from 'react';

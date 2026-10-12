@@ -1,6 +1,9 @@
 // Tarjeta de una estación (S3, 8.5): disponibilidad en números grandes, distancia si hay
 // ubicación, "actualizado hace N min", "Ver en mapa" y "Reportar problema".
 // No usa onPress: tiene botones adentro (una tarjeta presionable no puede contener botones).
+// Misma estructura en todas: nombre con la etiqueta arriba a la derecha (el nombre pasa a dos
+// líneas sin mover la etiqueta) y los números con los botones abajo de todo, así las tarjetas de
+// una fila quedan alineadas aunque el nombre o la referencia ocupen más.
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Boton, EtiquetaEstado, Tarjeta, Texto } from '../../ui';
@@ -30,78 +33,85 @@ export default function TarjetaEstacion({ estacion, distanciaKm, seleccionada, a
   return (
     // El contenedor lleva la ref para que un enlace profundo pueda desplazar la pantalla hasta acá.
     <View ref={refContenedor} style={estilos.contenedor}>
-    <Tarjeta
-      testID={`estacion-${estacion.id}`}
-      titulo={estacion.nombre}
-      accion={<EtiquetaEstado texto={estado.texto} tono={estado.tono} icono={estado.icono ?? undefined} testID={`estado-estacion-${estacion.id}`} />}
-      etiquetaAccesible={estacion.nombre}
-      estilo={[estilos.tarjeta, seleccionada && estilos.elegida]}
-    >
-      <View style={estilos.lugar}>
-        <Texto variante="chico" color={colores.textoSuave}>
-          {lugar}
-        </Texto>
-        {actualizado ? (
-          <Texto variante="chico" color={colores.textoSuave} testID={`actualizado-${estacion.id}`}>
-            {actualizado}
+      <Tarjeta
+        testID={`estacion-${estacion.id}`}
+        etiquetaAccesible={estacion.nombre}
+        estilo={[estilos.tarjeta, seleccionada && estilos.elegida]}
+      >
+        <View style={estilos.cabecera}>
+          <Texto variante="titulo3" role="heading" aria-level={3} estilo={estilos.titulo}>
+            {estacion.nombre}
           </Texto>
-        ) : null}
-        {distancia ? (
-          <Texto variante="chico" peso="700" color={colores.accionOscuro} testID={`distancia-${estacion.id}`}>
-            {`Estás ${distancia}`}
+          <View style={estilos.etiqueta}>
+            <EtiquetaEstado texto={estado.texto} tono={estado.tono} icono={estado.icono ?? undefined} testID={`estado-estacion-${estacion.id}`} />
+          </View>
+        </View>
+
+        <View style={estilos.lugar}>
+          <Texto variante="chico" color={colores.textoSuave}>
+            {lugar}
           </Texto>
-        ) : null}
-      </View>
+          {distancia ? (
+            <Texto variante="chico" peso="700" color={colores.accionOscuro} testID={`distancia-${estacion.id}`}>
+              {`Estás ${distancia}`}
+            </Texto>
+          ) : null}
+        </View>
 
-      <View style={estilos.numeros}>
-        <Numero
-          valor={estacion.bicicletas}
-          etiqueta={estacion.bicicletas === 1 ? 'bicicleta' : 'bicicletas'}
-          testID={`bicicletas-${estacion.id}`}
-          apagado={fuera}
-        />
-        <Numero
-          valor={estacion.anclajesLibres}
-          etiqueta={estacion.anclajesLibres === 1 ? 'anclaje libre' : 'anclajes libres'}
-          testID={`anclajes-${estacion.id}`}
-          apagado={fuera}
-        />
-      </View>
-
-      {fuera ? (
-        <Texto variante="chico" color={colores.peligro} peso="600">
-          La estación no está prestando servicio. Probá en otra cercana.
-        </Texto>
-      ) : null}
-
-      <View style={estilos.acciones}>
-        <Boton
-          titulo="Ver en mapa"
-          icono="ubicacion"
-          variante="secundario"
-          onPress={() => onVerEnMapa(estacion.id)}
-          etiquetaAccesible={`Ver ${estacion.nombre} en el mapa`}
-          testID={`ver-mapa-${estacion.id}`}
-        />
-        <Boton
-          titulo="Reportar"
-          variante="texto"
-          onPress={() => onReportar(estacion)}
-          etiquetaAccesible={`Reportar un problema en ${estacion.nombre}`}
-          testID={`reportar-${estacion.id}`}
-        />
-      </View>
-    </Tarjeta>
+        <View style={estilos.pie}>
+          <View style={estilos.numeros}>
+            <Numero
+              valor={estacion.bicicletas}
+              etiqueta={estacion.bicicletas === 1 ? 'bicicleta' : 'bicicletas'}
+              testID={`bicicletas-${estacion.id}`}
+              apagado={fuera}
+            />
+            <Numero
+              valor={estacion.anclajesLibres}
+              etiqueta={estacion.anclajesLibres === 1 ? 'anclaje libre' : 'anclajes libres'}
+              testID={`anclajes-${estacion.id}`}
+              apagado={fuera}
+            />
+          </View>
+          {actualizado ? (
+            <Texto variante="chico" color={colores.textoSuave} testID={`actualizado-${estacion.id}`}>
+              {actualizado}
+            </Texto>
+          ) : null}
+          <View style={estilos.acciones}>
+            <Boton
+              titulo="Ver en mapa"
+              icono="ubicacion"
+              variante="secundario"
+              onPress={() => onVerEnMapa(estacion.id)}
+              etiquetaAccesible={`Ver ${estacion.nombre} en el mapa`}
+              testID={`ver-mapa-${estacion.id}`}
+            />
+            <Boton
+              titulo="Reportar"
+              variante="texto"
+              onPress={() => onReportar(estacion)}
+              etiquetaAccesible={`Reportar un problema en ${estacion.nombre}`}
+              testID={`reportar-${estacion.id}`}
+            />
+          </View>
+        </View>
+      </Tarjeta>
     </View>
   );
 }
 
 const estilos = StyleSheet.create({
-  contenedor: { flexGrow: 1, flexBasis: 300, minWidth: 0 },
-  tarjeta: { flexGrow: 1, minWidth: 0, gap: espacio.s },
+  contenedor: { flexGrow: 1, minWidth: 0 },
+  tarjeta: { flexGrow: 1, minWidth: 0 },
   // La elegida en el mapa se marca con borde (un fondo celeste bajaría el contraste de los botones).
   elegida: { borderColor: colores.alertaAcento, borderWidth: 2 },
-  lugar: { gap: 2 },
+  cabecera: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.s },
+  titulo: { flex: 1, minWidth: 0 },
+  etiqueta: { flexShrink: 0, paddingTop: 1 },
+  lugar: { gap: 2, marginTop: -espacio.s },
+  // Números, fecha y botones van abajo de todo: alineados entre las tarjetas de una misma fila.
+  pie: { marginTop: 'auto', gap: espacio.s },
   numeros: { flexDirection: 'row', gap: espacio.m },
   numero: {
     flex: 1,

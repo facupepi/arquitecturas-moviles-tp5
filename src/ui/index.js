@@ -23,3 +23,5 @@ export { default as FilaDato } from './FilaDato';
 export { default as Interruptor } from './Interruptor';
 export { default as Texto } from './Texto';
 export { ContextoMarco } from './contextoMarco';
+export { useGrilla, columnasPara, anchoContenidoEstimado } from './useGrilla';
+export { default as Grilla, useAnchoDisponible } from './Grilla';

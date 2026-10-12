@@ -41,7 +41,7 @@ export default function AvisosDispositivo() {
 
   const activar = useComando(sesion.activarPush, {
     evento: EVENTOS.PUSH_HABILITADO,
-    alExito: () => { refrescar(); aviso.mostrar('Listo: te vamos a avisar en este dispositivo.'); },
+    alExito: () => { refrescar(); aviso.mostrar('Activaste los avisos en este dispositivo.'); },
   });
   const desactivar = useComando(sesion.desactivarPush, {
     alExito: () => { refrescar(); aviso.mostrar('Ya no vas a recibir avisos en este dispositivo.', 'info'); },
@@ -62,7 +62,7 @@ export default function AvisosDispositivo() {
   if (soporte === null && estado.soportado) descripcion = 'Comprobando si este navegador admite avisos…';
   else if (sinSoporte) descripcion = null;
   else if (bloqueado) descripcion = 'Bloqueaste las notificaciones para este sitio. Habilitalas desde la configuración del navegador y volvé a intentar.';
-  else if (estado.activo) descripcion = 'Activados: te avisamos aunque tengas la app cerrada.';
+  else if (estado.activo) descripcion = 'Activados en este dispositivo.';
 
   const permiso = PERMISOS[sinSoporte ? 'no-soportado' : estado.permiso] ?? PERMISOS.default;
 

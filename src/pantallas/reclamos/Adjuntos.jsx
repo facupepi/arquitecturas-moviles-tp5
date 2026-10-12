@@ -44,7 +44,7 @@ export default function Adjuntos({ archivos, onAgregar, onQuitar, preparando, de
         </Texto>
       </View>
       <Texto variante="chico" color={colores.textoSuave}>
-        Fotos JPG o PNG, o un PDF de hasta 2 MB. Las fotos se achican antes de enviarse.
+        Fotos JPG o PNG, o un PDF de hasta 2 MB.
       </Texto>
 
       {archivos.length ? (

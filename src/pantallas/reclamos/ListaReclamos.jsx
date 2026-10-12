@@ -1,7 +1,7 @@
 // "Mis reclamos" (R3 en resumen y R4): buscador sobre lo cargado, tarjetas y "Cargar más".
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Boton, Campo, EtiquetaEstado, Icono, Tarjeta, Texto, Vacio } from '../../ui';
+import { Boton, Campo, EtiquetaEstado, Grilla, Icono, Tarjeta, Texto, Vacio } from '../../ui';
 import { colores, espacio } from '../../tema/tokens';
 import { fecha, tiempoPasado } from '../../../shared/formato.mjs';
 import PasosReclamo from './PasosReclamo';
@@ -21,7 +21,7 @@ function TarjetaReclamo({ reclamo, onAbrir }) {
   ].filter(Boolean).join(', ');
 
   return (
-    <Tarjeta onPress={() => onAbrir(reclamo.id)} etiquetaAccesible={etiqueta} testID={`reclamo-${reclamo.codigo}`}>
+    <Tarjeta onPress={() => onAbrir(reclamo.id)} etiquetaAccesible={etiqueta} testID={`reclamo-${reclamo.codigo}`} estilo={estilos.tarjeta}>
       <View style={estilos.fila}>
         <View style={estilos.codigo}>
           <Texto variante="titulo3">{reclamo.codigo}</Texto>
@@ -37,17 +37,19 @@ function TarjetaReclamo({ reclamo, onAbrir }) {
           {reclamo.direccion}
         </Texto>
       </View>
-      <PasosReclamo reclamo={reclamo} compacto />
-      <View style={estilos.pie}>
-        <Texto variante="chico" color={colores.textoSuave}>
-          {reclamo.creadoEn ? `${fecha(reclamo.creadoEn)} · ${cuando}` : 'Recién creado'}
-          {adjuntos ? ` · ${adjuntos} ${adjuntos === 1 ? 'adjunto' : 'adjuntos'}` : ''}
-        </Texto>
-        <View style={estilos.ver}>
-          <Texto variante="chico" peso="700" color={colores.accion}>
-            Ver detalle
+      <View style={estilos.abajo}>
+        <PasosReclamo reclamo={reclamo} compacto />
+        <View style={estilos.pie}>
+          <Texto variante="chico" color={colores.textoSuave}>
+            {reclamo.creadoEn ? `${fecha(reclamo.creadoEn)} · ${cuando}` : 'Recién creado'}
+            {adjuntos ? ` · ${adjuntos} ${adjuntos === 1 ? 'adjunto' : 'adjuntos'}` : ''}
           </Texto>
-          <Icono nombre="chevron" tamano={16} color={colores.accion} />
+          <View style={estilos.ver}>
+            <Texto variante="chico" peso="700" color={colores.accion}>
+              Ver detalle
+            </Texto>
+            <Icono nombre="chevron" tamano={16} color={colores.accion} />
+          </View>
         </View>
       </View>
     </Tarjeta>
@@ -65,7 +67,6 @@ export default function ListaReclamos({ reclamos, hayMas, onCargarMas, onAbrir, 
       <Vacio
         icono="reclamo"
         titulo="Todavía no hiciste reclamos"
-        mensaje="Cuando envíes uno, vas a poder seguir acá cómo avanza hasta que se resuelva."
         testID="reclamos-vacio"
       />
     );
@@ -88,13 +89,11 @@ export default function ListaReclamos({ reclamos, hayMas, onCargarMas, onAbrir, 
       </Texto>
 
       {visibles.length ? (
-        <View role="list" style={estilos.lista}>
+        <Grilla minAncho={340} maxColumnas={3} rol="list" rolCelda="listitem">
           {visibles.map((r) => (
-            <View role="listitem" key={r.id}>
-              <TarjetaReclamo reclamo={r} onAbrir={onAbrir} />
-            </View>
+            <TarjetaReclamo key={r.id} reclamo={r} onAbrir={onAbrir} />
           ))}
-        </View>
+        </Grilla>
       ) : (
         <Vacio
           icono="buscar"
@@ -129,8 +128,9 @@ export default function ListaReclamos({ reclamos, hayMas, onCargarMas, onAbrir, 
 
 const estilos = StyleSheet.create({
   contenedor: { gap: espacio.m },
-  lista: { gap: espacio.m },
-  fila: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: espacio.s, flexWrap: 'wrap' },
+  tarjeta: { flexGrow: 1 },
+  abajo: { marginTop: 'auto', gap: espacio.m },
+  fila: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: espacio.s },
   codigo: { gap: 0, flexShrink: 1 },
   direccion: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.xs },
   flexible: { flex: 1, minWidth: 0 },

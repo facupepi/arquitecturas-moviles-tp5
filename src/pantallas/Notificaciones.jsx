@@ -5,7 +5,7 @@
 // - El historial sale del almacén (notificaciones personales + avisos de la ciudad, ya unidos y
 //   filtrados por las preferencias). Con "Ver todos los avisos de la ciudad" se muestran sin filtro.
 // - #/notificaciones/<id> abre el detalle y la marca como leída (enlace profundo).
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
   Boton, Cargando, ErrorCarga, Interruptor, Pantalla, Pestanas, Seccion, Texto, Vacio, useAvisoFlotante,
@@ -26,18 +26,18 @@ import { desplazarHasta } from './notificaciones/desplazar';
 import { FILTROS, filtrar, textoNoLeidas } from './notificaciones/presentacion';
 
 const LIMITE_INICIAL = 50;
+// Desde este ancho de contenido el historial y las preferencias van lado a lado.
+const ANCHO_DOS_COLUMNAS = 900;
 const PASO = 20;
 
 const VACIOS = {
   todas: {
     icono: 'campana',
     titulo: 'Todavía no tenés notificaciones',
-    mensaje: 'Acá van a aparecer los avisos de la ciudad y las novedades de tus trámites.',
   },
   no_leidas: {
     icono: 'checkCirculo',
     titulo: 'Estás al día',
-    mensaje: 'No hay avisos pendientes de lectura.',
   },
   ciudad: {
     icono: 'ubicacion',
@@ -47,7 +47,6 @@ const VACIOS = {
   tramites: {
     icono: 'tributo',
     titulo: 'Sin novedades de tus trámites',
-    mensaje: 'Cuando pagues, reclames o estaciones, los avisos te llegan acá.',
   },
 };
 
@@ -76,6 +75,12 @@ export default function Notificaciones({ ruta }) {
   const refPreferencias = useRef(null);
   const refTituloPreferencias = useRef(null);
   const abiertaDesdeLista = useRef(false);
+  const [ancho, setAncho] = useState(0);
+  const medir = useCallback((e) => {
+    const w = Math.round(e.nativeEvent.layout.width);
+    setAncho((a) => (Math.abs(a - w) > 1 ? w : a));
+  }, []);
+  const lado = ancho >= ANCHO_DOS_COLUMNAS;
 
   const completo = useHistorialCompleto({
     activo: verTodos,
@@ -137,13 +142,13 @@ export default function Notificaciones({ ruta }) {
 
   // ---------- Marcar todas ----------
   const todas = useComando(repositorio.marcarTodasLeidas, {
-    alExito: () => aviso.mostrar('Listo: marcamos todas como leídas.'),
+    alExito: () => aviso.mostrar('Marcamos todas como leídas.'),
   });
   const marcarTodas = () => {
     const pendientes = historial.filter((n) => !n.leida);
     if (!pendientes.length) {
       todas.limpiar();
-      aviso.mostrar('Ya estás al día: no hay notificaciones sin leer.', 'info');
+      aviso.mostrar('No tenés notificaciones sin leer.', 'info');
       return;
     }
     todas.ejecutar(pendientes);
@@ -181,78 +186,84 @@ export default function Notificaciones({ ruta }) {
     <Pantalla
       titulo="Notificaciones"
       bajada="Los avisos de la ciudad y de tus trámites, en un solo lugar."
-      accion={encabezado}
+      accion={lado ? undefined : encabezado}
       testID="pantalla-notificaciones"
     >
-      <Seccion titulo="Historial">
-        <Pestanas
-          etiqueta="Filtrar notificaciones"
-          valor={filtro}
-          onCambio={setFiltro}
-          opciones={FILTROS.map((f) => (f.valor === 'no_leidas' ? { ...f, contador: noLeidas } : f))}
-          testID="filtro"
-        />
-
-        <View style={estilos.barra}>
-          <Texto variante="chico" peso="700" color={colores.textoSuave} testID="resumen-no-leidas" estilo={estilos.flexible}>
-            {textoNoLeidas(noLeidas)}
-          </Texto>
-          {/* Con todo leído no hay nada que marcar: el botón no se muestra (sigue mientras guarda). */}
-          {noLeidas > 0 || todas.ocupado ? (
-            <Boton
-              titulo="Marcar todas como leídas"
-              icono="check"
-              variante="secundario"
-              onPress={marcarTodas}
-              cargando={todas.ocupado}
-              testID="marcar-todas"
+      <View onLayout={medir} style={lado ? estilos.columnas : estilos.unaColumna}>
+        <View style={lado ? estilos.principal : null}>
+          <Seccion titulo="Historial">
+            <Pestanas
+              etiqueta="Filtrar notificaciones"
+              valor={filtro}
+              onCambio={setFiltro}
+              opciones={FILTROS.map((f) => (f.valor === 'no_leidas' ? { ...f, contador: noLeidas } : f))}
+              testID="filtro"
             />
-          ) : null}
+
+            <View style={estilos.barra}>
+              <Texto variante="chico" peso="700" color={colores.textoSuave} testID="resumen-no-leidas" estilo={estilos.flexible}>
+                {textoNoLeidas(noLeidas)}
+              </Texto>
+              {/* Con todo leído no hay nada que marcar: el botón no se muestra (sigue mientras guarda). */}
+              {noLeidas > 0 || todas.ocupado ? (
+                <Boton
+                  titulo="Marcar todas como leídas"
+                  icono="check"
+                  variante="secundario"
+                  onPress={marcarTodas}
+                  cargando={todas.ocupado}
+                  testID="marcar-todas"
+                />
+              ) : null}
+            </View>
+            {todas.error ? (
+              <Texto role="alert" variante="chico" color={colores.peligro} peso="600" testID="error-marcar-todas">
+                No pudimos marcarlas como leídas. {todas.error.message}
+              </Texto>
+            ) : null}
+
+            <Interruptor
+              etiqueta="Ver todos los avisos de la ciudad"
+              descripcion="Incluye los de zonas y temas que no seguís."
+              valor={verTodos}
+              onCambio={setVerTodos}
+              testID="interruptor-todos"
+            />
+
+            <ErrorCarga error={datos.errorLista || completo.error} testID="error-historial" />
+
+            {verTodos && completo.cargando ? (
+              <Texto variante="chico" color={colores.textoSuave} role="status">
+                Buscando todos los avisos…
+              </Texto>
+            ) : null}
+
+            {visibles.length ? (
+              <View style={estilos.lista} testID="lista-notificaciones">
+                {visibles.map((n) => (
+                  <TarjetaNotificacion key={`${n.fuente}-${n.id}`} notificacion={n} ahora={ahora} onAbrir={abrir} />
+                ))}
+              </View>
+            ) : (
+              <Vacio icono={vacio.icono} titulo={vacio.titulo} mensaje={vacio.mensaje} accion={accionVacio} testID="vacio-notificaciones" />
+            )}
+
+            {datos.hayMas ? (
+              <Boton titulo="Cargar más" icono="mas" variante="secundario" ancho="completo" onPress={verMas} testID="cargar-mas-notificaciones" />
+            ) : null}
+          </Seccion>
         </View>
-        {todas.error ? (
-          <Texto role="alert" variante="chico" color={colores.peligro} peso="600" testID="error-marcar-todas">
-            No pudimos marcarlas como leídas. {todas.error.message}
-          </Texto>
-        ) : null}
 
-        <Interruptor
-          etiqueta="Ver todos los avisos de la ciudad"
-          descripcion="Incluye los de zonas y temas que no seguís."
-          valor={verTodos}
-          onCambio={setVerTodos}
-          testID="interruptor-todos"
-        />
-
-        <ErrorCarga error={datos.errorLista || completo.error} testID="error-historial" />
-
-        {verTodos && completo.cargando ? (
-          <Texto variante="chico" color={colores.textoSuave} role="status">
-            Buscando todos los avisos…
-          </Texto>
-        ) : null}
-
-        {visibles.length ? (
-          <View style={estilos.lista} testID="lista-notificaciones">
-            {visibles.map((n) => (
-              <TarjetaNotificacion key={`${n.fuente}-${n.id}`} notificacion={n} ahora={ahora} onAbrir={abrir} />
-            ))}
-          </View>
-        ) : (
-          <Vacio icono={vacio.icono} titulo={vacio.titulo} mensaje={vacio.mensaje} accion={accionVacio} testID="vacio-notificaciones" />
-        )}
-
-        {datos.hayMas ? (
-          <Boton titulo="Cargar más" icono="mas" variante="secundario" ancho="completo" onPress={verMas} testID="cargar-mas-notificaciones" />
-        ) : null}
-      </Seccion>
-
-      <Preferencias
-        ref={refPreferencias}
-        refTitulo={refTituloPreferencias}
-        preferencias={datos.preferencias}
-        guardado={guardado}
-        errorPerfil={datos.errorPerfil}
-      />
+        <View style={lado ? estilos.lateral : null}>
+          <Preferencias
+            ref={refPreferencias}
+            refTitulo={refTituloPreferencias}
+            preferencias={datos.preferencias}
+            guardado={guardado}
+            errorPerfil={datos.errorPerfil}
+          />
+        </View>
+      </View>
 
       {idAbierta ? (
         <DetalleNotificacion
@@ -273,4 +284,8 @@ const estilos = StyleSheet.create({
   barra: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: espacio.s },
   flexible: { flexShrink: 1 },
   lista: { gap: espacio.s },
+  columnas: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.xl },
+  unaColumna: { gap: espacio.l },
+  principal: { flex: 3, minWidth: 0 },
+  lateral: { flex: 2, minWidth: 0, paddingTop: espacio.s },
 });

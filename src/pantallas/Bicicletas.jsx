@@ -3,7 +3,7 @@
 // (estaciones cercanas con la ubicación) y B4 (reportar un problema con el reclamo precargado).
 // La ubicación solo vive en memoria mientras la pantalla está abierta: nunca se guarda.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useMunicipal } from '../datos/almacen';
 import { useAhora } from '../datos/useAhora';
 import { useRuta } from '../navegacion';
@@ -16,6 +16,7 @@ import {
 import { ordenarPorCercania } from '../../shared/dominio.mjs';
 import TarjetaEstacion from './bicicletas/TarjetaEstacion';
 import { llevarALaVista } from './bicicletas/llevarALaVista';
+import { ANCHO_LADO_A_LADO, Grilla, MapaYLista, useAncho } from './bicicletas/Disposicion';
 import {
   distanciaTexto, estadoEstacion, normalizarBusqueda, ordenarPorDisponibilidad, plural,
 } from './bicicletas/utiles';
@@ -45,7 +46,7 @@ function Resumen({ estaciones }) {
             {total === 1 ? 'bicicleta disponible ahora' : 'bicicletas disponibles ahora'}
           </Texto>
           <Texto variante="chico" color={colores.textoSuave}>
-            {`En ${conBicis} de ${estaciones.length} estaciones. Se actualiza sola, sin recargar.`}
+            {`En ${conBicis} de ${estaciones.length} estaciones.`}
           </Texto>
         </View>
       </View>
@@ -58,6 +59,13 @@ export default function Bicicletas({ ruta }) {
   const { listo, estaciones, error } = useMunicipal(seleccionar);
   const ahora = useAhora(30_000);
   const refMapa = useRef(null);
+  const [ancho, alMedir] = useAncho();
+  const { height: altoVentana } = useWindowDimensions();
+  const ladoALado = ancho >= ANCHO_LADO_A_LADO;
+  const refLadoALado = useRef(ladoALado);
+  refLadoALado.current = ladoALado;
+  // En escritorio el mapa acompaña a la lista y ocupa casi todo el alto visible.
+  const altoMapa = ladoALado ? Math.round(Math.min(620, Math.max(380, altoVentana - 330))) : 300;
 
   const [seleccionado, setSeleccionado] = useState(ruta?.id ?? null);
   const [posicion, setPosicion] = useState(null);
@@ -139,7 +147,8 @@ export default function Bicicletas({ ruta }) {
 
   const verEnMapa = useCallback((id) => {
     setSeleccionado(id);
-    llevarALaVista(refMapa);
+    // Lado a lado el mapa ya está a la vista: no hace falta desplazar la pantalla.
+    if (!refLadoALado.current) llevarALaVista(refMapa);
   }, []);
 
   const reportar = useCallback((estacion) => {
@@ -167,17 +176,13 @@ export default function Bicicletas({ ruta }) {
     contenido = (
       <Vacio
         icono="bicicleta"
-        titulo="Todavía no hay estaciones"
-        mensaje="Cuando la Municipalidad habilite estaciones de bicicletas, las vas a ver acá."
+        titulo="Todavía no hay estaciones habilitadas"
         testID="bicicletas-vacio"
       />
     );
   } else {
-    contenido = (
+    const avisos = (
       <>
-        {error ? <ErrorCarga error={error} testID="bicicletas-error" /> : null}
-        <Resumen estaciones={estaciones} />
-
         {errorUbicacion ? (
           <Aviso
             tono="alerta"
@@ -192,18 +197,21 @@ export default function Bicicletas({ ruta }) {
           <Aviso
             tono="exito"
             titulo={`La más cercana con bicis: ${masCercana.nombre}`}
-            mensaje={`Estás ${distanciaTexto(masCercana.distanciaKm)}. Ordenamos la lista por cercanía. Tu ubicación no se guarda.`}
+            mensaje={`Estás ${distanciaTexto(masCercana.distanciaKm)}. Tu ubicación no se guarda.`}
             testID="aviso-cercana"
           />
         ) : null}
-
+      </>
+    );
+    const mapa = (
+      <>
         <View ref={refMapa}>
           <Mapa
             puntos={puntos}
             seleccionado={seleccionado}
             onSeleccionar={setSeleccionado}
             ubicacion={posicion}
-            alto={300}
+            alto={altoMapa}
             etiqueta="Mapa de las estaciones de bicicletas de San Francisco"
             testID="mapa-estaciones"
           />
@@ -215,44 +223,70 @@ export default function Bicicletas({ ruta }) {
           <Punto color={coloresMapa.seleccionado} texto="Elegida" elegida />
           {posicion ? <Punto color={coloresMapa.ubicacion} texto="Vos" /> : null}
         </View>
-
-        <Seccion titulo={posicion ? 'Estaciones por cercanía' : 'Estaciones'}>
-          <Campo
-            id="buscar-estacion"
-            etiqueta="Buscar estación"
-            valor={busqueda}
-            onCambio={setBusqueda}
-            placeholder="Por ejemplo: UTN o Terminal"
-            ayuda={filtro ? `${plural(visibles.length, 'estación encontrada', 'estaciones encontradas')}` : undefined}
-            teclaEnter="search"
-            testID="buscar-estacion"
-          />
-          {visibles.length ? (
-            <View style={estilos.grilla}>
-              {visibles.map((e) => (
-                <TarjetaEstacion
-                  key={e.id}
-                  refContenedor={(nodo) => { refsTarjetas.current[e.id] = nodo; }}
-                  estacion={e}
-                  distanciaKm={e.distanciaKm}
-                  seleccionada={e.id === seleccionado}
-                  ahora={ahora}
-                  onVerEnMapa={verEnMapa}
-                  onReportar={reportar}
-                />
-              ))}
-            </View>
-          ) : (
-            <Vacio
-              icono="buscar"
-              titulo="No encontramos estaciones"
-              mensaje={`Ninguna estación coincide con "${busqueda.trim()}". Probá con otro nombre.`}
-              accion={{ titulo: 'Ver todas', onPress: () => setBusqueda(''), testID: 'limpiar-busqueda' }}
-              testID="estaciones-sin-resultados"
-            />
-          )}
-        </Seccion>
       </>
+    );
+    const lista = (
+      <Seccion titulo={posicion ? 'Estaciones por cercanía' : 'Estaciones'}>
+        <Campo
+          id="buscar-estacion"
+          etiqueta="Buscar estación"
+          valor={busqueda}
+          onCambio={setBusqueda}
+          placeholder="Por ejemplo: UTN o Terminal"
+          ayuda={filtro ? `${plural(visibles.length, 'estación encontrada', 'estaciones encontradas')}` : undefined}
+          teclaEnter="search"
+          testID="buscar-estacion"
+        />
+        {visibles.length ? (
+          <Grilla minimo={300} maximo={3}>
+            {visibles.map((e) => (
+              <TarjetaEstacion
+                key={e.id}
+                refContenedor={(nodo) => { refsTarjetas.current[e.id] = nodo; }}
+                estacion={e}
+                distanciaKm={e.distanciaKm}
+                seleccionada={e.id === seleccionado}
+                ahora={ahora}
+                onVerEnMapa={verEnMapa}
+                onReportar={reportar}
+              />
+            ))}
+          </Grilla>
+        ) : (
+          <Vacio
+            icono="buscar"
+            titulo="No encontramos estaciones"
+            mensaje={`Ninguna estación coincide con "${busqueda.trim()}".`}
+            accion={{ titulo: 'Ver todas', onPress: () => setBusqueda(''), testID: 'limpiar-busqueda' }}
+            testID="estaciones-sin-resultados"
+          />
+        )}
+      </Seccion>
+    );
+    contenido = (
+      <View onLayout={alMedir} style={estilos.contenido}>
+        {error ? <ErrorCarga error={error} testID="bicicletas-error" /> : null}
+        {ladoALado ? (
+          <MapaYLista
+            ladoALado
+            mapa={mapa}
+            lista={(
+              <>
+                <Resumen estaciones={estaciones} />
+                {avisos}
+                {lista}
+              </>
+            )}
+          />
+        ) : (
+          <>
+            <Resumen estaciones={estaciones} />
+            {avisos}
+            {mapa}
+            {lista}
+          </>
+        )}
+      </View>
     );
   }
 
@@ -286,5 +320,5 @@ const estilos = StyleSheet.create({
   punto: { flexDirection: 'row', alignItems: 'center', gap: espacio.xs },
   circulo: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: colores.blanco },
   circuloElegido: { width: 14, height: 14, borderRadius: 7, borderColor: colores.texto },
-  grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.m },
+  contenido: { gap: espacio.l },
 });

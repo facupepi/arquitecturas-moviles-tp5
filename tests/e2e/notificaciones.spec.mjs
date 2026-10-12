@@ -177,7 +177,7 @@ test.describe('Notificaciones', () => {
 
     // En este navegador de prueba el push no está disponible: el interruptor lo explica.
     await expect(page.getByTestId('interruptor-push')).toHaveAttribute('aria-disabled', 'true');
-    await expect(page.getByTestId('push-no-disponible')).toContainText(/esta demostración|no admite|instalada/);
+    await expect(page.getByTestId('push-no-disponible')).toContainText(/no están disponibles|no admite|instalada/);
     await revisarAccesibilidad(page, 'notificaciones-preferencias');
   });
 

@@ -45,7 +45,7 @@ export const TIPOS_TRAMITES = ['tributos', 'estacionamiento', 'reclamos'];
 export const EXPLICACION_FRECUENCIA = {
   inmediata: 'Te avisamos en el momento en que se publica.',
   resumen_diario: 'Un solo aviso por día, a las 20, con las novedades. Las emergencias llegan igual al momento.',
-  solo_historial: 'No te mandamos avisos: los ves acá cuando entrás. Las emergencias llegan igual al momento.',
+  solo_historial: 'No te mandamos avisos al celular. Las emergencias te llegan igual.',
 };
 
 export const FILTROS = [

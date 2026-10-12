@@ -1,5 +1,7 @@
 // Tarjeta (WP5, 7.2). Con onPress es un Pressable con role="button": en ese caso no pongas
 // botones adentro (un botón dentro de otro no es válido); usá `accion` sin onPress.
+// La `accion` (por ejemplo una EtiquetaEstado) queda arriba a la derecha y no baja de línea: un
+// título largo pasa a dos líneas (o se corta en `lineasTitulo`) sin mover lo demás.
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { colores, espacio, radios, sombras } from '../tema/tokens';
@@ -16,6 +18,7 @@ const TONOS = {
 export default function Tarjeta({
   children,
   titulo,
+  lineasTitulo,
   accion,
   tono = 'normal',
   onPress,
@@ -35,13 +38,13 @@ export default function Tarjeta({
       {titulo || accion ? (
         <View style={estilos.cabecera}>
           {titulo ? (
-            <Texto variante="titulo3" estilo={estilos.flexible}>
+            <Texto variante="titulo3" numberOfLines={lineasTitulo} estilo={estilos.flexible}>
               {titulo}
             </Texto>
           ) : (
             <View style={estilos.flexible} />
           )}
-          {accion}
+          {accion ? <View style={estilos.accion}>{accion}</View> : null}
         </View>
       ) : null}
       {children}
@@ -88,7 +91,8 @@ const estilos = StyleSheet.create({
     alignSelf: 'stretch',
     ...sombras.tarjeta,
   },
-  cabecera: { flexDirection: 'row', alignItems: 'center', gap: espacio.m, flexWrap: 'wrap' },
+  cabecera: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.m },
+  accion: { flexShrink: 0 },
   flexible: { flex: 1, minWidth: 0 },
   resaltada: { borderColor: colores.accion },
   presionada: { opacity: 0.85 },

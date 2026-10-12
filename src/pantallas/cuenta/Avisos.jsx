@@ -23,7 +23,7 @@ function explicacion(estado) {
   if (estado.permiso === 'denied') {
     return 'Bloqueaste las notificaciones para este sitio. Para recibirlas, habilitalas en la configuración del navegador.';
   }
-  if (estado.activo) return 'Te avisamos aunque tengas la app cerrada.';
+  if (estado.activo) return null;
   return 'Activalos para enterarte de alarmas, vencimientos y respuestas a tus reclamos aunque tengas la app cerrada.';
 }
 
@@ -36,7 +36,7 @@ export default function Avisos({ onElegir }) {
     evento: EVENTOS.PUSH_HABILITADO,
     alExito: () => {
       refrescar();
-      aviso.mostrar('Listo: vas a recibir avisos en este dispositivo.');
+      aviso.mostrar('Activaste los avisos en este dispositivo.');
     },
   });
   const desactivar = useComando(desactivarPush, {

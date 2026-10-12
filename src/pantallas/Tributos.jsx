@@ -5,7 +5,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native';
 import { colores, espacio } from '../tema/tokens';
 import {
-  Aviso, Boton, Cargando, ErrorCarga, Icono, Pantalla, Pestanas, Seccion, Tarjeta, Texto, Vacio,
+  Aviso, Boton, Cargando, ErrorCarga, Grilla, Icono, Pantalla, Pestanas, Seccion, Tarjeta, Texto, Vacio,
+  useAnchoDisponible,
 } from '../ui';
 import { useRuta } from '../navegacion';
 import { cargarMas, useMunicipal } from '../datos/almacen';
@@ -28,6 +29,9 @@ import DialogoComprobante from './tributos/DialogoComprobante';
 import HistorialPagos from './tributos/HistorialPagos';
 import Recordatorios, { tributoDeDestino } from './tributos/Recordatorios';
 
+// Desde este ancho de contenido, el resumen y los recordatorios van lado a lado.
+const ANCHO_DOS_COLUMNAS = 760;
+
 const seleccionar = (s) => ({
   listo: s.listo,
   altaTerminada: s.altaTerminada,
@@ -48,7 +52,7 @@ function Resumen({ resumen, ahora }) {
   const { total, impagos, vencidos, totalVencido, proximo } = resumen;
   const alDia = impagos.length === 0;
   return (
-    <Tarjeta tono={vencidos ? 'peligro' : 'destacada'} testID="resumen-tributos">
+    <Tarjeta tono={vencidos ? 'peligro' : 'destacada'} testID="resumen-tributos" estilo={[estilos.llena, estilos.centrada]}>
       <View style={estilos.resumenFila}>
         <View style={estilos.resumenTextos}>
           <Texto variante="antetitulo" color={vencidos ? colores.peligro : colores.accionOscuro}>
@@ -63,7 +67,7 @@ function Resumen({ resumen, ahora }) {
         </View>
       </View>
       <Texto variante="chico" color={colores.texto} testID="resumen-detalle">
-        {alDia ? 'Estás al día: no tenés cedulones sin pagar.' : `${plural(impagos.length, 'cedulón', 'cedulones')} sin pagar`}
+        {alDia ? 'Estás al día con tus cedulones.' : `${plural(impagos.length, 'cedulón', 'cedulones')} sin pagar`}
         {vencidos ? (
           <Texto variante="chico" peso="700" color={colores.peligro}>
             {` · incluye ${plural(vencidos, 'vencido', 'vencidos')} (${dinero(totalVencido)})`}
@@ -79,8 +83,42 @@ function Resumen({ resumen, ahora }) {
   );
 }
 
+function BloqueRecordatorios({ enTarjeta, recordatorios, ahora, onAbrir, onVerAvisos }) {
+  const verAvisos = <Boton titulo="Ver avisos" variante="texto" onPress={onVerAvisos} testID="ver-notificaciones" />;
+  const cuerpo = (
+    <>
+      <Texto variante="chico" color={colores.textoSuave}>
+        Te avisamos {LIMITES.diasAvisoVencimiento} días antes de cada vencimiento y cuando un cedulón vence.
+      </Texto>
+      {recordatorios.length ? (
+        <Recordatorios recordatorios={recordatorios} ahora={ahora} onAbrir={onAbrir} />
+      ) : (
+        <Texto variante="chico" color={colores.textoSuave} testID="sin-recordatorios">
+          No tenés recordatorios pendientes.
+        </Texto>
+      )}
+    </>
+  );
+  if (!enTarjeta) {
+    return <Seccion titulo="Recordatorios" accion={verAvisos}>{cuerpo}</Seccion>;
+  }
+  return (
+    <Tarjeta estilo={estilos.llena}>
+      <View style={estilos.cabeceraTarjeta}>
+        <Texto role="heading" aria-level={2} variante="titulo3" estilo={estilos.flexible}>
+          Recordatorios
+        </Texto>
+        {verAvisos}
+      </View>
+      {cuerpo}
+    </Tarjeta>
+  );
+}
+
 export default function Tributos({ ruta }) {
   const { navegar } = useRuta();
+  const [ancho, alMedir] = useAnchoDisponible();
+  const amplio = ancho >= ANCHO_DOS_COLUMNAS;
   const datos = useMunicipal(seleccionar);
   const leyenda = useTextoLeyenda();
   const ahora = useAhora(30_000);
@@ -205,10 +243,28 @@ export default function Tributos({ ruta }) {
       />
     );
   } else {
+    const bloqueRecordatorios = (
+      <BloqueRecordatorios
+        enTarjeta={amplio}
+        recordatorios={recordatorios}
+        ahora={ahora}
+        onAbrir={abrirRecordatorio}
+        onVerAvisos={() => navegar('notificaciones')}
+      />
+    );
     contenido = (
       <>
         {datos.errorTributos ? <ErrorCarga error={datos.errorTributos} testID="error-tributos" /> : null}
-        <Resumen resumen={resumen} ahora={ahora} />
+        {amplio ? (
+          <View style={estilos.fila}>
+            <View style={estilos.columna}>
+              <Resumen resumen={resumen} ahora={ahora} />
+            </View>
+            <View style={estilos.columna}>{bloqueRecordatorios}</View>
+          </View>
+        ) : (
+          <Resumen resumen={resumen} ahora={ahora} />
+        )}
         <View style={estilos.bloque}>
           <Pestanas
             etiqueta="Cedulones"
@@ -223,9 +279,11 @@ export default function Tributos({ ruta }) {
           <View role="tabpanel" aria-label={pestana === 'pendientes' ? 'Cedulones pendientes' : 'Historial de pagos'} style={estilos.panel}>
             {pestana === 'pendientes' ? (
               pendientes.length ? (
-                pendientes.map((t) => (
-                  <TarjetaTributo key={t.id} tributo={t} ahora={ahora} onVerCedulon={verCedulon} onPagar={pagar} />
-                ))
+                <Grilla minAncho={300} maxColumnas={3}>
+                  {pendientes.map((t) => (
+                    <TarjetaTributo key={t.id} tributo={t} ahora={ahora} onVerCedulon={verCedulon} onPagar={pagar} />
+                  ))}
+                </Grilla>
               ) : (
                 <Vacio
                   icono="checkCirculo"
@@ -249,21 +307,7 @@ export default function Tributos({ ruta }) {
             )}
           </View>
         </View>
-        <Seccion
-          titulo="Recordatorios"
-          accion={<Boton titulo="Ver avisos" variante="texto" onPress={() => navegar('notificaciones')} testID="ver-notificaciones" />}
-        >
-          <Texto variante="chico" color={colores.textoSuave}>
-            Te avisamos {LIMITES.diasAvisoVencimiento} días antes de cada vencimiento y cuando un cedulón vence.
-          </Texto>
-          {recordatorios.length ? (
-            <Recordatorios recordatorios={recordatorios} ahora={ahora} onAbrir={abrirRecordatorio} />
-          ) : (
-            <Texto variante="chico" color={colores.textoSuave} testID="sin-recordatorios">
-              No tenés recordatorios pendientes.
-            </Texto>
-          )}
-        </Seccion>
+        {!amplio ? bloqueRecordatorios : null}
       </>
     );
   }
@@ -283,7 +327,9 @@ export default function Tributos({ ruta }) {
           testID="cedulon-no-encontrado"
         />
       ) : null}
-      {contenido}
+      <View onLayout={alMedir} style={estilos.contenido}>
+        {contenido}
+      </View>
 
       <DialogoCedulon
         key={`cedulon-${dialogo?.tributoId ?? ''}`}
@@ -321,6 +367,13 @@ const estilos = StyleSheet.create({
   resumenFila: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.m },
   resumenTextos: { flex: 1, minWidth: 0, gap: 2 },
   resumenIcono: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  contenido: { gap: espacio.l },
+  fila: { flexDirection: 'row', alignItems: 'stretch', gap: espacio.l },
+  columna: { flex: 1, minWidth: 0 },
+  llena: { flexGrow: 1 },
+  centrada: { justifyContent: 'center' },
+  cabeceraTarjeta: { flexDirection: 'row', alignItems: 'center', gap: espacio.s, marginVertical: -espacio.s },
+  flexible: { flex: 1, minWidth: 0 },
   bloque: { gap: espacio.m },
   panel: { gap: espacio.m },
 });

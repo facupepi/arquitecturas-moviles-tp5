@@ -17,7 +17,7 @@ import { registroListo } from '../plataforma/registroSW';
 const CLAVE_TOKEN = 'conecta:token-push';
 
 const MOTIVOS = {
-  emuladores: 'Los avisos en el celular no están disponibles en esta demostración. Las novedades te llegan igual con la app abierta y quedan en el historial.',
+  emuladores: 'Los avisos en el celular no están disponibles en este entorno de pruebas.',
   sinClave: 'Los avisos en este dispositivo todavía no están configurados. Podés consultar el historial de notificaciones.',
   navegador: 'Este navegador no admite avisos en segundo plano. Podés consultar el historial de notificaciones.',
   ios: 'En iPhone y iPad, los avisos funcionan solo con la app instalada en la pantalla de inicio (Compartir, Agregar a inicio).',

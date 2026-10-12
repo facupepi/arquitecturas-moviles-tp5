@@ -100,7 +100,7 @@ test.describe('Mi cuenta', () => {
     const interruptor = page.getByTestId('cuenta-interruptor-push');
     await expect(interruptor).toHaveAttribute('aria-checked', 'false');
     await expect(interruptor).toHaveAttribute('aria-disabled', 'true');
-    await expect(page.getByTestId('cuenta-avisos')).toContainText('no están disponibles en esta demostración');
+    await expect(page.getByTestId('cuenta-avisos')).toContainText('no están disponibles');
 
     // Instalación: instrucciones y, cuando el navegador la ofrece, el botón.
     await expect(page.getByTestId('cuenta-instalar').getByTestId(/^instalacion-(ios|manual)$/)).toBeVisible();

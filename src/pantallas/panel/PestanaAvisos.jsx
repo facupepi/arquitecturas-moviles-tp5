@@ -16,7 +16,7 @@ import {
 import { nuevoIdSolicitud } from '../../../shared/dominio.mjs';
 import { ETIQUETAS, TIPOS_AVISO, ZONAS } from '../../../shared/constantes.mjs';
 import { tiempoPasado } from '../../../shared/formato.mjs';
-import { EstadoEnvio, accionPanel, estilosPanel } from './comun';
+import { DosColumnas, EstadoEnvio, accionPanel, estilosPanel } from './comun';
 
 const LARGOS = { titulo: 100, cuerpo: 500, detalle: 3000, enlace: 300 };
 const SIN_DESTINO = 'ninguno';
@@ -36,7 +36,7 @@ const VACIO = {
 const EJEMPLO = {
   titulo: 'Corte de tránsito por obras en el centro',
   cuerpo: 'Hoy de 8 a 13 h está cortado el Bv. 9 de Julio frente a la Municipalidad por trabajos de bacheo. Usá calles alternativas.',
-  detalle: 'Aviso de demostración. Las obras forman parte del plan de mantenimiento de calzadas.',
+  detalle: 'Las obras forman parte del plan de mantenimiento de calzadas.',
   tipo: 'obras',
   zona: 'centro',
   destino: 'reclamos',
@@ -106,7 +106,7 @@ function UltimosAvisos({ eventosPorId }) {
   return (
     <Seccion titulo="Últimos avisos publicados">
       {!recientes.length ? (
-        <Vacio icono="campana" titulo="Todavía no hay avisos" mensaje="Los avisos que publiques aparecen acá." />
+        <Vacio icono="campana" titulo="Todavía no publicaste avisos" />
       ) : (
         recientes.map((a) => {
           const evento = a.eventoId ? eventosPorId.get(a.eventoId) : null;
@@ -119,7 +119,7 @@ function UltimosAvisos({ eventosPorId }) {
                   {`${tiempoPasado(a.creadoEn, ahora)}${a.autor === 'simulador' ? ' · simulador' : ''}`}
                 </Texto>
               </View>
-              <Texto variante="cuerpo" peso="700">{a.titulo}</Texto>
+              <Texto variante="cuerpo" peso="700" numberOfLines={2}>{a.titulo}</Texto>
               {evento ? <EstadoEnvio evento={evento} testID={`envio-aviso-${a.id}`} /> : null}
             </Tarjeta>
           );
@@ -173,104 +173,107 @@ export default function PestanaAvisos({ eventosPorId }) {
 
   return (
     <View style={estilos.contenedor}>
-      <Tarjeta titulo="Publicar un aviso">
-        <Texto variante="chico" color={colores.textoSuave}>
-          Lo ven al instante los vecinos que siguen este tipo de aviso y esta zona. A quienes tienen las
-          notificaciones activadas les llega además una notificación en el celular.
-        </Texto>
-        <Boton
-          titulo="Completar con un ejemplo"
-          icono="mensaje"
-          variante="secundario"
-          onPress={() => { setForm(EJEMPLO); setErrores({}); }}
-          testID="aviso-ejemplo"
-        />
-        <Campo
-          etiqueta="Título"
-          valor={form.titulo}
-          onCambio={cambiar('titulo')}
-          error={errorDe('titulo')}
-          maxLargo={LARGOS.titulo}
-          placeholder="Ej.: Corte de agua en zona Sur"
-          id="aviso-titulo"
-          testID="campo-aviso-titulo"
-        />
-        <Campo
-          etiqueta="Aviso"
-          valor={form.cuerpo}
-          onCambio={cambiar('cuerpo')}
-          error={errorDe('cuerpo')}
-          ayuda="Es el texto de la notificación: contá qué pasa, dónde y hasta cuándo."
-          multilinea
-          maxLargo={LARGOS.cuerpo}
-          id="aviso-cuerpo"
-          testID="campo-aviso-cuerpo"
-        />
-        <Selector
-          etiqueta="Tipo de aviso"
-          valor={form.tipo}
-          opciones={OPCIONES_TIPO}
-          onCambio={cambiar('tipo')}
-          error={errorDe('tipo')}
-          testID="aviso-tipo"
-        />
-        <Selector
-          etiqueta="Zona"
-          valor={form.zona}
-          opciones={OPCIONES_ZONA}
-          onCambio={cambiar('zona')}
-          error={errorDe('zona')}
-          testID="aviso-zona"
-        />
-        <Campo
-          etiqueta="Más información (opcional)"
-          valor={form.detalle}
-          onCambio={cambiar('detalle')}
-          error={errorDe('detalle')}
-          ayuda="Se muestra al abrir el aviso."
-          multilinea
-          maxLargo={LARGOS.detalle}
-          id="aviso-detalle"
-          testID="campo-aviso-detalle"
-        />
-        <Selector
-          etiqueta="Botón para ir a un servicio de la app (opcional)"
-          valor={form.destino}
-          opciones={OPCIONES_DESTINO}
-          onCambio={cambiar('destino')}
-          variante="lista"
-          testID="aviso-destino"
-        />
-        <Campo
-          etiqueta="Enlace a una página externa (opcional)"
-          valor={form.enlace}
-          onCambio={cambiar('enlace')}
-          error={errorDe('enlace')}
-          placeholder="https://www.sanfrancisco.gov.ar"
-          modoTeclado="url"
-          maxLargo={LARGOS.enlace}
-          id="aviso-enlace"
-          testID="campo-aviso-enlace"
-        />
-        <Selector
-          etiqueta="¿Hasta cuándo está vigente?"
-          valor={form.vigencia}
-          opciones={VIGENCIAS}
-          onCambio={cambiar('vigencia')}
-          error={errorDe('vigencia')}
-          testID="aviso-vigencia"
-        />
-        {form.tipo === 'emergencias' && form.vigencia !== SIN_VENCIMIENTO ? (
-          <Aviso tono="alerta" mensaje="Mientras esté vigente, la emergencia se muestra en un cartel arriba de todo en la app." />
-        ) : null}
-        <VistaPrevia form={form} />
-        {hayErrores ? (
-          <Aviso tono="peligro" rol="alert" mensaje="Revisá los campos marcados antes de publicar." testID="errores-aviso" />
-        ) : null}
-        <Boton titulo="Revisar y publicar" icono="campana" onPress={revisar} ancho="completo" testID="publicar-aviso" />
-      </Tarjeta>
-
-      <UltimosAvisos eventosPorId={eventosPorId} />
+      <DosColumnas
+        proporcion={[3, 2]}
+        principal={(
+          <Tarjeta titulo="Publicar un aviso">
+            <Texto variante="chico" color={colores.textoSuave}>
+              Lo reciben los vecinos que siguen este tipo de aviso y esta zona. Las emergencias les llegan a todos.
+            </Texto>
+            <Boton
+              titulo="Completar con un ejemplo"
+              icono="mensaje"
+              variante="secundario"
+              onPress={() => { setForm(EJEMPLO); setErrores({}); }}
+              testID="aviso-ejemplo"
+            />
+            <Campo
+              etiqueta="Título"
+              valor={form.titulo}
+              onCambio={cambiar('titulo')}
+              error={errorDe('titulo')}
+              maxLargo={LARGOS.titulo}
+              placeholder="Ej.: Corte de agua en zona Sur"
+              id="aviso-titulo"
+              testID="campo-aviso-titulo"
+            />
+            <Campo
+              etiqueta="Aviso"
+              valor={form.cuerpo}
+              onCambio={cambiar('cuerpo')}
+              error={errorDe('cuerpo')}
+              ayuda="Contá qué pasa, dónde y hasta cuándo."
+              multilinea
+              maxLargo={LARGOS.cuerpo}
+              id="aviso-cuerpo"
+              testID="campo-aviso-cuerpo"
+            />
+            <Selector
+              etiqueta="Tipo de aviso"
+              valor={form.tipo}
+              opciones={OPCIONES_TIPO}
+              onCambio={cambiar('tipo')}
+              error={errorDe('tipo')}
+              testID="aviso-tipo"
+            />
+            <Selector
+              etiqueta="Zona"
+              valor={form.zona}
+              opciones={OPCIONES_ZONA}
+              onCambio={cambiar('zona')}
+              error={errorDe('zona')}
+              testID="aviso-zona"
+            />
+            <Campo
+              etiqueta="Más información (opcional)"
+              valor={form.detalle}
+              onCambio={cambiar('detalle')}
+              error={errorDe('detalle')}
+              ayuda="Se muestra al abrir el aviso."
+              multilinea
+              maxLargo={LARGOS.detalle}
+              id="aviso-detalle"
+              testID="campo-aviso-detalle"
+            />
+            <Selector
+              etiqueta="Botón para ir a un servicio de la app (opcional)"
+              valor={form.destino}
+              opciones={OPCIONES_DESTINO}
+              onCambio={cambiar('destino')}
+              variante="lista"
+              testID="aviso-destino"
+            />
+            <Campo
+              etiqueta="Enlace a una página externa (opcional)"
+              valor={form.enlace}
+              onCambio={cambiar('enlace')}
+              error={errorDe('enlace')}
+              placeholder="https://www.sanfrancisco.gov.ar"
+              modoTeclado="url"
+              maxLargo={LARGOS.enlace}
+              id="aviso-enlace"
+              testID="campo-aviso-enlace"
+            />
+            <Selector
+              etiqueta="¿Hasta cuándo está vigente?"
+              valor={form.vigencia}
+              opciones={VIGENCIAS}
+              onCambio={cambiar('vigencia')}
+              error={errorDe('vigencia')}
+              testID="aviso-vigencia"
+            />
+            {form.tipo === 'emergencias' && form.vigencia !== SIN_VENCIMIENTO ? (
+              <Aviso tono="alerta" mensaje="Mientras esté vigente, la emergencia se muestra en un cartel arriba de todo en la app." />
+            ) : null}
+            <VistaPrevia form={form} />
+            {hayErrores ? (
+              <Aviso tono="peligro" rol="alert" mensaje="Revisá los campos marcados antes de publicar." testID="errores-aviso" />
+            ) : null}
+            <Boton titulo="Revisar y publicar" icono="campana" onPress={revisar} ancho="completo" testID="publicar-aviso" />
+          </Tarjeta>
+        )}
+        lateral={<UltimosAvisos eventosPorId={eventosPorId} />}
+      />
 
       <Dialogo
         visible={!!confirmacion}

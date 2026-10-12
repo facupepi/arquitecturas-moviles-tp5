@@ -2,10 +2,10 @@
 // horario; E2 inicio con patente y minutos; E3 temporizador con aviso antes de vencer; E4 extensión
 // y finalización anticipada; historial con "Cargar más". Enlace profundo: #/estacionamiento/p1.
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
-import { colores, coloresMapa, cortes, espacio, radios } from '../tema/tokens';
+import { StyleSheet, View } from 'react-native';
+import { colores, coloresMapa, espacio, radios } from '../tema/tokens';
 import {
-  Aviso, Cargando, ErrorCarga, Mapa, Pantalla, Seccion, Tarjeta, Texto, Vacio,
+  Aviso, Cargando, ErrorCarga, FilaDato, Mapa, Pantalla, Seccion, Tarjeta, Texto, Vacio, useAnchoDisponible,
 } from '../ui';
 import { useMunicipal, cargarMas } from '../datos/almacen';
 import { useAhora } from '../datos/useAhora';
@@ -17,6 +17,9 @@ import SesionActiva from './estacionamiento/SesionActiva';
 import {
   horarioEstricto, puntosDeZonas, separarSesiones, umbralAviso, zonaEnHorario,
 } from './estacionamiento/util';
+
+// Desde este ancho de contenido: mapa y zonas a la izquierda; sesión, inicio e historial a la derecha.
+const ANCHO_DOS_COLUMNAS = 840;
 
 const TITULO = 'Estacionamiento medido';
 const BAJADA = 'Elegí la zona, indicá tu patente y controlá el tiempo desde el celular.';
@@ -67,7 +70,7 @@ function AvisoHorario({ zona, estricto, cobra }) {
     <Aviso
       tono="info"
       titulo="Fuera del horario de cobro"
-      mensaje="Modo demostración: el control de horario está apagado, así que podés iniciar igual."
+      mensaje="Podés iniciar igual."
       testID="aviso-horario"
     />
   );
@@ -76,11 +79,11 @@ function AvisoHorario({ zona, estricto, cobra }) {
 export default function Estacionamiento({ ruta }) {
   const { listo, zonas, config, sesiones, hayMas, errorZonas, errorSesiones } = useMunicipal(seleccionar);
   const { navegar } = useRuta();
-  const { width } = useWindowDimensions();
+  const [anchoDisponible, alMedir] = useAnchoDisponible();
   const ahora = useAhora(1000);
   // Lo que no necesita el segundo exacto (horario de las zonas, mapa) cambia cada 15 s.
   const ahoraLento = Math.floor(ahora / 15000) * 15000;
-  const ancho = width >= cortes.escritorio;
+  const ancho = anchoDisponible >= ANCHO_DOS_COLUMNAS;
 
   const idRuta = ruta?.id ?? null;
   const [zonaId, setZonaId] = useState(idRuta);
@@ -137,41 +140,65 @@ export default function Estacionamiento({ ruta }) {
         <Vacio
           icono="reloj"
           titulo="Tu próximo lugar te espera"
-          mensaje="Cuando inicies una sesión, vas a ver acá el tiempo que te queda y vas a poder extenderla."
+          mensaje="No tenés un estacionamiento activo."
           testID="sin-sesiones"
         />
       ) : null}
     </Seccion>
   );
 
+  const sinZonas = errorZonas
+    ? <ErrorCarga error={errorZonas} testID="error-zonas" />
+    : !zonas.length
+      ? <Cargando lineas={4} mensaje="Cargando las zonas de estacionamiento…" testID="cargando-zonas" />
+      : null;
+
+  const mapa = (
+    <>
+      <Mapa
+        puntos={puntos}
+        seleccionado={zonaId}
+        onSeleccionar={elegirZona}
+        alto={ancho ? 360 : 240}
+        etiqueta="Mapa de las zonas de estacionamiento medido de San Francisco"
+        testID="mapa-estacionamiento"
+      />
+      <LeyendaMapa />
+    </>
+  );
+  const selector = <SelectorZona zonas={zonas} valor={zonaId} onCambio={elegirZona} ahora={ahoraLento} />;
+  const formulario = (
+    <>
+      <AvisoHorario zona={zona} estricto={estricto} cobra={cobra} />
+      <FormularioInicio
+        zona={zona}
+        config={config}
+        ahora={ahoraLento}
+        patente={patente}
+        onPatente={setPatente}
+        alIniciar={(s) => setSesionNueva(s.id)}
+      />
+    </>
+  );
+
   let cuerpoFormulario;
-  if (errorZonas) {
-    cuerpoFormulario = <ErrorCarga error={errorZonas} testID="error-zonas" />;
-  } else if (!zonas.length) {
-    cuerpoFormulario = <Cargando lineas={4} mensaje="Cargando las zonas de estacionamiento…" testID="cargando-zonas" />;
+  if (sinZonas) {
+    cuerpoFormulario = sinZonas;
+  } else if (ancho) {
+    // El mapa y las zonas quedan en la columna izquierda; acá, la zona elegida y los datos.
+    cuerpoFormulario = (
+      <Tarjeta>
+        {zona ? <FilaDato etiqueta="Zona" valor={zona.nombre} testID="zona-elegida" /> : null}
+        {formulario}
+      </Tarjeta>
+    );
   } else {
     cuerpoFormulario = (
       <>
-        <Mapa
-          puntos={puntos}
-          seleccionado={zonaId}
-          onSeleccionar={elegirZona}
-          alto={ancho ? 320 : 240}
-          etiqueta="Mapa de las zonas de estacionamiento medido de San Francisco"
-          testID="mapa-estacionamiento"
-        />
-        <LeyendaMapa />
+        {mapa}
         <Tarjeta>
-          <SelectorZona zonas={zonas} valor={zonaId} onCambio={elegirZona} ahora={ahoraLento} />
-          <AvisoHorario zona={zona} estricto={estricto} cobra={cobra} />
-          <FormularioInicio
-            zona={zona}
-            config={config}
-            ahora={ahoraLento}
-            patente={patente}
-            onPatente={setPatente}
-            alIniciar={(s) => setSesionNueva(s.id)}
-          />
+          {selector}
+          {formulario}
         </Tarjeta>
       </>
     );
@@ -189,31 +216,45 @@ export default function Estacionamiento({ ruta }) {
     </Seccion>
   );
 
+  // La sesión en curso va primero; si no hay, primero se inicia. Con clave estable, al reordenar
+  // se mueven sin volver a montarse (no se pierde la patente escrita).
+  const ordenadas = (activas.length ? ['activas', 'formulario'] : ['formulario', 'activas']).map((clave) => (
+    <React.Fragment key={clave}>{clave === 'activas' ? seccionActivas : seccionFormulario}</React.Fragment>
+  ));
+
   return (
     <Pantalla titulo={TITULO} bajada={BAJADA} testID="pantalla-estacionamiento">
-      {ancho ? (
-        <View style={estilos.columnas}>
-          <View style={estilos.columnaPrincipal}>{seccionFormulario}</View>
-          <View style={estilos.columnaLateral}>
-            {seccionActivas}
+      <View onLayout={alMedir} style={ancho ? estilos.columnas : estilos.apilado}>
+        {ancho ? (
+          <>
+            <View style={estilos.columnaPrincipal}>
+              <Seccion titulo="Zonas" testID="zonas">
+                {sinZonas ?? (
+                  <>
+                    {mapa}
+                    <Tarjeta>{selector}</Tarjeta>
+                  </>
+                )}
+              </Seccion>
+            </View>
+            <View style={estilos.columnaLateral}>
+              {ordenadas}
+              {seccionHistorial}
+            </View>
+          </>
+        ) : (
+          <>
+            {ordenadas}
             {seccionHistorial}
-          </View>
-        </View>
-      ) : (
-        <>
-          {/* En el celular, la sesión en curso va primero; si no hay, primero se inicia. Con clave
-              estable, al reordenar se mueven sin volver a montarse (no se pierde la patente escrita). */}
-          {(activas.length ? ['activas', 'formulario'] : ['formulario', 'activas']).map((clave) => (
-            <React.Fragment key={clave}>{clave === 'activas' ? seccionActivas : seccionFormulario}</React.Fragment>
-          ))}
-          {seccionHistorial}
-        </>
-      )}
+          </>
+        )}
+      </View>
     </Pantalla>
   );
 }
 
 const estilos = StyleSheet.create({
+  apilado: { gap: espacio.l },
   columnas: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.xl },
   columnaPrincipal: { flex: 3, minWidth: 0, gap: espacio.l },
   columnaLateral: { flex: 2, minWidth: 0, gap: espacio.l },

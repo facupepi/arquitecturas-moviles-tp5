@@ -4,6 +4,8 @@
 // Los enlaces los abre <Boton href> con abrirEnlace: tel: y mailto: en la misma ventana (la app del
 // sistema toma el control) y https://wa.me en otra pestaña. Funciona sin conexión con la caché.
 // Enlace profundo opcional: #/contactos?categoria=emergencias.
+// En pantallas anchas, las áreas van en una grilla de 2 o 3 columnas con tarjetas del mismo alto
+// (los botones quedan abajo de todo) y la tarjeta destacada pone sus botones a la derecha.
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useMunicipal } from '../datos/almacen';
@@ -13,6 +15,7 @@ import {
   Boton, Cargando, ErrorCarga, EtiquetaEstado, Icono, Pantalla, Selector, Tarjeta, Texto, Vacio,
 } from '../ui';
 import { CATEGORIAS_CONTACTO, ETIQUETAS } from '../../shared/constantes.mjs';
+import { Grilla, useAncho } from './bicicletas/Disposicion';
 
 // Respaldo de la tarjeta destacada si municipal/info todavía no llegó (mismos datos del catálogo).
 const LINEA_VECINO = '147';
@@ -44,27 +47,34 @@ function usado(medio, contacto) {
   registrarEvento(EVENTOS.CONTACTO_USADO, { medio, contacto });
 }
 
-function Destacada({ info }) {
+function Destacada({ info, ancha }) {
   const linea = info?.lineaVecino || LINEA_VECINO;
   const whatsapp = info?.whatsapp || WHATSAPP_TANA;
   return (
-    <Tarjeta tono="destacada" testID="contacto-destacado" etiquetaAccesible="Atención al vecino, línea 147 y canal Tana">
-      <View style={estilos.destacadaCabecera}>
-        <View style={estilos.destacadaIcono}>
-          <Icono nombre="telefono" tamano={24} color={colores.blanco} />
+    <Tarjeta
+      tono="destacada"
+      testID="contacto-destacado"
+      etiquetaAccesible="Atención al vecino, línea 147 y canal Tana"
+      estilo={ancha ? estilos.destacadaAncha : null}
+    >
+      <View style={ancha ? estilos.destacadaTextos : estilos.destacadaColumna}>
+        <View style={estilos.destacadaCabecera}>
+          <View style={estilos.destacadaIcono}>
+            <Icono nombre="telefono" tamano={24} color={colores.blanco} />
+          </View>
+          <View style={estilos.flexible}>
+            <Texto variante="antetitulo" color={colores.accionOscuro}>
+              Atención al vecino
+            </Texto>
+            <Texto variante="titulo2" role="heading" aria-level={2}>
+              {`Línea ${linea}`}
+            </Texto>
+          </View>
         </View>
-        <View style={estilos.flexible}>
-          <Texto variante="antetitulo" color={colores.accionOscuro}>
-            Atención al vecino
-          </Texto>
-          <Texto variante="titulo2" role="heading" aria-level={2}>
-            {`Línea ${linea}`}
-          </Texto>
-        </View>
+        <Texto variante="cuerpo" color={colores.texto}>
+          Consultas, trámites y reclamos. Por WhatsApp te atiende Tana, el canal municipal.
+        </Texto>
       </View>
-      <Texto variante="cuerpo" color={colores.texto}>
-        Consultas, trámites y reclamos. Por WhatsApp te atiende Tana, el canal municipal.
-      </Texto>
       <View style={estilos.botones}>
         <Boton
           titulo={`Llamar al ${linea}`}
@@ -98,13 +108,13 @@ function Dato({ icono, children }) {
   );
 }
 
-function TarjetaContacto({ c, ancho }) {
+function TarjetaContacto({ c }) {
   const categoria = ETIQUETAS.categoriasContacto[c.categoria] ?? c.categoria;
   return (
     <Tarjeta
       testID={`contacto-${c.id}`}
       etiquetaAccesible={`${c.nombre}, ${c.area}`}
-      estilo={{ width: ancho || '100%' }}
+      estilo={estilos.tarjeta}
     >
       <View style={estilos.cabecera}>
         <View style={estilos.flexible}>
@@ -115,7 +125,9 @@ function TarjetaContacto({ c, ancho }) {
             {c.nombre}
           </Texto>
         </View>
-        <EtiquetaEstado texto={categoria} tono={TONO_CATEGORIA[c.categoria] ?? 'neutro'} />
+        <View style={estilos.etiqueta}>
+          <EtiquetaEstado texto={categoria} tono={TONO_CATEGORIA[c.categoria] ?? 'neutro'} />
+        </View>
       </View>
       {c.descripcion ? (
         <Texto variante="cuerpo" color={colores.texto}>
@@ -128,7 +140,7 @@ function TarjetaContacto({ c, ancho }) {
         {c.direccion ? <Dato icono="ubicacion">{c.direccion}</Dato> : null}
         {c.horario ? <Dato icono="reloj">{c.horario}</Dato> : null}
       </View>
-      <View style={estilos.botones}>
+      <View style={[estilos.botones, estilos.alPie]}>
         {c.telefono ? (
           <Boton
             titulo="Llamar"
@@ -189,7 +201,7 @@ export default function Contactos({ ruta }) {
     error: s.errores?.contactos ?? null,
   }));
   const [categoria, setCategoria] = useState(() => categoriaInicial(ruta));
-  const [ancho, setAncho] = useState(0);
+  const [ancho, alMedir] = useAncho();
   const [demorado, setDemorado] = useState(false);
 
   // El enlace profundo puede cambiar sin desmontar la pantalla (#/contactos?categoria=salud).
@@ -220,9 +232,6 @@ export default function Contactos({ ruta }) {
   );
 
   const cargando = !error && sinDatos && (!listo || !demorado);
-  // En pantallas anchas, dos tarjetas por fila.
-  const columnas = ancho >= 640 ? 2 : 1;
-  const anchoTarjeta = columnas === 2 ? Math.floor((ancho - espacio.l) / 2) : null;
 
   let lista;
   if (error && sinDatos) {
@@ -243,22 +252,17 @@ export default function Contactos({ ruta }) {
       <Vacio
         icono="telefono"
         titulo="No hay contactos en esta categoría"
-        mensaje="Probá con otra categoría o mirá todos los contactos."
         accion={{ titulo: 'Ver todos', onPress: () => setCategoria(TODAS), testID: 'ver-todos-contactos' }}
         testID="contactos-vacio"
       />
     );
   } else {
     lista = (
-      <View
-        style={estilos.lista}
-        testID="lista-contactos"
-        onLayout={(e) => setAncho(Math.round(e.nativeEvent.layout.width))}
-      >
+      <Grilla minimo={300} maximo={3} separacion={espacio.l} testID="lista-contactos">
         {visibles.map((c) => (
-          <TarjetaContacto key={c.id} c={c} ancho={anchoTarjeta} />
+          <TarjetaContacto key={c.id} c={c} />
         ))}
-      </View>
+      </Grilla>
     );
   }
 
@@ -268,7 +272,8 @@ export default function Contactos({ ruta }) {
       bajada="Llamá, escribí o mandá un WhatsApp a cada área de la Municipalidad."
       testID="pantalla-contactos"
     >
-      <Destacada info={info} />
+      <View onLayout={alMedir} style={estilos.medida} />
+      <Destacada info={info} ancha={ancho >= 720} />
       {error && !sinDatos ? <ErrorCarga error={error} testID="contactos-error" /> : null}
       <Selector
         etiqueta="Categoría"
@@ -293,6 +298,14 @@ export default function Contactos({ ruta }) {
 const estilos = StyleSheet.create({
   flexible: { flex: 1, minWidth: 0 },
   destacadaCabecera: { flexDirection: 'row', alignItems: 'center', gap: espacio.m },
+  destacadaColumna: { gap: espacio.m },
+  destacadaAncha: { flexDirection: 'row', alignItems: 'center', gap: espacio.xl },
+  destacadaTextos: { flex: 1, minWidth: 0, gap: espacio.m },
+  // Solo mide el ancho disponible (alto 0); el gap del cuerpo lo compensa el margen negativo.
+  medida: { height: 0, marginBottom: -espacio.l },
+  tarjeta: { flexGrow: 1 },
+  etiqueta: { flexShrink: 0 },
+  alPie: { marginTop: 'auto' },
   destacadaIcono: {
     width: 48,
     height: 48,
@@ -306,6 +319,5 @@ const estilos = StyleSheet.create({
   datos: { gap: espacio.xs },
   dato: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.s },
   region: { alignSelf: 'stretch' },
-  lista: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.l },
   nota: { flexDirection: 'row', gap: espacio.s, alignItems: 'flex-start' },
 });

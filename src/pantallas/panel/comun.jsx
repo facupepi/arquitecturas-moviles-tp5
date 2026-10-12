@@ -1,5 +1,5 @@
 // Piezas compartidas por las pestañas del panel municipal (S8, sección 8.11).
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { EVENTOS } from '../../firebase/analytics';
 import { colores, espacio } from '../../tema/tokens';
@@ -89,17 +89,56 @@ export function useVacioConfirmado(vacio, ms = 6000) {
   return confirmado;
 }
 
-/** Grilla que pasa de una columna en el celular a varias en la notebook del proyector. */
-export function Grilla({ children, testID }) {
+/** Ancho que ocupa un contenedor (onLayout). 0 hasta la primera medición. */
+export function useAncho() {
+  const [ancho, setAncho] = useState(0);
+  const alMedir = useCallback((e) => {
+    const w = Math.round(e.nativeEvent.layout.width);
+    setAncho((a) => (Math.abs(a - w) > 1 ? w : a));
+  }, []);
+  return [ancho, alMedir];
+}
+
+/** Ancho a partir del cual el panel pone dos columnas lado a lado (formulario y lista, por ejemplo). */
+export const ANCHO_DOS_COLUMNAS = 900;
+
+const SEPARACION = espacio.m;
+
+/**
+ * Grilla de tarjetas: suma columnas según el ancho disponible (una en el celular, tres o más en la
+ * computadora). Todas las celdas tienen el mismo ancho, también las de la última fila, y las de una
+ * misma fila el mismo alto (la tarjeta de adentro se estira con estilosPanel.celda).
+ */
+export function Grilla({ children, minimo = 300, testID }) {
+  const [ancho, alMedir] = useAncho();
+  const columnas = ancho ? Math.max(1, Math.floor((ancho + SEPARACION) / (minimo + SEPARACION))) : 1;
+  const anchoCelda = columnas > 1 ? Math.floor((ancho - SEPARACION * (columnas - 1)) / columnas) : null;
   return (
-    <View testID={testID} style={estilos.grilla}>
-      {children}
+    <View testID={testID} onLayout={alMedir} style={estilos.grilla}>
+      {React.Children.map(children, (hijo) => (hijo ? (
+        <View style={[estilos.celdaGrilla, anchoCelda ? { width: anchoCelda } : estilos.celdaCompleta]}>{hijo}</View>
+      ) : null))}
+    </View>
+  );
+}
+
+/** Dos columnas lado a lado desde ANCHO_DOS_COLUMNAS; una debajo de la otra en el celular. */
+export function DosColumnas({ principal, lateral, proporcion = [3, 2] }) {
+  const [ancho, alMedir] = useAncho();
+  const lado = ancho >= ANCHO_DOS_COLUMNAS;
+  return (
+    <View onLayout={alMedir} style={lado ? estilos.dosColumnas : estilos.unaColumna}>
+      <View style={lado ? { flex: proporcion[0], minWidth: 0 } : null}>{principal}</View>
+      <View style={lado ? { flex: proporcion[1], minWidth: 0 } : null}>{lateral}</View>
     </View>
   );
 }
 
 export const estilosPanel = StyleSheet.create({
-  celda: { flexGrow: 1, flexBasis: 300, minWidth: 0 },
+  // La tarjeta llena su celda de la Grilla: así todas las de una fila quedan del mismo alto.
+  celda: { flexGrow: 1, minWidth: 0 },
+  // Empuja lo que sigue al pie de la tarjeta (botones y estado alineados entre tarjetas).
+  empujar: { flexGrow: 1 },
   fila: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: espacio.s },
   ayuda: { maxWidth: 680 },
 });
@@ -107,5 +146,9 @@ export const estilosPanel = StyleSheet.create({
 const estilos = StyleSheet.create({
   envio: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.xs },
   flexible: { flex: 1, minWidth: 0 },
-  grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.m, alignItems: 'stretch' },
+  grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: SEPARACION, alignItems: 'stretch' },
+  celdaGrilla: { flexDirection: 'column', minWidth: 0 },
+  celdaCompleta: { width: '100%' },
+  dosColumnas: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.xl },
+  unaColumna: { gap: espacio.l },
 });

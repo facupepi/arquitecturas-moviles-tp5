@@ -102,7 +102,7 @@ test.describe('Reclamos', () => {
     await expect(direccion).toHaveAttribute('aria-invalid', 'true');
     await expect(descripcion).toHaveAttribute('aria-invalid', 'true');
     // El mensaje está debajo del campo y el campo lo anuncia con aria-describedby.
-    await expect(page.locator('#reclamo-direccion-error')).toHaveText('Indicá dónde es: calle y altura, una esquina o un lugar conocido.');
+    await expect(page.locator('#reclamo-direccion-error')).toHaveText('Indicá dónde es, con calle y altura, una esquina o un lugar conocido.');
     await expect(page.locator('#reclamo-descripcion-error')).toHaveText('Contanos qué pasa (al menos 10 caracteres).');
     await expect(direccion).toHaveAttribute('aria-describedby', /reclamo-direccion-error/);
     await expect(page.getByTestId('formulario-reclamo').getByText('Elegí de qué se trata tu reclamo.')).toBeVisible();
@@ -118,7 +118,7 @@ test.describe('Reclamos', () => {
     await direccion.fill('Bv. 25 de Mayo 1500');
     await descripcion.fill('Corta');
     await expect(page.locator('#reclamo-direccion-error')).toHaveCount(0);
-    await expect(page.locator('#reclamo-descripcion-error')).toHaveText('Contanos un poco más: escribí al menos 10 caracteres.');
+    await expect(page.locator('#reclamo-descripcion-error')).toHaveText('Contanos un poco más, con al menos 10 caracteres.');
     await expect(page.getByTestId('resumen-errores')).toHaveText('Revisá el campo marcado arriba.');
     await revisarAccesibilidad(page, 'reclamos-errores');
 

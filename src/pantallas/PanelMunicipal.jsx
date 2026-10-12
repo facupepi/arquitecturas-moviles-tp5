@@ -1,4 +1,4 @@
-// Panel municipal de demostración (S8, sección 8.11). Solo para administradores: el Enrutador
+// Panel municipal (S8, sección 8.11). Solo para administradores: el Enrutador
 // redirige a inicio si esAdmin es falso. Simula los sistemas de la Municipalidad: avanza reclamos,
 // activa alarmas, mueve bicicletas, publica avisos y dispara el simulador y los recordatorios.
 // Todo se escribe en Firestore, así que el celular del vecino cambia solo, sin recargar.
@@ -16,7 +16,7 @@ import PestanaDemo from './panel/PestanaDemo';
 
 const PESTANAS = ['reclamos', 'alarmas', 'bicicletas', 'avisos', 'demo'];
 const ETIQUETAS_PESTANA = {
-  reclamos: 'Reclamos', alarmas: 'Alarmas', bicicletas: 'Bicicletas', avisos: 'Avisos', demo: 'Demo',
+  reclamos: 'Reclamos', alarmas: 'Alarmas', bicicletas: 'Bicicletas', avisos: 'Avisos', demo: 'Simulación',
 };
 
 // useAdmin abre sus escuchas al montarse: para "Reintentar" se vuelve a montar este componente.
@@ -67,15 +67,18 @@ function ContenidoPanel({ pestana, onPestana, onReintentar }) {
 
 export default function PanelMunicipal({ ruta }) {
   const listo = useMunicipal((s) => s.listo);
-  // #/panel/alarmas abre directo esa pestaña.
-  const [pestana, setPestana] = useState(() => (PESTANAS.includes(ruta?.id) ? ruta.id : 'reclamos'));
+  // #/panel/alarmas abre directo esa pestaña; #/panel/simulacion es otro nombre de #/panel/demo.
+  const [pestana, setPestana] = useState(() => {
+    const id = ruta?.id === 'simulacion' ? 'demo' : ruta?.id;
+    return PESTANAS.includes(id) ? id : 'reclamos';
+  });
   const [intento, setIntento] = useState(0);
 
   return (
     <Pantalla
-      titulo="Panel municipal de demostración"
+      titulo="Panel municipal"
       antetitulo="ADMINISTRACIÓN MUNICIPAL"
-      bajada="Simula los sistemas municipales: cada cambio se ve al instante en el celular de los vecinos."
+      bajada="Bicicletas, alarmas, reclamos y avisos de la ciudad."
       testID="pantalla-panel"
     >
       {listo ? (

@@ -189,7 +189,7 @@ export function datosInicialesVecino(ahora = Date.now()) {
   const notificaciones = [{
     id: 'bienvenida',
     titulo: 'Te damos la bienvenida a San Francisco Conecta',
-    cuerpo: 'Acá vas a recibir los avisos de la ciudad y de tus trámites. Elegí qué querés recibir en Notificaciones.',
+    cuerpo: 'Elegí qué avisos querés recibir y de qué zonas.',
     tipo: 'servicios', zona: null, destino: '#/notificaciones', enlace: null,
     creadoEn: ahora, leida: false, leidaEn: null, origen: 'servidor',
   }];

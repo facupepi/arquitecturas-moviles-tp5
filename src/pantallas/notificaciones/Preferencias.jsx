@@ -1,5 +1,5 @@
 // Tarjeta de preferencias (S7, N2; zonas compartidas con Alarmas, A4): tipos, zonas, frecuencia
-// y avisos en este dispositivo. Cada toque se guarda solo; el estado del guardado se anuncia debajo.
+// y avisos en este dispositivo. Cada toque se guarda solo; "Guardando…" y "Cambios guardados." se anuncian debajo.
 import React, { forwardRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Aviso, ErrorCarga, Selector, Tarjeta, Texto } from '../../ui';
@@ -34,7 +34,7 @@ const Preferencias = forwardRef(function Preferencias({ preferencias, guardado, 
 
   const ningunTipo = !p.tipos.some((t) => TIPOS_CIUDAD.includes(t) || TIPOS_TRAMITES.includes(t));
 
-  let estadoGuardado = 'Los cambios se guardan solos.';
+  let estadoGuardado = '';
   if (guardado.fase === 'guardando') estadoGuardado = 'Guardando…';
   else if (guardado.fase === 'guardado') estadoGuardado = 'Cambios guardados.';
   const errorGeneral = guardado.error && !['tipos', 'zonas', 'frecuencia'].includes(guardado.error.campo) ? guardado.error : null;
@@ -84,7 +84,7 @@ const Preferencias = forwardRef(function Preferencias({ preferencias, guardado, 
             Las emergencias te llegan siempre, aunque no elijas ningún tema.
           </Texto>
           {ningunTipo ? (
-            <Aviso tono="alerta" mensaje="No elegiste ningún tema: solo vas a recibir emergencias." testID="aviso-sin-tipos" />
+            <Aviso tono="alerta" mensaje="Como no elegiste ningún tema, solo te llegan las emergencias." testID="aviso-sin-tipos" />
           ) : null}
         </Grupo>
 
@@ -102,11 +102,11 @@ const Preferencias = forwardRef(function Preferencias({ preferencias, guardado, 
             Son las mismas zonas que seguís en Alarmas. Los avisos para toda la ciudad te llegan igual.
           </Texto>
           {p.zonas.length === 0 ? (
-            <Aviso tono="alerta" mensaje="No seguís ninguna zona: solo vas a ver los avisos para toda la ciudad." testID="aviso-sin-zonas" />
+            <Aviso tono="alerta" mensaje="Como no seguís ninguna zona, solo te llegan los avisos para toda la ciudad." testID="aviso-sin-zonas" />
           ) : null}
         </Grupo>
 
-        <View style={estilos.pie}>
+        <View style={errorGeneral || estadoGuardado ? estilos.pie : null}>
           {errorGeneral ? (
             <Texto role="alert" variante="chico" color={colores.peligro} peso="600" testID="error-preferencias">
               No pudimos guardar el cambio. {errorGeneral.message}

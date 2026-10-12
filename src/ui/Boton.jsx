@@ -14,6 +14,8 @@ const VARIANTES = {
   secundario: { fondo: colores.celesteClaro, fondoActivo: '#c9e7f8', texto: colores.accionOscuro, borde: colores.celesteClaro },
   // Fondo al pasar el puntero más claro que celesteClaro: con texto accion queda en 4,55:1 (AA; pedido de S7).
   texto: { fondo: 'transparent', fondoActivo: '#eef7fd', texto: colores.accion, borde: 'transparent' },
+  // Sobre fondos de color (por ejemplo, dentro de un <Aviso>): blanco con borde, para que se vea como botón.
+  contorno: { fondo: colores.superficie, fondoActivo: '#eef7fd', texto: colores.accionOscuro, borde: colores.bordeCampo },
   peligro: { fondo: colores.peligro, fondoActivo: '#86132c', texto: colores.blanco, borde: colores.peligro },
 };
 

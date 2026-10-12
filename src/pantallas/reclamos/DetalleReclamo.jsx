@@ -2,7 +2,7 @@
 // y adjuntos con "Ver" mediante una URL firmada de 5 minutos (urlAdjunto, R2).
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
-import { Aviso, Boton, EtiquetaEstado, FilaDato, Icono, Seccion, Tarjeta, Texto } from '../../ui';
+import { Aviso, Boton, EtiquetaEstado, FilaDato, Icono, Seccion, Tarjeta, Texto, useAnchoDisponible } from '../../ui';
 import { colores, espacio, radios } from '../../tema/tokens';
 import { urlAdjunto } from '../../datos/repositorio';
 import { desdeFirebase } from '../../datos/errores';
@@ -11,6 +11,9 @@ import { abrirEnlace } from '../../plataforma/enlaces';
 import { fechaHora } from '../../../shared/formato.mjs';
 import PasosReclamo from './PasosReclamo';
 import { esImagen, estadoVisible, etiquetaCategoria, tamanoLegible, ubicacionDeEstacion } from './util';
+
+// Desde este ancho de contenido, los datos y el seguimiento van en dos columnas.
+const ANCHO_DOS_COLUMNAS = 820;
 
 // Se renuevan antes de que venzan los 5 minutos de la URL firmada.
 const MARGEN_RENOVACION_MS = 45_000;
@@ -91,6 +94,8 @@ export default function DetalleReclamo({ reclamo, uid, estaciones }) {
   const adjuntos = reclamo.adjuntos ?? [];
   const { urls, error, cargando, pedir } = useUrlsAdjuntos(uid, adjuntos, enLinea && adjuntos.length > 0);
   const [errorVer, setErrorVer] = useState(null);
+  const [ancho, alMedir] = useAnchoDisponible();
+  const dosColumnas = ancho >= ANCHO_DOS_COLUMNAS;
   const estado = estadoVisible(reclamo);
   const estacion = reclamo.estacionId ? estaciones.find((e) => e.id === reclamo.estacionId) : null;
 
@@ -108,8 +113,36 @@ export default function DetalleReclamo({ reclamo, uid, estaciones }) {
     abrirEnlace(actual.url).catch(() => setErrorVer('El navegador no dejó abrir el archivo.'));
   };
 
-  return (
-    <View style={estilos.contenedor}>
+  const adjuntosSeccion = adjuntos.length ? (
+    <Seccion titulo="Archivos adjuntos">
+      <View style={estilos.adjuntos}>
+        {adjuntos.map((a, i) => (
+          <Adjunto key={a.ruta ?? i} adjunto={a} indice={i} url={urls[a.ruta]?.url} onVer={() => ver(a)} />
+        ))}
+      </View>
+      {cargando && !Object.keys(urls).length ? (
+        <Texto role="status" variante="chico" color={colores.textoSuave}>
+          Preparando las vistas previas…
+        </Texto>
+      ) : null}
+      {!enLinea ? (
+        <Texto variante="chico" color={colores.textoSuave}>
+          Sin conexión: los archivos se pueden ver cuando vuelvas a estar en línea.
+        </Texto>
+      ) : null}
+      {errorVer || (error && enLinea) ? (
+        <View style={estilos.filaError}>
+          <Icono nombre="alerta" tamano={16} color={colores.peligro} />
+          <Texto role="alert" variante="chico" color={colores.peligro} peso="600" estilo={estilos.flexible} testID="error-adjuntos-detalle">
+            {errorVer ?? error?.message}
+          </Texto>
+        </View>
+      ) : null}
+    </Seccion>
+  ) : null;
+
+  const datos = (
+    <Seccion titulo="Datos del reclamo">
       <Tarjeta testID="detalle-reclamo">
         <View style={estilos.cabecera}>
           <View style={estilos.flexible}>
@@ -124,7 +157,7 @@ export default function DetalleReclamo({ reclamo, uid, estaciones }) {
           <Aviso
             tono="info"
             icono="sinConexion"
-            mensaje="Pendiente de envío: se va a mandar solo cuando vuelvas a estar en línea."
+            mensaje="Se envía cuando vuelvas a estar en línea."
             testID="aviso-pendiente"
           />
         ) : null}
@@ -143,55 +176,49 @@ export default function DetalleReclamo({ reclamo, uid, estaciones }) {
           <Texto variante="cuerpo">{reclamo.descripcion}</Texto>
         </View>
       </Tarjeta>
+    </Seccion>
+  );
 
-      <Seccion titulo="Seguimiento">
-        <Tarjeta>
-          <PasosReclamo reclamo={reclamo} />
-          <Texto variante="chico" color={colores.textoSuave}>
-            Esta pantalla se actualiza sola cuando la Municipalidad avanza tu reclamo.
-          </Texto>
+  const seguimiento = (
+    <Seccion titulo="Seguimiento">
+      <Tarjeta>
+        <PasosReclamo reclamo={reclamo} />
+      </Tarjeta>
+      {reclamo.notaMunicipal ? (
+        <Tarjeta tono="destacada" titulo="Respuesta de la Municipalidad" testID="nota-municipal">
+          <Texto variante="cuerpo">{reclamo.notaMunicipal}</Texto>
         </Tarjeta>
-        {reclamo.notaMunicipal ? (
-          <Tarjeta tono="destacada" titulo="Respuesta de la Municipalidad" testID="nota-municipal">
-            <Texto variante="cuerpo">{reclamo.notaMunicipal}</Texto>
-          </Tarjeta>
-        ) : null}
-      </Seccion>
-
-      {adjuntos.length ? (
-        <Seccion titulo="Archivos adjuntos">
-          <View style={estilos.adjuntos}>
-            {adjuntos.map((a, i) => (
-              <Adjunto key={a.ruta ?? i} adjunto={a} indice={i} url={urls[a.ruta]?.url} onVer={() => ver(a)} />
-            ))}
-          </View>
-          {cargando && !Object.keys(urls).length ? (
-            <Texto role="status" variante="chico" color={colores.textoSuave}>
-              Preparando las vistas previas…
-            </Texto>
-          ) : null}
-          {!enLinea ? (
-            <Texto variante="chico" color={colores.textoSuave}>
-              Sin conexión: los archivos se pueden ver cuando vuelvas a estar en línea.
-            </Texto>
-          ) : null}
-          {errorVer || (error && enLinea) ? (
-            <View style={estilos.filaError}>
-              <Icono nombre="alerta" tamano={16} color={colores.peligro} />
-              <Texto role="alert" variante="chico" color={colores.peligro} peso="600" estilo={estilos.flexible} testID="error-adjuntos-detalle">
-                {errorVer ?? error?.message}
-              </Texto>
-            </View>
-          ) : null}
-        </Seccion>
       ) : null}
+    </Seccion>
+  );
+
+  // En el escritorio: datos y adjuntos a la izquierda, seguimiento a la derecha.
+  return (
+    <View onLayout={alMedir} style={dosColumnas ? estilos.columnas : estilos.contenedor}>
+      {dosColumnas ? (
+        <>
+          <View style={estilos.columna}>
+            {datos}
+            {adjuntosSeccion}
+          </View>
+          <View style={estilos.columna}>{seguimiento}</View>
+        </>
+      ) : (
+        <>
+          {datos}
+          {seguimiento}
+          {adjuntosSeccion}
+        </>
+      )}
     </View>
   );
 }
 
 const estilos = StyleSheet.create({
   contenedor: { gap: espacio.l },
-  cabecera: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: espacio.s, flexWrap: 'wrap' },
+  columnas: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.xl },
+  columna: { flex: 1, minWidth: 0, gap: espacio.l },
+  cabecera: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: espacio.s },
   flexible: { flex: 1, minWidth: 0 },
   descripcion: { gap: espacio.xs },
   adjuntos: { gap: espacio.s },

@@ -14,7 +14,7 @@ import {
 import { nuevoIdSolicitud, siguienteEstadoReclamo } from '../../../shared/dominio.mjs';
 import { ETIQUETAS } from '../../../shared/constantes.mjs';
 import { codigoVecino, tiempoPasado } from '../../../shared/formato.mjs';
-import { EstadoEnvio, TONO_ESTADO_RECLAMO, accionPanel, estilosPanel, fechaCorta, plural } from './comun';
+import { EstadoEnvio, Grilla, TONO_ESTADO_RECLAMO, accionPanel, estilosPanel, fechaCorta, plural } from './comun';
 
 const LARGO_NOTA = 300;
 const POR_PAGINA = 12;   // se dibujan de a tandas: 50 tarjetas juntas pesan en un celular modesto
@@ -55,7 +55,7 @@ function ReclamoPanel({ reclamo, evento, ahora, onAvanzar }) {
   return (
     <Tarjeta testID={`reclamo-panel-${reclamo.id}`} estilo={estilosPanel.celda}>
       <View style={estilos.cabecera}>
-        <Texto variante="titulo3" estilo={estilos.codigo}>
+        <Texto variante="titulo3" numberOfLines={1} estilo={estilos.codigo}>
           {reclamo.codigo ?? 'Reclamo'}
         </Texto>
         <EtiquetaEstado
@@ -65,11 +65,11 @@ function ReclamoPanel({ reclamo, evento, ahora, onAvanzar }) {
         />
       </View>
       <View style={estilos.datos}>
-        <Texto variante="chico" peso="700">
+        <Texto variante="chico" peso="700" numberOfLines={1}>
           {`${categoria} · ${reclamo.direccion || 'Sin dirección'}`}
         </Texto>
         {reclamo.descripcion ? (
-          <Texto variante="cuerpo" numberOfLines={3}>
+          <Texto variante="cuerpo" numberOfLines={2}>
             {reclamo.descripcion}
           </Texto>
         ) : null}
@@ -88,7 +88,7 @@ function ReclamoPanel({ reclamo, evento, ahora, onAvanzar }) {
           ) : null}
         </View>
         {reclamo.notaMunicipal ? (
-          <Texto variante="chico">
+          <Texto variante="chico" numberOfLines={2}>
             <Texto variante="chico" peso="700">Nota para el vecino: </Texto>
             {reclamo.notaMunicipal}
           </Texto>
@@ -97,6 +97,7 @@ function ReclamoPanel({ reclamo, evento, ahora, onAvanzar }) {
           <EstadoEnvio evento={evento} testID={`envio-reclamo-${reclamo.id}`} />
         ) : null}
       </View>
+      <View style={estilosPanel.empujar} />
       {siguiente ? (
         <Boton
           titulo={TEXTO_AVANCE[siguiente]}
@@ -108,7 +109,7 @@ function ReclamoPanel({ reclamo, evento, ahora, onAvanzar }) {
           ancho="completo"
         />
       ) : (
-        <View style={estilos.adjuntos}>
+        <View style={estilos.cerrado}>
           <Icono nombre="checkCirculo" tamano={18} color={colores.exito} />
           <Texto variante="chico" color={colores.exito} peso="700">
             Reclamo cerrado
@@ -165,7 +166,7 @@ export default function PestanaReclamos({ reclamos, cargando, error, eventosPorI
   };
   const confirmar = () => {
     if (!actual || !siguiente) return;
-    mensajeExito.current = `El reclamo ${actual.codigo} pasó a ${ETIQUETAS.estadosReclamo[siguiente]}. El vecino ya lo ve en su celular.`;
+    mensajeExito.current = `El reclamo ${actual.codigo} pasó a ${ETIQUETAS.estadosReclamo[siguiente]}.`;
     avance.ejecutar(
       { uid: actual.uid, reclamoId: actual.id, estadoActual: actual.estado, nota: nota.trim() || null },
       dialogo.requestId,
@@ -179,36 +180,35 @@ export default function PestanaReclamos({ reclamos, cargando, error, eventosPorI
 
   return (
     <View style={estilos.contenedor}>
-      <Texto variante="chico" color={colores.textoSuave} estilo={estilosPanel.ayuda}>
-        Reclamos de todos los vecinos, del más nuevo al más viejo. Al avanzarlo, el vecino ve el cambio y
-        recibe un aviso.
-      </Texto>
       {error ? <ErrorCarga error={error} onReintentar={onReintentar} testID="error-reclamos-panel" /> : null}
       {reclamos.length ? (
-        <>
-          <Selector
-            etiqueta="Mostrar"
-            valor={filtro}
-            onCambio={setFiltro}
-            opciones={FILTROS.map((f) => ({ valor: f, etiqueta: `${ETIQUETA_FILTRO[f]} (${conteos[f]})` }))}
-            testID="filtro-reclamos"
-          />
-          <Campo
-            etiqueta="Buscar por código, dirección o descripción"
-            valor={busqueda}
-            onCambio={setBusqueda}
-            placeholder="Por ejemplo: R-1A2B3C o Belgrano"
-            id="buscar-reclamos-panel"
-            testID="buscar-reclamos-panel"
-          />
-        </>
+        <View style={estilos.filtros}>
+          <View style={estilos.filtro}>
+            <Selector
+              etiqueta="Mostrar"
+              valor={filtro}
+              onCambio={setFiltro}
+              opciones={FILTROS.map((f) => ({ valor: f, etiqueta: `${ETIQUETA_FILTRO[f]} (${conteos[f]})` }))}
+              testID="filtro-reclamos"
+            />
+          </View>
+          <View style={estilos.busqueda}>
+            <Campo
+              etiqueta="Buscar por código, dirección o descripción"
+              valor={busqueda}
+              onCambio={setBusqueda}
+              placeholder="Por ejemplo: R-1A2B3C o Belgrano"
+              id="buscar-reclamos-panel"
+              testID="buscar-reclamos-panel"
+            />
+          </View>
+        </View>
       ) : null}
 
       {!reclamos.length ? (
         <Vacio
           icono="reclamo"
           titulo="Todavía no hay reclamos de vecinos"
-          mensaje="Cuando un vecino cargue un reclamo desde la app, aparece acá al instante."
           testID="vacio-reclamos-panel"
         />
       ) : !visibles.length ? (
@@ -220,26 +220,26 @@ export default function PestanaReclamos({ reclamos, cargando, error, eventosPorI
           testID="vacio-filtro-reclamos"
         />
       ) : (
-        <View style={estilos.grilla}>
-          {visibles.slice(0, mostrar).map((r) => (
-            <ReclamoPanel
-              key={clave(r)}
-              reclamo={r}
-              evento={r.ultimoEventoId ? eventosPorId.get(r.ultimoEventoId) : null}
-              ahora={ahora}
-              onAvanzar={abrir}
-            />
-          ))}
+        <View style={estilos.lista}>
+          <Grilla>
+            {visibles.slice(0, mostrar).map((r) => (
+              <ReclamoPanel
+                key={clave(r)}
+                reclamo={r}
+                evento={r.ultimoEventoId ? eventosPorId.get(r.ultimoEventoId) : null}
+                ahora={ahora}
+                onAvanzar={abrir}
+              />
+            ))}
+          </Grilla>
           {visibles.length > mostrar ? (
-            <View style={estilos.verMas}>
-              <Boton
+            <Boton
               titulo={`Ver más reclamos (quedan ${visibles.length - mostrar})`}
               variante="secundario"
               ancho="completo"
               onPress={() => setMostrar((n) => n + POR_PAGINA)}
               testID="ver-mas-reclamos-panel"
-              />
-            </View>
+            />
           ) : null}
         </View>
       )}
@@ -281,7 +281,7 @@ export default function PestanaReclamos({ reclamos, cargando, error, eventosPorI
                 onCambio={setNota}
                 multilinea
                 maxLargo={LARGO_NOTA}
-                ayuda="Por ejemplo: La cuadrilla pasa mañana a la mañana."
+                ayuda="Por ejemplo, la cuadrilla pasa mañana a la mañana."
                 error={avance.errorDe('nota')}
                 id="nota-reclamo"
                 testID="nota-reclamo"
@@ -299,10 +299,13 @@ export default function PestanaReclamos({ reclamos, cargando, error, eventosPorI
 
 const estilos = StyleSheet.create({
   contenedor: { gap: espacio.l },
-  grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.m },
-  cabecera: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: espacio.s },
-  codigo: { flexShrink: 1 },
+  lista: { gap: espacio.m },
+  cabecera: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: espacio.s },
+  codigo: { flexShrink: 1, minWidth: 0 },
   datos: { gap: espacio.xs },
   adjuntos: { flexDirection: 'row', alignItems: 'center', gap: espacio.xs },
-  verMas: { width: '100%' },
+  cerrado: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: espacio.xs, minHeight: 48 },
+  filtros: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', columnGap: espacio.xl, rowGap: espacio.l },
+  filtro: { flexShrink: 0, maxWidth: '100%' },
+  busqueda: { flexGrow: 1, flexBasis: 320, minWidth: 0 },
 });

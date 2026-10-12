@@ -23,10 +23,10 @@ const BASE_VALIDA = {
 const MENSAJES = {
   categoria: () => 'Elegí de qué se trata tu reclamo.',
   direccion: (valor) => (String(valor ?? '').trim()
-    ? 'La ubicación es muy corta: sumá la calle y la altura, o una esquina.'
-    : 'Indicá dónde es: calle y altura, una esquina o un lugar conocido.'),
+    ? 'La ubicación es muy corta. Sumá la calle y la altura, o una esquina.'
+    : 'Indicá dónde es, con calle y altura, una esquina o un lugar conocido.'),
   descripcion: (valor) => (String(valor ?? '').trim()
-    ? 'Contanos un poco más: escribí al menos 10 caracteres.'
+    ? 'Contanos un poco más, con al menos 10 caracteres.'
     : 'Contanos qué pasa (al menos 10 caracteres).'),
 };
 

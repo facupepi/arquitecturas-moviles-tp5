@@ -109,13 +109,14 @@ export default function MenuLateral({ alElegir }) {
 /** Menú lateral fijo de escritorio. */
 export function MenuLateralFijo() {
   return (
-    <ScrollView style={estilos.fijo} contentContainerStyle={estilos.fijoContenido} dataSet={{ noImprimir: true }}>
-      <View style={estilos.cabecera}>
-        <Texto variante="titulo3">Tus servicios</Texto>
-        <Texto variante="chico" color={colores.textoSuave}>
-          Todo en un solo lugar
-        </Texto>
-      </View>
+    // Sin cabecera ni barra de desplazamiento propia: a 1366 × 768 entra entero, con el Panel, y en una ventana más
+    // baja se puede seguir desplazando con la rueda o el teclado sin que aparezca la barra.
+    <ScrollView
+      style={estilos.fijo}
+      contentContainerStyle={estilos.fijoContenido}
+      showsVerticalScrollIndicator={false}
+      dataSet={{ noImprimir: true }}
+    >
       <MenuLateral />
     </ScrollView>
   );
@@ -132,12 +133,9 @@ export function MenuMovil({ visible, onCerrar }) {
       <View style={estilos.capa}>
         <View style={[estilos.panelMovil, { width: ancho }]}>
           <View style={[estilos.cabecera, estilos.cabeceraMovil]}>
-            <View style={estilos.flexible}>
-              <Texto variante="titulo3">Tus servicios</Texto>
-              <Texto variante="chico" color={colores.textoSuave}>
-                Todo en un solo lugar
-              </Texto>
-            </View>
+            <Texto variante="titulo3" estilo={estilos.flexible}>
+              Tus servicios
+            </Texto>
             <Pressable
               role="button"
               aria-label="Cerrar menú"
@@ -159,8 +157,8 @@ export function MenuMovil({ visible, onCerrar }) {
 }
 
 const estilos = StyleSheet.create({
-  contenido: { gap: espacio.l },
-  lista: { gap: 2 },
+  contenido: { gap: espacio.m },
+  lista: { gap: 0 },
   item: {
     minHeight: medidas.toqueMinimo,
     flexDirection: 'row',
@@ -174,6 +172,7 @@ const estilos = StyleSheet.create({
   itemResaltado: { backgroundColor: '#eef4f8' },
   flexible: { flex: 1, minWidth: 0 },
   ayuda: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: espacio.m,
@@ -195,7 +194,7 @@ const estilos = StyleSheet.create({
   },
   fijoContenido: { padding: espacio.l, gap: espacio.l },
   cabecera: { gap: 2, paddingHorizontal: espacio.m },
-  cabeceraMovil: { flexDirection: 'row', alignItems: 'center', paddingTop: espacio.l, paddingLeft: espacio.xl, paddingRight: espacio.s },
+  cabeceraMovil: { flexDirection: 'row', alignItems: 'center', paddingTop: espacio.m, paddingLeft: espacio.xl, paddingRight: espacio.s },
   capa: { flex: 1, flexDirection: 'row' },
   panelMovil: {
     zIndex: 1,

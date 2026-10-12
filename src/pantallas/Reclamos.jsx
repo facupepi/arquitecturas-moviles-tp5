@@ -5,7 +5,7 @@
 //   #/reclamos/<id>               detalle con la línea de tiempo
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Boton, Cargando, ErrorCarga, Pantalla, Seccion, Vacio } from '../ui';
+import { Boton, Cargando, ErrorCarga, Pantalla, Seccion, Vacio, useAnchoDisponible } from '../ui';
 import { espacio } from '../tema/tokens';
 import { useRuta } from '../navegacion';
 import { cargarMas, useMunicipal } from '../datos/almacen';
@@ -13,6 +13,9 @@ import FormularioReclamo from './reclamos/FormularioReclamo';
 import ListaReclamos from './reclamos/ListaReclamos';
 import DetalleReclamo from './reclamos/DetalleReclamo';
 import { ubicacionDeEstacion } from './reclamos/util';
+
+// Desde este ancho de contenido, el formulario y la lista van en dos columnas.
+const ANCHO_DOS_COLUMNAS = 900;
 
 const TITULO = 'Centro de reclamos';
 const BAJADA = 'Contanos qué pasa en tu barrio y seguí cada reclamo hasta que se resuelva.';
@@ -65,6 +68,8 @@ export default function Reclamos({ ruta }) {
   const { navegar } = useRuta();
   const { listo, altaTerminada, reclamos, hayMas, error, estaciones, uid } = useMunicipal(seleccionar);
   const masReclamos = useCargarMas(reclamos.length);
+  const [ancho, alMedir] = useAnchoDisponible();
+  const dosColumnas = ancho >= ANCHO_DOS_COLUMNAS;
 
   const id = ruta?.id ?? null;
   const enDetalle = id !== null && id !== 'nuevo';
@@ -114,7 +119,6 @@ export default function Reclamos({ ruta }) {
         key="detalle"
         titulo={`Reclamo ${reclamo.codigo}`}
         antetitulo="CENTRO DE RECLAMOS"
-        bajada="Seguí en vivo cómo avanza tu reclamo."
         accion={<VolverAMisReclamos navegar={navegar} />}
         testID="pantalla-reclamos"
       >
@@ -145,24 +149,34 @@ export default function Reclamos({ ruta }) {
 
   return (
     <Pantalla key="principal" titulo={TITULO} bajada={BAJADA} testID="pantalla-reclamos">
-      <Seccion titulo="Nuevo reclamo">
-        {listo ? (
-          <FormularioReclamo
-            precarga={precarga}
-            onVer={(reclamoId) => navegar('reclamos', reclamoId)}
-            onCreado={() => {
-              if (id === 'nuevo') navegar('reclamos', null, null, { reemplazar: true });
-            }}
-          />
-        ) : (
-          <Cargando lineas={5} mensaje="Preparando el formulario…" testID="cargando-formulario" />
-        )}
-      </Seccion>
-      <Seccion titulo="Mis reclamos">{contenidoLista}</Seccion>
+      <View onLayout={alMedir} style={dosColumnas ? estilos.columnas : estilos.apilado}>
+        <View style={dosColumnas ? estilos.columnaFormulario : null}>
+          <Seccion titulo="Nuevo reclamo">
+            {listo ? (
+              <FormularioReclamo
+                precarga={precarga}
+                onVer={(reclamoId) => navegar('reclamos', reclamoId)}
+                onCreado={() => {
+                  if (id === 'nuevo') navegar('reclamos', null, null, { reemplazar: true });
+                }}
+              />
+            ) : (
+              <Cargando lineas={5} mensaje="Preparando el formulario…" testID="cargando-formulario" />
+            )}
+          </Seccion>
+        </View>
+        <View style={dosColumnas ? estilos.columnaLista : null}>
+          <Seccion titulo="Mis reclamos">{contenidoLista}</Seccion>
+        </View>
+      </View>
     </Pantalla>
   );
 }
 
 const estilos = StyleSheet.create({
   lista: { gap: espacio.m },
+  apilado: { gap: espacio.l },
+  columnas: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.xl },
+  columnaFormulario: { flex: 5, minWidth: 0 },
+  columnaLista: { flex: 7, minWidth: 0 },
 });

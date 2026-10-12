@@ -1,6 +1,6 @@
-// Pestaña Demo del panel (S8): parámetros de municipal/config (simulador, horario estricto y aviso
+// Pestaña Simulación del panel (S8; valor interno "demo"): parámetros de municipal/config (simulador, horario estricto y aviso
 // de estacionamiento), las tareas de Supabase a pedido (paso del simulador, recordatorios T4 y
-// resumen N2), "Restablecer valores de demo" y los últimos 20 eventos de la bandeja de salida.
+// resumen N2), "Restablecer valores iniciales" y los últimos 20 eventos de la bandeja de salida.
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useMunicipal } from '../../datos/almacen';
@@ -14,13 +14,13 @@ import {
 } from '../../ui';
 import { ETIQUETAS, LIMITES } from '../../../shared/constantes.mjs';
 import { tiempoPasado } from '../../../shared/formato.mjs';
-import { EtiquetaEvento, TIPOS_EVENTO, accionPanel, estilosPanel, plural } from './comun';
+import { DosColumnas, EtiquetaEvento, TIPOS_EVENTO, accionPanel, plural } from './comun';
 
 const MINUTOS_SIMULADOR = [1, 2, 5, 10];
 const AVISO_CLASE = LIMITES.avisoEstacionamientoMinMax;   // 14: con 15 minutos, avisa al minuto de empezar
 const OPCIONES_AVISO_EST = Array.from({ length: LIMITES.avisoEstacionamientoMinMax }, (_, i) => {
   const n = i + 1;
-  return { valor: String(n), etiqueta: `${plural(n, 'minuto')} antes del fin${n === AVISO_CLASE ? ' (recomendado para la clase)' : ''}` };
+  return { valor: String(n), etiqueta: `${plural(n, 'minuto')} antes del fin${n === AVISO_CLASE ? ' (recomendado para probar)' : ''}` };
 });
 
 // ---------- Textos de los resultados de las tareas ----------
@@ -50,7 +50,7 @@ function textoRecordatorios(r) {
   }
   return {
     titulo: `Se crearon ${plural(n, 'recordatorio')} de vencimiento`,
-    lineas: [push ? `Se enviaron ${plural(push, 'notificación push', 'notificaciones push')}.` : 'Ningún celular tenía las notificaciones push activadas: lo ven en Notificaciones.'],
+    lineas: [push ? `Se enviaron ${plural(push, 'notificación push', 'notificaciones push')}.` : 'Ningún celular tenía los avisos push activados. Los vecinos lo ven en Notificaciones.'],
   };
 }
 
@@ -103,7 +103,7 @@ function Configuracion({ config }) {
   const errorGeneral = guardar.error && !guardar.error.campo ? guardar.error : null;
 
   return (
-    <Tarjeta titulo="Configuración de la demo">
+    <Tarjeta titulo="Configuración">
       <Interruptor
         etiqueta="Simulador automático"
         descripcion="Mueve bicicletas y avanza reclamos solo, cada tantos minutos. Nunca activa alarmas."
@@ -122,7 +122,7 @@ function Configuracion({ config }) {
       />
       <Interruptor
         etiqueta="Cobro de estacionamiento solo en horario"
-        descripcion="Si lo apagás, se puede estacionar a cualquier hora (útil si la clase es de noche)."
+        descripcion="Si lo apagás, se puede estacionar a cualquier hora."
         valor={config.horarioEstricto}
         onCambio={(v) => guardar.ejecutar({ horarioEstricto: v })}
         deshabilitado={guardar.ocupado}
@@ -142,12 +142,12 @@ function Configuracion({ config }) {
       </Texto>
       {errorGeneral ? <Aviso tono="peligro" rol="alert" mensaje={errorGeneral.message} testID="error-configuracion" /> : null}
       <Boton
-        titulo="Usar valores para la clase"
+        titulo="Usar valores para probar"
         icono="ajustes"
         variante="texto"
         onPress={() => guardar.ejecutar({ avisoEstacionamientoMin: AVISO_CLASE, simuladorActivo: false })}
         deshabilitado={guardar.ocupado}
-        etiquetaAccesible={`Usar valores para la clase: aviso ${AVISO_CLASE} minutos antes y simulador apagado`}
+        etiquetaAccesible={`Usar valores para probar: aviso ${AVISO_CLASE} minutos antes y simulador apagado`}
         testID="valores-clase"
       />
     </Tarjeta>
@@ -171,15 +171,12 @@ function Eventos({ eventos, reclamos, cargando, error, onReintentar }) {
   const contexto = useMemo(() => ({ avisos, alarmas, reclamos }), [avisos, alarmas, reclamos]);
   return (
     <Seccion titulo="Últimos eventos enviados">
-      <Texto variante="chico" color={colores.textoSuave} estilo={estilosPanel.ayuda}>
-        Cada alarma, aviso o avance de reclamo deja un evento. El servidor lo toma y envía las notificaciones.
-      </Texto>
       {cargando ? (
         <Cargando lineas={3} mensaje="Cargando eventos…" />
       ) : error ? (
         <ErrorCarga error={error} onReintentar={onReintentar} testID="error-eventos" />
       ) : !eventos.length ? (
-        <Vacio icono="campana" titulo="Todavía no hay eventos" mensaje="Activá una alarma o publicá un aviso para ver acá cómo se envía." testID="vacio-eventos" />
+        <Vacio icono="campana" titulo="Todavía no hay envíos" testID="vacio-eventos" />
       ) : (
         <View style={estilos.lista} testID="lista-eventos">
           {eventos.map((e) => (
@@ -218,70 +215,77 @@ export default function PestanaDemo({ eventos, reclamos, cargando, error, onRein
     ...accionPanel('restablecer_demo'),
     alExito: () => {
       setConfirmarRestablecer(false);
-      aviso.mostrar('Listo: bicicletas, alarmas y configuración volvieron a los valores iniciales.');
+      aviso.mostrar('Bicicletas, alarmas y configuración volvieron a los valores iniciales.');
     },
   });
 
   return (
     <View style={estilos.contenedor}>
-
-      <Tarjeta titulo="Acciones inmediatas">
-        <AccionTarea
-          titulo="Un paso del simulador"
-          descripcion="Mueve algunas bicicletas y avanza reclamos que esperan hace unos minutos."
-          boton="Ejecutar un paso del simulador ahora"
-          icono="actualizar"
-          tarea="simulador"
-          armarTexto={(r) => textoSimulador(r, { estaciones, reclamos })}
-          testID="simulador-ahora"
-          testIDResultado="resultado-simulador"
-        />
-        <View style={estilos.separador} />
-        <AccionTarea
-          titulo="Recordatorios de vencimiento"
-          descripcion="Avisa a los vecinos con cedulones vencidos o que vencen en los próximos 3 días."
-          boton="Enviar recordatorios ahora"
-          icono="tributo"
-          tarea="diaria"
-          armarTexto={textoRecordatorios}
-          testID="recordatorios-ahora"
-          testIDResultado="resultado-recordatorios"
-        />
-        <View style={estilos.separador} />
-        <AccionTarea
-          titulo="Resumen diario"
-          descripcion="Envía el resumen del día a quienes eligieron “Resumen diario” en sus preferencias."
-          boton="Enviar resumen ahora"
-          icono="campana"
-          tarea="resumen"
-          armarTexto={textoResumen}
-          testID="resumen-ahora"
-          testIDResultado="resultado-resumen"
-        />
-        <View style={estilos.separador} />
-        <View style={estilos.accion}>
-          <Texto variante="cuerpo" peso="700">Volver a empezar</Texto>
-          <Texto variante="chico" color={colores.textoSuave}>
-            Deja las bicicletas como al principio, desactiva todas las alarmas y restablece la configuración.
-          </Texto>
-          <Boton
-            titulo="Restablecer valores de demo"
-            icono="actualizar"
-            variante="texto"
-            onPress={() => { restablecer.limpiar(); setConfirmarRestablecer(true); }}
-            testID="restablecer-demo"
-          />
-        </View>
-      </Tarjeta>
-
-      {errorCatalogo && !config ? <ErrorCarga error={errorCatalogo} testID="error-config" /> : null}
-      {config ? <Configuracion config={config} /> : !errorCatalogo ? <Cargando lineas={3} /> : null}
+      <DosColumnas
+        proporcion={[1, 1]}
+        principal={(
+          <Tarjeta titulo="Acciones inmediatas">
+            <AccionTarea
+              titulo="Un paso del simulador"
+              descripcion="Mueve algunas bicicletas y avanza reclamos que esperan hace unos minutos."
+              boton="Ejecutar un paso del simulador ahora"
+              icono="actualizar"
+              tarea="simulador"
+              armarTexto={(r) => textoSimulador(r, { estaciones, reclamos })}
+              testID="simulador-ahora"
+              testIDResultado="resultado-simulador"
+            />
+            <View style={estilos.separador} />
+            <AccionTarea
+              titulo="Recordatorios de vencimiento"
+              descripcion="Avisa a los vecinos con cedulones vencidos o que vencen en los próximos 3 días."
+              boton="Enviar recordatorios ahora"
+              icono="tributo"
+              tarea="diaria"
+              armarTexto={textoRecordatorios}
+              testID="recordatorios-ahora"
+              testIDResultado="resultado-recordatorios"
+            />
+            <View style={estilos.separador} />
+            <AccionTarea
+              titulo="Resumen diario"
+              descripcion="Envía el resumen del día a quienes eligieron “Resumen diario” en sus preferencias."
+              boton="Enviar resumen ahora"
+              icono="campana"
+              tarea="resumen"
+              armarTexto={textoResumen}
+              testID="resumen-ahora"
+              testIDResultado="resultado-resumen"
+            />
+            <View style={estilos.separador} />
+            <View style={estilos.accion}>
+              <Texto variante="cuerpo" peso="700">Volver a empezar</Texto>
+              <Texto variante="chico" color={colores.textoSuave}>
+                Deja las bicicletas como al principio, desactiva todas las alarmas y restablece la configuración.
+              </Texto>
+              <Boton
+                titulo="Restablecer valores iniciales"
+                icono="actualizar"
+                variante="texto"
+                onPress={() => { restablecer.limpiar(); setConfirmarRestablecer(true); }}
+                testID="restablecer-demo"
+              />
+            </View>
+          </Tarjeta>
+        )}
+        lateral={(
+          <>
+            {errorCatalogo && !config ? <ErrorCarga error={errorCatalogo} testID="error-config" /> : null}
+            {config ? <Configuracion config={config} /> : !errorCatalogo ? <Cargando lineas={3} /> : null}
+          </>
+        )}
+      />
 
       <Eventos eventos={eventos} reclamos={reclamos} cargando={cargando} error={error} onReintentar={onReintentar} />
 
       <Dialogo
         visible={confirmarRestablecer}
-        titulo="¿Restablecer la demo?"
+        titulo="¿Restablecer los valores iniciales?"
         onCerrar={() => !restablecer.ocupado && setConfirmarRestablecer(false)}
         cerrable={!restablecer.ocupado}
         testID="dialogo-restablecer"

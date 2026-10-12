@@ -8,12 +8,6 @@ import { fechaHora } from '../../../shared/formato.mjs';
 import { ESTADOS_RECLAMO } from '../../../shared/constantes.mjs';
 import { etiquetaEstado } from './util';
 
-const DESCRIPCIONES = {
-  recibido: 'La Municipalidad registró tu reclamo.',
-  en_proceso: 'Un equipo municipal está trabajando en el lugar.',
-  resuelto: 'El problema quedó solucionado.',
-};
-
 function pasos(reclamo) {
   const actual = Math.max(0, ESTADOS_RECLAMO.indexOf(reclamo?.estado));
   return ESTADOS_RECLAMO.map((estado, i) => ({
@@ -78,11 +72,6 @@ export default function PasosReclamo({ reclamo, compacto = false }) {
               <Texto variante="chico" color={p.hecho ? colores.texto : colores.textoSuave} testID={`fecha-${p.estado}`}>
                 {estadoTexto}
               </Texto>
-              {p.actual ? (
-                <Texto variante="chico" color={colores.textoSuave}>
-                  {DESCRIPCIONES[p.estado]}
-                </Texto>
-              ) : null}
             </View>
           </View>
         );

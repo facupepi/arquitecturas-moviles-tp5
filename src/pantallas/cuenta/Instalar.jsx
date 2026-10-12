@@ -33,8 +33,7 @@ export default function Instalar({ compacto = false }) {
       <View testID="instalacion-lista" style={estilos.bloque}>
         <EtiquetaEstado texto="App instalada" tono="exito" icono="checkCirculo" />
         <Texto variante="chico" color={colores.textoSuave}>
-          Abrí Conecta desde el ícono de tu pantalla de inicio, como cualquier otra app. Funciona también sin conexión
-          con los últimos datos guardados.
+          Funciona también sin conexión, con los últimos datos guardados.
         </Texto>
       </View>
     );
@@ -64,7 +63,7 @@ export default function Instalar({ compacto = false }) {
     <View testID={esIOS ? 'instalacion-ios' : 'instalacion-manual'} style={estilos.bloque}>
       {respuesta === 'dismissed' ? (
         <Texto variante="chico" color={colores.textoSuave}>
-          No pasa nada: podés instalarla más tarde desde el menú del navegador.
+          Podés instalarla más tarde desde el menú del navegador.
         </Texto>
       ) : null}
       {esIOS ? (

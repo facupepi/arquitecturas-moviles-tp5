@@ -12,7 +12,7 @@ import { useRuta } from '../navegacion';
 import { SERVICIOS } from '../tema/servicios';
 import { colores, espacio, medidas, radios, tipografia } from '../tema/tokens';
 import {
-  Cargando, ErrorCarga, EtiquetaEstado, Icono, Pantalla, Seccion, Tarjeta, Texto, Vacio,
+  Cargando, ErrorCarga, EtiquetaEstado, Icono, Pantalla, Seccion, Tarjeta, Texto, Vacio, anchoContenidoEstimado,
 } from '../ui';
 import { alPresionarEspacio, conFoco } from '../ui/comun';
 import { dinero, fecha, hora, tiempoRelativo, tiempoPasado } from '../../shared/formato.mjs';
@@ -20,6 +20,7 @@ import { ETIQUETAS } from '../../shared/constantes.mjs';
 
 const MIN = 60_000;
 const GAP = espacio.s;
+const GAP_ANCHO = espacio.m;
 const SALTO = '\n';
 
 // Palabras con las que un vecino busca cada servicio (sin tildes: se comparan normalizadas).
@@ -228,40 +229,57 @@ function Buscador({ valor, onCambio, onEnviar }) {
 
 // ---------- Grilla de servicios ----------
 
-function Acceso({ servicio, dato, ancho, completo, onPress }) {
+function Acceso({ servicio, dato, ancho, completo, vertical, onPress }) {
   const etiqueta = ETIQUETA_TILE[servicio.ruta] ?? servicio.corto;
+  const textos = (
+    <>
+      <Texto variante="cuerpo" peso="700" numberOfLines={1} estilo={estilos.accesoNombre}>
+        {completo ? servicio.nombre : etiqueta}
+      </Texto>
+      <Texto
+        variante="chico"
+        peso={dato.tono === 'normal' ? '600' : '700'}
+        color={COLOR_TONO[dato.tono] ?? colores.textoSuave}
+        numberOfLines={2}
+        estilo={estilos.accesoDato}
+        testID={`dato-${servicio.ruta}`}
+      >
+        {dato.texto}
+      </Texto>
+    </>
+  );
   return (
     <Tarjeta
       onPress={onPress}
       etiquetaAccesible={`${servicio.nombre}: ${dato.accesible ?? dato.texto.split(SALTO).join(', ')}`}
       testID={`servicio-${servicio.ruta}`}
-      estilo={[estilos.acceso, { width: ancho }, completo && estilos.accesoCompleto]}
+      estilo={[estilos.acceso, { width: ancho }, vertical && estilos.accesoVertical]}
     >
+      {vertical ? (
+        // Escritorio: los siete accesos en una sola fila, con el ícono arriba.
+        <>
+          <View style={[estilos.accesoIcono, estilos.accesoIconoVertical, { backgroundColor: servicio.fondo }]}>
+            <Icono nombre={servicio.icono} tamano={22} color={servicio.tinta} />
+          </View>
+          <View style={[estilos.accesoTextos, estilos.accesoTextosVertical]}>{textos}</View>
+        </>
+      ) : (
       <View style={estilos.accesoFila}>
         <View style={[estilos.accesoIcono, { backgroundColor: servicio.fondo }]}>
           <Icono nombre={servicio.icono} tamano={20} color={servicio.tinta} />
         </View>
-        <View style={estilos.accesoTextos}>
-          <Texto variante="cuerpo" peso="700" numberOfLines={1} estilo={estilos.accesoNombre}>
-            {completo ? servicio.nombre : etiqueta}
-          </Texto>
-          <Texto
-            variante="chico"
-            peso={dato.tono === 'normal' ? '600' : '700'}
-            color={COLOR_TONO[dato.tono] ?? colores.textoSuave}
-            numberOfLines={2}
-            estilo={estilos.accesoDato}
-            testID={`dato-${servicio.ruta}`}
-          >
-            {dato.texto}
-          </Texto>
-        </View>
+        <View style={estilos.accesoTextos}>{textos}</View>
       </View>
+      )}
     </Tarjeta>
   );
 }
 
-function columnasPara(ancho) {
+// Ancho desde el que los siete accesos entran en una fila (unos 130 px cada uno, con el ícono arriba).
+const ANCHO_FILA_UNICA = 980;
+
+function columnasPara(ancho, cantidad) {
+  if (ancho >= ANCHO_FILA_UNICA) return Math.max(1, cantidad);
   if (ancho >= 760) return 4;
   if (ancho >= 500) return 3;
   return 2;
@@ -270,15 +288,17 @@ function columnasPara(ancho) {
 function Grilla({ servicios, resumen, onElegir }) {
   const { width } = useWindowDimensions();
   const [medido, setMedido] = useState(null);
-  const ancho = medido ?? Math.max(0, Math.min(width, medidas.anchoMaximo) - 2 * medidas.margenLateral);
-  const columnas = columnasPara(ancho);
-  const anchoAcceso = Math.floor((ancho - GAP * (columnas - 1)) / columnas);
+  const ancho = medido ?? anchoContenidoEstimado(width);
+  const columnas = columnasPara(ancho, servicios.length);
+  const vertical = ancho >= ANCHO_FILA_UNICA;
+  const gap = vertical ? GAP_ANCHO : GAP;
+  const anchoAcceso = Math.floor((ancho - gap * (columnas - 1)) / columnas);
   const sobrante = servicios.length % columnas;
 
   return (
     <View
       testID="grilla-servicios"
-      style={estilos.grilla}
+      style={[estilos.grilla, { gap }]}
       onLayout={(e) => {
         const w = Math.round(e.nativeEvent.layout.width);
         if (w > 0 && w !== medido) setMedido(w);
@@ -294,6 +314,7 @@ function Grilla({ servicios, resumen, onElegir }) {
             dato={datoDe(servicio.ruta, resumen)}
             ancho={completo ? ancho : anchoAcceso}
             completo={completo}
+            vertical={vertical}
             onPress={() => onElegir(servicio.ruta)}
           />
         );
@@ -356,7 +377,7 @@ function FilaResumen({ icono, servicio, etiqueta, valor, detalle, tono = 'normal
       </View>
       <View style={estilos.filaTextos}>
         <View style={estilos.filaCabecera}>
-          <Texto variante="chico" peso="700" color={colores.textoSuave} estilo={estilos.flexible}>
+          <Texto variante="chico" peso="700" color={colores.textoSuave} estilo={estilos.filaEtiqueta}>
             {etiqueta}
           </Texto>
           <Texto variante="cuerpo" peso="700" color={tono === 'normal' ? colores.texto : COLOR_TONO[tono]} testID={`${testID}-valor`}>
@@ -423,7 +444,7 @@ function Resumen({ r, navegar }) {
         detalle: `${sesion.patente} en ${sesion.zonaNombre}, hasta las ${hora(sesion.fin)}.${r.activas.length > 1 ? ` Y ${plural(r.activas.length - 1, 'sesión más', 'sesiones más')}.` : ''}`,
         tono: 'exito',
       }
-      : { valor: 'Sin sesión', detalle: 'Iniciá tu estacionamiento medido en segundos.', tono: 'normal' };
+      : { valor: 'Sin sesión', detalle: 'No tenés un estacionamiento activo.', tono: 'normal' };
 
   // Avisos sin leer
   const avisos = errorDe('notificaciones')
@@ -474,7 +495,7 @@ function Resumen({ r, navegar }) {
   );
 }
 
-function UltimoAviso({ r, navegar }) {
+function UltimoAviso({ r, navegar, estirar = false }) {
   if (!r.listo) return <Cargando lineas={2} mensaje="Buscando avisos…" testID="aviso-cargando" />;
   const error = r.errores?.avisos;
   if (error) return <ErrorCarga error={error} testID="aviso-error" />;
@@ -484,7 +505,7 @@ function UltimoAviso({ r, navegar }) {
       <Vacio
         icono="checkCirculo"
         titulo="Estás al día"
-        mensaje="No hay avisos de la ciudad para tus zonas. Cuando haya novedades, te las mostramos acá."
+        mensaje="No hay avisos de la ciudad para tus zonas."
         accion={{ titulo: 'Elegir qué avisos recibir', onPress: () => navegar('notificaciones'), testID: 'ir-preferencias' }}
         testID="avisos-vacio"
       />
@@ -497,6 +518,7 @@ function UltimoAviso({ r, navegar }) {
       onPress={() => navegar('notificaciones', aviso.id)}
       etiquetaAccesible={`${aviso.leida ? '' : 'Nuevo. '}${aviso.titulo}. ${aviso.cuerpo}`}
       testID="ultimo-aviso"
+      estilo={estirar ? estilos.avisoEstirado : null}
     >
       <View style={estilos.avisoEtiquetas}>
         {aviso.leida ? null : <EtiquetaEstado texto="Nuevo" tono="info" />}
@@ -506,6 +528,7 @@ function UltimoAviso({ r, navegar }) {
       <Texto variante="cuerpo" color={colores.textoSuave} numberOfLines={3}>
         {aviso.cuerpo}
       </Texto>
+      {estirar ? <View style={estilos.flexible} /> : null}
       <View style={estilos.avisoPie}>
         <Texto variante="chico" color={colores.textoSuave} estilo={estilos.flexible}>
           {tiempoPasado(aviso.creadoEn, r.ahora)}
@@ -546,6 +569,8 @@ export default function Inicio() {
     else if (atajos.length) irAAtajo(atajos[0]);
   };
 
+  const { width } = useWindowDimensions();
+  const ancho = anchoContenidoEstimado(width) >= ANCHO_FILA_UNICA;
   const nombre = (r.usuario?.nombre || '').trim().split(/\s+/)[0];
   const resultados = servicios.length + atajos.length;
 
@@ -580,14 +605,19 @@ export default function Inicio() {
       </View>
 
       {buscando ? null : (
-        <>
-          <Seccion titulo="Tu resumen" testID="seccion-resumen">
-            <Resumen r={r} navegar={navegar} />
-          </Seccion>
-          <Seccion titulo="Último aviso de la ciudad" testID="seccion-aviso">
-            <UltimoAviso r={r} navegar={navegar} />
-          </Seccion>
-        </>
+        // En escritorio, el resumen y el último aviso van lado a lado y con el mismo alto.
+        <View style={ancho ? estilos.dosColumnas : estilos.unaColumna}>
+          <View style={ancho ? estilos.columnaResumen : null}>
+            <Seccion titulo="Tu resumen" testID="seccion-resumen" estirar={ancho}>
+              <Resumen r={r} navegar={navegar} />
+            </Seccion>
+          </View>
+          <View style={ancho ? estilos.columnaAviso : null}>
+            <Seccion titulo="Último aviso de la ciudad" testID="seccion-aviso" estirar={ancho}>
+              <UltimoAviso r={r} navegar={navegar} estirar={ancho} />
+            </Seccion>
+          </View>
+        </View>
       )}
     </Pantalla>
   );
@@ -629,7 +659,9 @@ const estilos = StyleSheet.create({
   borrarResaltado: { backgroundColor: colores.fondo },
   grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
   acceso: { padding: espacio.m, gap: 0, alignSelf: 'auto', minHeight: 76, justifyContent: 'center' },
-  accesoCompleto: {},
+  accesoVertical: { minHeight: 0, justifyContent: 'flex-start', alignItems: 'flex-start', gap: espacio.s, paddingVertical: espacio.l },
+  accesoIconoVertical: { width: 42, height: 42 },
+  accesoTextosVertical: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', alignSelf: 'stretch' },
   accesoFila: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   accesoIcono: {
     width: 38,
@@ -666,7 +698,15 @@ const estilos = StyleSheet.create({
     flexShrink: 0,
   },
   filaTextos: { flex: 1, minWidth: 0, gap: 2 },
-  filaCabecera: { flexDirection: 'row', alignItems: 'baseline', gap: espacio.s, flexWrap: 'wrap' },
+  filaCabecera: { flexDirection: 'row', alignItems: 'baseline', columnGap: espacio.s, flexWrap: 'wrap' },
+  // Crece hasta empujar el valor a la derecha; si no entran los dos, el valor baja a otra línea
+  // (antes la etiqueta se achicaba y cortaba "Estacionamiento" a la mitad a 360 px).
+  filaEtiqueta: { flexGrow: 1, flexShrink: 0 },
   avisoEtiquetas: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.s },
+  dosColumnas: { flexDirection: 'row', alignItems: 'stretch', gap: espacio.xl },
+  unaColumna: { gap: espacio.l },
+  columnaResumen: { flex: 3, minWidth: 0, flexDirection: 'column' },
+  columnaAviso: { flex: 2, minWidth: 0, flexDirection: 'column' },
+  avisoEstirado: { flexGrow: 1 },
   avisoPie: { flexDirection: 'row', alignItems: 'center', gap: espacio.xs },
 });

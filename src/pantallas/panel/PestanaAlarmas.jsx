@@ -33,30 +33,27 @@ function AlarmaPanel({ alarma, evento, ahora }) {
   };
 
   return (
-    <Tarjeta tono={alarma.activa ? 'peligro' : 'normal'} testID={`alarma-panel-tarjeta-${alarma.id}`} estilo={estilosPanel.celda}>
-      <Interruptor
-        etiqueta={alarma.nombre}
-        descripcion={`${alarma.referencia ?? ''} · Zona ${zona}`.replace(/^ · /, '')}
-        valor={alarma.activa}
-        onCambio={alternar}
-        deshabilitado={cambio.ocupado}
-        testID={`alarma-panel-${alarma.id}`}
-      />
-      <View style={estilosPanel.fila}>
-        <EtiquetaEstado
-          texto={alarma.activa ? 'Activada' : 'Desactivada'}
-          tono={alarma.activa ? 'peligro' : 'neutro'}
-          icono={alarma.activa ? 'alarma' : undefined}
-          testID={`estado-alarma-panel-${alarma.id}`}
-        />
-        <Texto variante="chico" color={colores.textoSuave}>
-          {cambio.ocupado
-            ? 'Guardando…'
-            : alarma.activa && alarma.activadaEn
-              ? `Activada ${tiempoPasado(alarma.activadaEn, ahora)}`
-              : alarma.actualizadoEn
-                ? `Actualizada ${tiempoPasado(alarma.actualizadoEn, ahora)}`
-                : ''}
+    <Tarjeta
+      tono={alarma.activa ? 'peligro' : 'normal'}
+      etiquetaAccesible={alarma.nombre}
+      testID={`alarma-panel-tarjeta-${alarma.id}`}
+      estilo={estilosPanel.celda}
+    >
+      {/* Misma estructura en todas: nombre (hasta dos líneas) con el estado arriba a la derecha, zona y lugar
+          en una línea a todo el ancho y el interruptor siempre al pie, alineado entre las tarjetas de una fila. */}
+      <View style={estilos.encabezado}>
+        <View style={estilos.cabecera}>
+          <Texto variante="titulo3" numberOfLines={2} estilo={estilos.titulo}>{alarma.nombre}</Texto>
+          <EtiquetaEstado
+            texto={alarma.activa ? 'Activada' : 'Desactivada'}
+            tono={alarma.activa ? 'peligro' : 'neutro'}
+            icono={alarma.activa ? 'alarma' : undefined}
+            sobreColor={alarma.activa}
+            testID={`estado-alarma-panel-${alarma.id}`}
+          />
+        </View>
+        <Texto variante="chico" color={colores.textoSuave} numberOfLines={1}>
+          {[`Zona ${zona}`, alarma.referencia].filter(Boolean).join(' · ')}
         </Texto>
       </View>
       {alarma.activa && alarma.activacionId ? (
@@ -65,6 +62,21 @@ function AlarmaPanel({ alarma, evento, ahora }) {
       {cambio.error ? (
         <Aviso tono="peligro" rol="alert" mensaje={cambio.error.message} testID={`error-alarma-${alarma.id}`} />
       ) : null}
+      <View style={estilosPanel.empujar} />
+      <Interruptor
+        etiqueta="Activa"
+        descripcion={cambio.ocupado
+          ? 'Guardando…'
+          : alarma.activa && alarma.activadaEn
+            ? `Activada ${tiempoPasado(alarma.activadaEn, ahora)}`
+            : alarma.actualizadoEn
+              ? `Actualizada ${tiempoPasado(alarma.actualizadoEn, ahora)}`
+              : undefined}
+        valor={alarma.activa}
+        onCambio={alternar}
+        deshabilitado={cambio.ocupado}
+        testID={`alarma-panel-${alarma.id}`}
+      />
     </Tarjeta>
   );
 }
@@ -83,14 +95,12 @@ export default function PestanaAlarmas({ eventosPorId }) {
     <View style={estilos.contenedor}>
       <Texto variante="chico" color={colores.textoSuave} estilo={estilosPanel.ayuda}>
         Al activar una alarma, les avisamos a los vecinos que siguen esa zona y a los que están cerca.
-        En sus celulares el mapa y la etiqueta cambian solos.
       </Texto>
       {error ? <ErrorCarga error={error} testID="error-alarmas-panel" /> : null}
       {!alarmas.length ? (
         <Vacio
           icono="alarma"
           titulo="No hay alarmas cargadas"
-          mensaje="Las alarmas comunitarias se cargan con el catálogo de la ciudad."
           testID="vacio-alarmas-panel"
         />
       ) : (
@@ -119,4 +129,7 @@ export default function PestanaAlarmas({ eventosPorId }) {
 
 const estilos = StyleSheet.create({
   contenedor: { gap: espacio.l },
+  cabecera: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.s },
+  encabezado: { gap: 2 },
+  titulo: { flex: 1, minWidth: 0 },
 });

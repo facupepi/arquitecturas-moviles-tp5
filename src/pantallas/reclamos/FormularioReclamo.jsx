@@ -30,7 +30,7 @@ function MensajeResultado({ resultado, enLinea, onVer, onCerrar }) {
         titulo={enLinea ? 'Estamos enviando tu reclamo' : 'Guardamos tu reclamo en el teléfono'}
         mensaje={
           enLinea
-            ? `Código ${resultado.codigo}. En unos segundos lo vas a ver como Recibido en Mis reclamos.`
+            ? `Código ${resultado.codigo}.`
             : `Código ${resultado.codigo}. Sin conexión: tu reclamo se enviará cuando vuelvas a estar en línea.`
         }
         onCerrar={onCerrar}
@@ -239,7 +239,7 @@ export default function FormularioReclamo({ precarga, onCreado, onVer }) {
           valor={datos.descripcion}
           onCambio={cambiar('descripcion')}
           placeholder="¿Qué pasa y desde cuándo?"
-          ayuda="Con al menos 10 caracteres nos alcanza para ubicar el problema."
+          ayuda="Al menos 10 caracteres."
           error={errorDe('descripcion')}
           ref={refs.descripcion}
           multilinea
@@ -254,7 +254,7 @@ export default function FormularioReclamo({ precarga, onCreado, onVer }) {
           deshabilitado={envio.ocupado}
           error={errorDeAdjuntos}
           aviso={avisoAdjuntos ?? (!enLinea && archivos.length
-            ? 'Sin conexión: para enviar archivos necesitás internet. Podés quitarlos y enviar el reclamo igual.'
+            ? 'Para enviar archivos necesitás conexión. Podés quitarlos y enviar el reclamo igual.'
             : null)}
         />
       </View>

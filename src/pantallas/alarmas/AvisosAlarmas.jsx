@@ -13,7 +13,6 @@ import { EVENTOS, registrarEvento } from '../../firebase/analytics';
 import { colores, espacio } from '../../tema/tokens';
 import { Aviso, Boton, Icono, Interruptor, Selector, Tarjeta, Texto } from '../../ui';
 import { ETIQUETAS, ZONAS } from '../../../shared/constantes.mjs';
-import { hora } from '../../../shared/formato.mjs';
 
 const OPCIONES_ZONAS = ZONAS.map((z) => ({ valor: z, etiqueta: ETIQUETAS.zonas[z] ?? z }));
 
@@ -104,7 +103,7 @@ function Zonas({ preferencias }) {
         <Aviso
           tono="alerta"
           titulo="No seguís ninguna zona"
-          mensaje="No te vamos a avisar cuando se active una alarma (salvo las cercanas, si activás el aviso por cercanía). Elegí al menos una zona."
+          mensaje="Elegí al menos una zona para que te avisemos cuando se active una alarma."
           testID="sin-zonas"
         />
       ) : null}
@@ -163,13 +162,8 @@ function Cercania({ alarmas }) {
           <Texto variante="chico" peso="700">
             {nombres.length
               ? `Cerca tuyo: ${nombres.join(', ')}.`
-              : `No hay alarmas a menos de ${radio}. Si te acercás a una, te avisamos igual.`}
+              : `No hay alarmas a menos de ${radio}.`}
           </Texto>
-          {Number.isFinite(registro.vence) ? (
-            <Texto variante="chico" color={colores.textoSuave}>
-              {`Activo hasta las ${hora(registro.vence)}. Se renueva solo mientras tengas la app abierta.`}
-            </Texto>
-          ) : null}
         </View>
       ) : null}
       <View style={estilos.fila}>
@@ -211,9 +205,6 @@ function AvisosCelular() {
   } else if (push.soportado) {
     contenido = (
       <View style={estilos.bloqueChico}>
-        <Texto variante="chico" color={colores.textoSuave}>
-          Para enterarte aunque tengas la app cerrada, activá los avisos en este celular.
-        </Texto>
         <Boton
           titulo="Activar avisos en este celular"
           icono="campana"
@@ -232,7 +223,7 @@ function AvisosCelular() {
   } else {
     contenido = (
       <Texto variante="chico" color={colores.textoSuave} testID="push-no-disponible">
-        {`${push.motivo ?? 'Este navegador no admite avisos con la app cerrada.'} Con la app abierta te avisamos igual.`}
+        {push.motivo ?? 'Este navegador no admite avisos con la app cerrada. Con la app abierta te avisamos igual.'}
       </Texto>
     );
   }
@@ -257,7 +248,7 @@ export default function AvisosAlarmas({ alarmas, preferencias, onIrANotificacion
           tono="aviso"
           titulo={alarmasApagadas ? 'Tenés apagados los avisos de alarmas' : 'Recibís los avisos en un resumen'}
           mensaje={alarmasApagadas
-            ? 'Vas a ver el estado en esta pantalla, pero no te vamos a avisar cuando se active una. Podés cambiarlo en Notificaciones.'
+            ? 'No te vamos a avisar cuando se active una alarma. Podés cambiarlo en Notificaciones.'
             : `Elegiste "${ETIQUETAS.frecuencias[preferencias.frecuencia] ?? preferencias.frecuencia}". Para enterarte en el momento, cambiá la frecuencia a Inmediata en Notificaciones.`}
           accion={{ titulo: 'Ir a Notificaciones', onPress: onIrANotificaciones, testID: 'ir-notificaciones' }}
           testID="aviso-preferencias"

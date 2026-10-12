@@ -68,7 +68,7 @@ export default function DialogoPago({ visible, tributo, requestId, ahora, ocupad
         {tributo.estado === 'vencido' ? (
           <Aviso
             tono="alerta"
-            mensaje="Este cedulón está vencido. En esta demostración no se suman recargos por mora."
+            mensaje="Este cedulón está vencido. No se aplican recargos por mora."
             testID="aviso-vencido-pago"
           />
         ) : null}
@@ -76,7 +76,7 @@ export default function DialogoPago({ visible, tributo, requestId, ahora, ocupad
         <Aviso
           tono="aviso"
           titulo={TEXTO_SIN_CARGOS}
-          mensaje="No se debita dinero de ninguna cuenta: es una demostración académica."
+          mensaje="No se debita dinero de ninguna cuenta."
           testID="aviso-sin-cargos"
         />
 

@@ -3,7 +3,7 @@
 // cerca) y A4 (suscripción a zonas). El aviso flotante de una alarma nueva lo publica el almacén
 // (deduplicado por claveEntrega): esta pantalla no muestra avisos flotantes propios.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useMunicipal } from '../datos/almacen';
 import { useAhora } from '../datos/useAhora';
 import { useRuta } from '../navegacion';
@@ -13,6 +13,7 @@ import { tiempoRelativo } from '../../shared/formato.mjs';
 import AvisosAlarmas from './alarmas/AvisosAlarmas';
 import TarjetaAlarma from './alarmas/TarjetaAlarma';
 import { llevarALaVista } from './bicicletas/llevarALaVista';
+import { ANCHO_LADO_A_LADO, Grilla, MapaYLista, useAncho } from './bicicletas/Disposicion';
 import { nombreZona } from './bicicletas/utiles';
 
 const seleccionar = (s) => ({
@@ -39,6 +40,13 @@ export default function Alarmas({ ruta }) {
   const { listo, alarmas, preferencias, cercanas, cercaniaActiva, error, recibidas } = useMunicipal(seleccionar);
   const ahora = useAhora(30_000);
   const refMapa = useRef(null);
+  const [ancho, alMedir] = useAncho();
+  const { height: altoVentana } = useWindowDimensions();
+  const ladoALado = ancho >= ANCHO_LADO_A_LADO;
+  const refLadoALado = useRef(ladoALado);
+  refLadoALado.current = ladoALado;
+  // En escritorio el mapa acompaña a la lista y ocupa casi todo el alto visible.
+  const altoMapa = ladoALado ? Math.round(Math.min(620, Math.max(380, altoVentana - 330))) : 280;
   const [seleccionado, setSeleccionado] = useState(ruta?.id ?? null);
   // Las alarmas llegan por su propia suscripción: se espera un poco antes de decir "no hay".
   const [esperaVencida, setEsperaVencida] = useState(false);
@@ -95,7 +103,8 @@ export default function Alarmas({ ruta }) {
 
   const verEnMapa = useCallback((id) => {
     setSeleccionado(id);
-    llevarALaVista(refMapa);
+    // Lado a lado el mapa ya está a la vista: no hace falta desplazar la pantalla.
+    if (!refLadoALado.current) llevarALaVista(refMapa);
   }, []);
 
   let contenido;
@@ -108,13 +117,58 @@ export default function Alarmas({ ruta }) {
       <Vacio
         icono="alarma"
         titulo="Todavía no hay alarmas comunitarias"
-        mensaje="Cuando la Municipalidad instale alarmas en tu barrio, vas a ver su estado acá."
         testID="alarmas-vacio"
       />
     );
   } else {
-    contenido = (
+    const mapa = (
       <>
+        <View ref={refMapa}>
+          <Mapa
+            puntos={puntos}
+            seleccionado={seleccionado}
+            onSeleccionar={setSeleccionado}
+            alto={altoMapa}
+            etiqueta="Mapa de las alarmas comunitarias de San Francisco"
+            testID="mapa-alarmas"
+          />
+        </View>
+        <View style={estilos.leyenda} aria-hidden>
+          <Punto color={coloresMapa.normal} texto="Desactivada" />
+          <Punto color={coloresMapa.activo} texto="Activada" />
+          <Punto color={coloresMapa.seleccionado} texto="Elegida" elegida />
+        </View>
+      </>
+    );
+    const avisos = (
+      <Seccion titulo="Tus avisos de alarmas">
+        <AvisosAlarmas
+          alarmas={alarmas}
+          preferencias={preferencias}
+          onIrANotificaciones={() => navegar('notificaciones')}
+        />
+      </Seccion>
+    );
+    const estado = (
+      <Seccion titulo="Estado de cada alarma">
+        <Grilla minimo={300} maximo={3}>
+          {ordenadas.map((a) => (
+            <TarjetaAlarma
+              key={a.id}
+              refContenedor={(nodo) => { refsTarjetas.current[a.id] = nodo; }}
+              alarma={a}
+              sigueZona={zonas.includes(a.zona)}
+              cerca={idsCerca.has(a.id)}
+              seleccionada={a.id === seleccionado}
+              ahora={ahora}
+              onVerEnMapa={verEnMapa}
+            />
+          ))}
+        </Grilla>
+      </Seccion>
+    );
+    contenido = (
+      <View onLayout={alMedir} style={estilos.contenido}>
         {error ? <ErrorCarga error={error} testID="alarmas-error" /> : null}
         {activas.length ? (
           <Aviso
@@ -126,55 +180,28 @@ export default function Alarmas({ ruta }) {
             testID="aviso-alarmas-activas"
           />
         ) : (
-          <Aviso
-            tono="exito"
-            titulo="Todas las alarmas están desactivadas"
-            mensaje="Si se activa alguna, la vas a ver acá al instante, sin recargar."
-            testID="aviso-sin-alarmas"
-          />
+          <Aviso tono="exito" titulo="Todas las alarmas están desactivadas" testID="aviso-sin-alarmas" />
         )}
-
-        <View ref={refMapa}>
-          <Mapa
-            puntos={puntos}
-            seleccionado={seleccionado}
-            onSeleccionar={setSeleccionado}
-            alto={280}
-            etiqueta="Mapa de las alarmas comunitarias de San Francisco"
-            testID="mapa-alarmas"
+        {ladoALado ? (
+          // En escritorio, el estado de cada alarma queda al lado del mapa.
+          <MapaYLista
+            ladoALado
+            mapa={mapa}
+            lista={(
+              <>
+                {estado}
+                {avisos}
+              </>
+            )}
           />
-        </View>
-        <View style={estilos.leyenda} aria-hidden>
-          <Punto color={coloresMapa.normal} texto="Desactivada" />
-          <Punto color={coloresMapa.activo} texto="Activada" />
-          <Punto color={coloresMapa.seleccionado} texto="Elegida" elegida />
-        </View>
-
-        <Seccion titulo="Tus avisos de alarmas">
-          <AvisosAlarmas
-            alarmas={alarmas}
-            preferencias={preferencias}
-            onIrANotificaciones={() => navegar('notificaciones')}
-          />
-        </Seccion>
-
-        <Seccion titulo="Estado de cada alarma">
-          <View style={estilos.grilla}>
-            {ordenadas.map((a) => (
-              <TarjetaAlarma
-                key={a.id}
-                refContenedor={(nodo) => { refsTarjetas.current[a.id] = nodo; }}
-                alarma={a}
-                sigueZona={zonas.includes(a.zona)}
-                cerca={idsCerca.has(a.id)}
-                seleccionada={a.id === seleccionado}
-                ahora={ahora}
-                onVerEnMapa={verEnMapa}
-              />
-            ))}
-          </View>
-        </Seccion>
-      </>
+        ) : (
+          <>
+            {mapa}
+            {avisos}
+            {estado}
+          </>
+        )}
+      </View>
     );
   }
 
@@ -205,5 +232,5 @@ const estilos = StyleSheet.create({
   punto: { flexDirection: 'row', alignItems: 'center', gap: espacio.xs },
   circulo: { width: 12, height: 12, borderRadius: 6 },
   circuloElegido: { width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: colores.texto },
-  grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.m },
+  contenido: { gap: espacio.l },
 });

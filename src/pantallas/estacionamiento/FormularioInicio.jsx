@@ -122,8 +122,8 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
         onCambio={cambiarPatente}
         mayusculas
         maxLargo={10}
-        placeholder="Por ejemplo, AB123CD"
-        ayuda="Como figura en la chapa: ABC123 o AB123CD."
+        placeholder="AB123CD"
+        ayuda="Como figura en la chapa, por ejemplo ABC123 o AB123CD."
         error={errorPatente ?? inicio.errorDe('patente')}
         ref={refPatente}
         teclaEnter="done"

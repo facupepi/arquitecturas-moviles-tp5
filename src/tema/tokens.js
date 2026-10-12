@@ -32,7 +32,7 @@ export const sombras = {
   flotante: { boxShadow: '0px 6px 24px rgba(16, 43, 61, 0.22)' },
   barra: { boxShadow: '0px 2px 10px rgba(30, 41, 57, 0.12)' },
 };
-export const medidas = { toqueMinimo: 48, anchoMaximo: 1120, margenLateral: 16, anchoMenu: 260 };
+export const medidas = { toqueMinimo: 48, anchoMaximo: 1440, margenLateral: 16, anchoMenu: 260 };
 export const cortes = { tableta: 600, escritorio: 900 }; // useWindowDimensions().width
 
 // Colores de los puntos del mapa (como heredado:MapView.jsx:37-43).

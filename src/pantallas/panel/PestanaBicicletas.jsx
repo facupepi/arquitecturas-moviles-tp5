@@ -33,15 +33,17 @@ function EstacionPanel({ estacion, ahora }) {
   const mover = (delta) => cambio.ejecutar({ estacionId: id, bicicletas: bicicletas + delta });
 
   return (
-    <Tarjeta testID={`estacion-panel-${id}`} estilo={estilosPanel.celda}>
+    <Tarjeta tono={fuera ? 'alerta' : 'normal'} etiquetaAccesible={nombre} testID={`estacion-panel-${id}`} estilo={estilosPanel.celda}>
+      {/* Misma estructura en todas: nombre (hasta dos líneas, con puntos suspensivos si no entra) y debajo
+          la zona con la etiqueta de estado a la derecha, así un nombre largo no mueve nada. */}
       <View style={estilos.cabecera}>
-        <View style={estilos.titulo}>
-          <Texto variante="titulo3">{nombre}</Texto>
-          <Texto variante="chico" color={colores.textoSuave}>
+        <Texto variante="titulo3" numberOfLines={2}>{nombre}</Texto>
+        <View style={estilos.subtitulo}>
+          <Texto variante="chico" color={colores.textoSuave} numberOfLines={1} estilo={estilos.zona}>
             {`Zona ${ETIQUETAS.zonas[estacion.zona] ?? estacion.zona}`}
           </Texto>
+          <EtiquetaEstado texto={estado.texto} tono={estado.tono} sobreColor={fuera} testID={`estado-estacion-panel-${id}`} />
         </View>
-        <EtiquetaEstado texto={estado.texto} tono={estado.tono} testID={`estado-estacion-panel-${id}`} />
       </View>
 
       <View style={estilos.cifra}>
@@ -78,7 +80,7 @@ function EstacionPanel({ estacion, ahora }) {
           />
         </View>
       </View>
-      <Texto variante="chico" color={colores.textoSuave}>
+      <Texto variante="chico" color={colores.textoSuave} numberOfLines={1}>
         {cambio.ocupado
           ? 'Guardando…'
           : `${plural(Math.max(0, capacidad - bicicletas), 'anclaje libre', 'anclajes libres')} · actualizada ${tiempoPasado(estacion.actualizadoEn, ahora) || 'recién'}`}
@@ -86,7 +88,6 @@ function EstacionPanel({ estacion, ahora }) {
 
       <Interruptor
         etiqueta="Fuera de servicio"
-        descripcion="Los vecinos la ven marcada en el mapa."
         valor={fuera}
         onCambio={(valor) => cambio.ejecutar({ estacionId: id, bicicletas, estado: valor ? 'fuera_de_servicio' : 'operativa' })}
         deshabilitado={cambio.ocupado}
@@ -119,7 +120,6 @@ export default function PestanaBicicletas() {
       <Vacio
         icono="bicicleta"
         titulo="No hay estaciones cargadas"
-        mensaje="Las estaciones se cargan con el catálogo de la ciudad."
         testID="vacio-bicicletas-panel"
       />
     );
@@ -127,9 +127,6 @@ export default function PestanaBicicletas() {
 
   return (
     <View style={estilos.contenedor}>
-      <Texto variante="chico" color={colores.textoSuave} estilo={estilosPanel.ayuda}>
-        Simulá que alguien retira o devuelve una bicicleta. El mapa del vecino se actualiza en el momento.
-      </Texto>
       {error ? <ErrorCarga error={error} testID="error-bicicletas-panel" /> : null}
       <Aviso
         tono="info"
@@ -148,8 +145,9 @@ export default function PestanaBicicletas() {
 
 const estilos = StyleSheet.create({
   contenedor: { gap: espacio.l },
-  cabecera: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: espacio.s },
-  titulo: { flexShrink: 1, minWidth: 0 },
+  cabecera: { gap: 2 },
+  subtitulo: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: espacio.s },
+  zona: { flexShrink: 1, minWidth: 0 },
   cifra: { flexDirection: 'row', alignItems: 'baseline', gap: espacio.s },
   botones: { flexDirection: 'row', gap: espacio.s },
   boton: { flex: 1, minWidth: 0 },

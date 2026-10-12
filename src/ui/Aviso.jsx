@@ -38,7 +38,7 @@ export default function Aviso({ tono = 'info', titulo, mensaje, accion, onCerrar
         ) : null}
         {accion ? (
           <View style={estilos.accion}>
-            <Boton titulo={accion.titulo} onPress={accion.onPress} variante="secundario" testID={accion.testID} />
+            <Boton titulo={accion.titulo} icono={accion.icono} onPress={accion.onPress} variante="contorno" testID={accion.testID} />
           </View>
         ) : null}
       </View>
