@@ -89,7 +89,7 @@ export function documentosVecino(uid, { ahora = Date.now(), nombre = 'Vecino de 
   const base = datosInicialesVecino(ahora);
   const raiz = `${C.usuarios}/${uid}`;
   const docs = [[raiz, aFirestore({
-    nombre, anonimo: true, creadoEn: ahora, actualizadoEn: ahora, altaEn: ahora,
+    nombre, anonimo: false, creadoEn: ahora, actualizadoEn: ahora, altaEn: ahora,
     preferencias: base.preferencias ?? PREFERENCIAS_POR_DEFECTO, cercania: null, privacidadAceptadaEn: null,
   })]];
   const tributos = listaConId(base.tributos);

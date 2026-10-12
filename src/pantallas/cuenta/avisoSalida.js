@@ -5,7 +5,7 @@
 
 let pendiente = null;
 
-/** tipo: 'borrado' | 'vinculada' | 'salida' (o null para descartarlo) */
+/** tipo: 'borrado' | 'salida' (o null para descartarlo) */
 export function dejarAvisoSalida(tipo) {
   pendiente = tipo;
 }
@@ -20,14 +20,10 @@ export function tomarAvisoSalida() {
 export const MENSAJES_SALIDA = {
   borrado: {
     titulo: 'Borramos tus datos',
-    mensaje: 'Eliminamos tu cuenta y todo lo que tenías guardado. Podés volver a entrar cuando quieras.',
-  },
-  vinculada: {
-    titulo: 'Tu cuenta quedó vinculada con Google',
-    mensaje: 'Cerraste la sesión. Para volver a tus datos, tocá Continuar con Google y elegí la misma cuenta.',
+    mensaje: 'Eliminamos tu cuenta y todo lo que tenías guardado. Podés volver a entrar con Google cuando quieras, empezando de cero.',
   },
   salida: {
     titulo: 'Cerraste la sesión',
-    mensaje: 'Para volver a ver tus gestiones, entrá con tu cuenta de Google.',
+    mensaje: 'Para volver a ver tus gestiones, tocá Continuar con Google y elegí la misma cuenta.',
   },
 };

@@ -1,27 +1,17 @@
-// Mi cuenta (S1, sección 8.2).
-// - Nombre y tipo de cuenta (se actualiza solo al vincular: useSesion escucha onIdTokenChanged).
-// - Invitado: "Vincular con Google" conserva el uid y todos los datos (sesion.vincular). Si esa cuenta
-//   de Google ya existe (error cuenta-existente del popup, o #/cuenta?vinculo=existente después de un
-//   redirect, con la credencial de leerCredencialPendiente), un diálogo ofrece entrar con ella
-//   avisando que se borran los datos del invitado (sesion.cambiarACuentaExistente).
-// - Lo que tenemos guardado del vecino (cantidades): muestra que vincular no pierde nada.
+// Mi cuenta (S1, sección 8.2). Solo hay cuentas de Google (no hay acceso anónimo).
+// - Nombre, correo y código de vecino (useSesion escucha onIdTokenChanged).
+// - Lo que tenemos guardado del vecino (cantidades).
 // - Avisos en este dispositivo e instalación de la app.
 // - Privacidad completa (aceptarPrivacidad), "Borrar mis datos" con confirmación y "Cerrar sesión".
-// - Invitado que cierra sesión (o llega con ?salir=1 desde el menú del marco): diálogo que explica
-//   que no podrá volver y ofrece solo vincular o borrar los datos y salir.
-import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+// - Escritorio ancho (≥ 1200 px): dos columnas parejas que ocupan todo el ancho del contenido, como el
+//   resto de las pantallas. En el celular, una sola columna en el orden de siempre.
+import React, { useState } from 'react';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSesion } from '../firebase/auth';
-import { EVENTOS } from '../firebase/analytics';
 import { useMunicipal } from '../datos/almacen';
 import { useComando } from '../datos/useComando';
-import { borrarCuentaYSalir, cambiarACuentaExistente, salir, vincular } from '../datos/sesion';
-import {
-  escucharCredencialPendiente,
-  leerCredencialPendiente,
-  limpiarCredencialPendiente,
-  useRuta,
-} from '../navegacion';
+import { borrarCuentaYSalir, salir } from '../datos/sesion';
+import { useRuta } from '../navegacion';
 import { colores, espacio, radios } from '../tema/tokens';
 import {
   Aviso,
@@ -35,11 +25,9 @@ import {
   Seccion,
   Tarjeta,
   Texto,
-  useAvisoFlotante,
 } from '../ui';
 import { version } from '../../package.json';
 import Avisos from './cuenta/Avisos';
-import BotonGoogle from './cuenta/BotonGoogle';
 import Instalar from './cuenta/Instalar';
 import Privacidad from './cuenta/Privacidad';
 import { dejarAvisoSalida } from './cuenta/avisoSalida';
@@ -79,18 +67,13 @@ function conAvisoSalida(tipo, operacion) {
 
 const borrarYSalir = conAvisoSalida('borrado', borrarCuentaYSalir);
 const salirDeGoogle = conAvisoSalida('salida', salir);
-const vincularYSalir = conAvisoSalida('vinculada', async () => {
-  await vincular();
-  await salir();
-});
 
 function Perfil({ usuario }) {
-  const invitado = usuario?.anonimo !== false;
-  const nombre = usuario?.nombre || (invitado ? 'Invitado' : 'Vecino');
+  const nombre = usuario?.nombre || 'Vecino';
   return (
     <View style={estilos.perfil} testID="cuenta-perfil">
-      <View style={[estilos.avatar, invitado ? estilos.avatarInvitado : null]} aria-hidden>
-        <Texto variante="titulo2" color={invitado ? colores.accionOscuro : colores.blanco}>
+      <View style={estilos.avatar} aria-hidden>
+        <Texto variante="titulo2" color={colores.blanco}>
           {nombre.slice(0, 1).toUpperCase()}
         </Texto>
       </View>
@@ -104,12 +87,7 @@ function Perfil({ usuario }) {
           </Texto>
         ) : null}
         <View style={estilos.etiqueta}>
-          <EtiquetaEstado
-            texto={invitado ? 'Cuenta de invitado' : 'Cuenta de Google'}
-            tono={invitado ? 'alerta' : 'exito'}
-            icono={invitado ? 'usuario' : 'checkCirculo'}
-            testID="cuenta-tipo"
-          />
+          <EtiquetaEstado texto="Cuenta de Google" tono="exito" icono="checkCirculo" testID="cuenta-tipo" />
         </View>
         {codigoVecino(usuario?.uid) ? (
           <Texto variante="chico" color={colores.textoSuave} testID="cuenta-codigo">
@@ -121,86 +99,24 @@ function Perfil({ usuario }) {
   );
 }
 
-export default function Cuenta({ ruta }) {
+export default function Cuenta() {
   const { usuario } = useSesion();
   const datos = useMunicipal(seleccionarDatos);
   const { navegar } = useRuta();
-  const aviso = useAvisoFlotante();
-  const invitado = usuario?.anonimo !== false;
+  const { width } = useWindowDimensions();
+  const dosColumnas = width >= ANCHO_DOS_COLUMNAS;
 
-  const [dialogo, setDialogo] = useState(null); // 'salir' | 'borrar' | 'existente' | null
-  const [credencial, setCredencial] = useState(null);
-
-  const limpiarParametros = useCallback(() => {
-    if (ruta?.params && Object.keys(ruta.params).length) navegar('cuenta', null, null, { reemplazar: true });
-  }, [navegar, ruta?.params]);
+  const [dialogo, setDialogo] = useState(null); // 'borrar' | null
 
   // ---------- Comandos ----------
-  const vinculo = useComando(vincular, {
-    evento: EVENTOS.VINCULAR,
-    alExito: () => aviso.mostrar('Listo: tu cuenta quedó vinculada con Google. Conservás todos tus datos.'),
-  });
-  const vinculoYSalida = useComando(vincularYSalir, { evento: EVENTOS.VINCULAR });
-  const cambio = useComando(cambiarACuentaExistente, {
-    alExito: () => {
-      limpiarCredencialPendiente();
-      setCredencial(null);
-      setDialogo(null);
-      aviso.mostrar('Entraste con tu cuenta de Google.');
-    },
-  });
   const borrado = useComando(borrarYSalir);
   const salida = useComando(salirDeGoogle);
 
-  // cuenta-existente desde el popup (vincular o vincular y salir): abre el diálogo de cambio.
-  useEffect(() => {
-    const error = vinculo.error?.codigo === 'cuenta-existente' ? vinculo.error
-      : vinculoYSalida.error?.codigo === 'cuenta-existente' ? vinculoYSalida.error : null;
-    if (!error) return;
-    setCredencial(error.datos?.credencial ?? null);
-    setDialogo('existente');
-  }, [vinculo.error, vinculoYSalida.error]);
-
-  // #/cuenta?vinculo=existente: credencial guardada por App.jsx después de un redirect.
-  useEffect(() => {
-    if (ruta?.params?.vinculo !== 'existente') return undefined;
-    const tomar = (c) => {
-      if (!c) return;
-      setCredencial(c);
-      setDialogo('existente');
-    };
-    tomar(leerCredencialPendiente());
-    return escucharCredencialPendiente(tomar);
-  }, [ruta?.params?.vinculo]);
-
-  // #/cuenta?salir=1: "Cerrar sesión" del marco para un invitado.
-  useEffect(() => {
-    if (ruta?.params?.salir !== '1') return;
-    if (invitado) setDialogo('salir');
-    else limpiarParametros();
-  }, [ruta?.params?.salir, invitado, limpiarParametros]);
-
   const cerrarDialogo = () => {
-    if (borrado.ocupado || cambio.ocupado || vinculoYSalida.ocupado) return;
-    if (dialogo === 'existente') {
-      limpiarCredencialPendiente();
-      setCredencial(null);
-    }
+    if (borrado.ocupado) return;
     borrado.limpiar();
-    cambio.limpiar();
-    vinculoYSalida.limpiar();
     setDialogo(null);
-    limpiarParametros();
   };
-
-  const cerrarSesion = () => {
-    if (invitado) setDialogo('salir');
-    else salida.ejecutar();
-  };
-
-  const errorVinculo = vinculo.error && vinculo.error.codigo !== 'cuenta-existente' ? vinculo.error : null;
-  const errorVinculoSalida = vinculoYSalida.error && vinculoYSalida.error.codigo !== 'cuenta-existente'
-    ? vinculoYSalida.error : null;
 
   // ---------- Contenido ----------
   const resumenDatos = !datos.listo ? (
@@ -219,6 +135,88 @@ export default function Cuenta({ ruta }) {
     </View>
   );
 
+  const perfil = (
+    <Tarjeta>
+      <Perfil usuario={usuario} />
+      <Texto variante="chico" color={colores.textoSuave}>
+        Tus datos quedan asociados a tu cuenta de Google: podés entrar desde cualquier celular o computadora.
+      </Texto>
+    </Tarjeta>
+  );
+
+  const avisoAdmin = datos.esAdmin ? (
+    <Aviso
+      tono="info"
+      titulo="Sos administrador de la demostración"
+      mensaje="Desde el panel municipal podés mover bicicletas, activar alarmas, responder reclamos y publicar avisos."
+      accion={{ titulo: 'Abrir el panel municipal', onPress: () => navegar('panel'), testID: 'cuenta-ir-panel' }}
+    />
+  ) : null;
+
+  const guardado = (
+    <Seccion titulo="Lo que guardamos de vos">
+      {datos.errorPerfil ? <ErrorCarga error={datos.errorPerfil} /> : null}
+      <Tarjeta>{resumenDatos}</Tarjeta>
+    </Seccion>
+  );
+
+  const notificaciones = (
+    <Seccion titulo="Notificaciones">
+      <Tarjeta>
+        <Avisos onElegir={() => navegar('notificaciones')} />
+      </Tarjeta>
+    </Seccion>
+  );
+
+  const instalar = (
+    <Seccion titulo="Instalar la app">
+      <Tarjeta testID="cuenta-instalar">
+        <Instalar />
+      </Tarjeta>
+    </Seccion>
+  );
+
+  const privacidad = (
+    <Seccion titulo="Privacidad">
+      <Tarjeta>
+        <Privacidad perfil={datos.perfil} listo={datos.listo} />
+      </Tarjeta>
+    </Seccion>
+  );
+
+  const sesionYDatos = (
+    <Seccion titulo="Sesión y datos">
+      <Tarjeta>
+        <View style={estilos.bloque}>
+          <Boton
+            titulo={salida.ocupado ? 'Cerrando sesión…' : 'Cerrar sesión'}
+            icono="salir"
+            variante="secundario"
+            ancho="completo"
+            cargando={salida.ocupado}
+            onPress={() => salida.ejecutar()}
+            testID="cerrar-sesion"
+          />
+          {salida.error ? <Aviso tono="peligro" rol="alert" mensaje={salida.error.message} testID="error-salir" /> : null}
+        </View>
+        <View style={estilos.separador} />
+        <View style={estilos.bloque}>
+          <Texto variante="chico" color={colores.textoSuave}>
+            Borra para siempre tu perfil, tus cedulones, pagos, reclamos con sus adjuntos, estacionamientos y
+            notificaciones, y también tu usuario.
+          </Texto>
+          <Boton
+            titulo="Borrar mis datos"
+            variante="peligro"
+            ancho="completo"
+            onPress={() => setDialogo('borrar')}
+            testID="borrar-datos"
+          />
+        </View>
+      </Tarjeta>
+    </Seccion>
+  );
+
   return (
     <Pantalla
       testID="pantalla-cuenta"
@@ -226,152 +224,35 @@ export default function Cuenta({ ruta }) {
       titulo="Mi cuenta"
       bajada="Tu perfil, tus avisos, la instalación de la app y el control de tus datos."
     >
-      <View style={estilos.columna}>
-        <Tarjeta tono={invitado ? 'alerta' : 'normal'}>
-          <Perfil usuario={usuario} />
-          {invitado ? (
-            <View style={estilos.bloque}>
-              <Texto variante="chico">
-                Estás usando Conecta como invitado. Tus datos quedan en esta cuenta, pero si cerrás la sesión o borrás los
-                datos del navegador no vas a poder recuperarlos. Vinculala con Google para conservarlos y usarlos en otro
-                dispositivo.
-              </Texto>
-              <BotonGoogle
-                titulo={vinculo.ocupado ? 'Conectando con Google…' : 'Vincular con Google'}
-                cargando={vinculo.ocupado}
-                deshabilitado={vinculoYSalida.ocupado}
-                onPress={() => vinculo.ejecutar()}
-                testID="vincular-google"
-              />
-              {errorVinculo ? (
-                <Aviso
-                  tono={errorVinculo.causa?.code === 'auth/popup-closed-by-user' ? 'info' : 'peligro'}
-                  rol="alert"
-                  mensaje={errorVinculo.message}
-                  testID="error-vincular"
-                />
-              ) : null}
-            </View>
-          ) : (
-            <Texto variante="chico" color={colores.textoSuave}>
-              Tus datos quedan asociados a tu cuenta de Google: podés entrar desde cualquier celular o computadora.
-            </Texto>
-          )}
-        </Tarjeta>
+      {dosColumnas ? (
+        <View style={estilos.columnas}>
+          <View style={estilos.columnaDoble}>
+            {perfil}
+            {avisoAdmin}
+            {guardado}
+            {sesionYDatos}
+          </View>
+          <View style={estilos.columnaDoble}>
+            {notificaciones}
+            {instalar}
+            {privacidad}
+          </View>
+        </View>
+      ) : (
+        <View style={estilos.columna}>
+          {perfil}
+          {avisoAdmin}
+          {guardado}
+          {notificaciones}
+          {instalar}
+          {privacidad}
+          {sesionYDatos}
+        </View>
+      )}
 
-        {datos.esAdmin ? (
-          <Aviso
-            tono="info"
-            titulo="Sos administrador de la demostración"
-            mensaje="Desde el panel municipal podés mover bicicletas, activar alarmas, responder reclamos y publicar avisos."
-            accion={{ titulo: 'Abrir el panel municipal', onPress: () => navegar('panel'), testID: 'cuenta-ir-panel' }}
-          />
-        ) : null}
-
-        <Seccion titulo="Lo que guardamos de vos">
-          {datos.errorPerfil ? <ErrorCarga error={datos.errorPerfil} /> : null}
-          <Tarjeta>
-            {resumenDatos}
-            {invitado && datos.listo ? (
-              <Texto variante="chico" color={colores.textoSuave}>
-                Al vincular con Google todo esto se conserva tal cual.
-              </Texto>
-            ) : null}
-          </Tarjeta>
-        </Seccion>
-
-        <Seccion titulo="Notificaciones">
-          <Tarjeta>
-            <Avisos onElegir={() => navegar('notificaciones')} />
-          </Tarjeta>
-        </Seccion>
-
-        <Seccion titulo="Instalar la app">
-          <Tarjeta testID="cuenta-instalar">
-            <Instalar />
-          </Tarjeta>
-        </Seccion>
-
-        <Seccion titulo="Privacidad">
-          <Tarjeta>
-            <Privacidad perfil={datos.perfil} listo={datos.listo} />
-          </Tarjeta>
-        </Seccion>
-
-        <Seccion titulo="Sesión y datos">
-          <Tarjeta>
-            <View style={estilos.bloque}>
-              <Boton
-                titulo={salida.ocupado ? 'Cerrando sesión…' : 'Cerrar sesión'}
-                icono="salir"
-                variante="secundario"
-                ancho="completo"
-                cargando={salida.ocupado}
-                onPress={cerrarSesion}
-                testID="cerrar-sesion"
-              />
-              {salida.error ? <Aviso tono="peligro" rol="alert" mensaje={salida.error.message} testID="error-salir" /> : null}
-            </View>
-            <View style={estilos.separador} />
-            <View style={estilos.bloque}>
-              <Texto variante="chico" color={colores.textoSuave}>
-                Borra para siempre tu perfil, tus cedulones, pagos, reclamos con sus adjuntos, estacionamientos y
-                notificaciones, y también tu usuario.
-              </Texto>
-              <Boton
-                titulo="Borrar mis datos"
-                variante="peligro"
-                ancho="completo"
-                onPress={() => setDialogo('borrar')}
-                testID="borrar-datos"
-              />
-            </View>
-          </Tarjeta>
-        </Seccion>
-
-        <Texto variante="chico" color={colores.textoSuave} alineacion="center" testID="cuenta-version">
-          San Francisco Conecta · versión {version}
-        </Texto>
-      </View>
-
-      {/* Invitado que quiere salir: solo vincular o borrar. */}
-      <Dialogo
-        visible={dialogo === 'salir'}
-        titulo="Antes de salir"
-        onCerrar={cerrarDialogo}
-        cerrable={!borrado.ocupado && !vinculoYSalida.ocupado}
-        testID="dialogo-invitado-salir"
-        acciones={[
-          {
-            titulo: 'Borrar mis datos y salir',
-            variante: 'peligro',
-            cargando: borrado.ocupado,
-            deshabilitado: vinculoYSalida.ocupado,
-            onPress: () => borrado.ejecutar(),
-            testID: 'salir-borrar',
-          },
-          {
-            titulo: vinculoYSalida.ocupado ? 'Conectando con Google…' : 'Vincular con Google y salir',
-            variante: 'primario',
-            cargando: vinculoYSalida.ocupado,
-            deshabilitado: borrado.ocupado,
-            onPress: () => vinculoYSalida.ejecutar(),
-            testID: 'salir-vincular',
-          },
-        ]}
-      >
-        <Texto variante="cuerpo">
-          Entraste como invitado. Si cerrás la sesión así, no vas a poder volver a esta cuenta ni recuperar tus datos.
-        </Texto>
-        <Texto variante="chico" color={colores.textoSuave}>
-          Vinculá tu cuenta con Google para volver cuando quieras con todo lo que hiciste, o borrá tus datos para no
-          dejar nada guardado.
-        </Texto>
-        {borrado.error ? <Aviso tono="peligro" rol="alert" mensaje={borrado.error.message} testID="error-borrar" /> : null}
-        {errorVinculoSalida ? (
-          <Aviso tono="peligro" rol="alert" mensaje={errorVinculoSalida.message} testID="error-salir-vincular" />
-        ) : null}
-      </Dialogo>
+      <Texto variante="chico" color={colores.textoSuave} alineacion="center" testID="cuenta-version">
+        San Francisco Conecta · versión {version}
+      </Texto>
 
       {/* Confirmación del borrado. */}
       <Dialogo
@@ -401,49 +282,16 @@ export default function Cuenta({ ruta }) {
         {borrado.error ? <Aviso tono="peligro" rol="alert" mensaje={borrado.error.message} testID="error-borrar" /> : null}
       </Dialogo>
 
-      {/* La cuenta de Google ya tenía datos. */}
-      <Dialogo
-        visible={dialogo === 'existente'}
-        titulo="Esa cuenta de Google ya tiene datos"
-        onCerrar={cerrarDialogo}
-        cerrable={!cambio.ocupado}
-        testID="dialogo-cuenta-existente"
-        acciones={[
-          { titulo: 'Seguir como invitado', variante: 'secundario', deshabilitado: cambio.ocupado, onPress: cerrarDialogo, testID: 'seguir-invitado' },
-          {
-            titulo: cambio.ocupado ? 'Cambiando de cuenta…' : 'Entrar con esa cuenta',
-            variante: 'peligro',
-            cargando: cambio.ocupado,
-            deshabilitado: !credencial,
-            onPress: () => cambio.ejecutar(credencial),
-            testID: 'confirmar-cuenta-existente',
-          },
-        ]}
-      >
-        <Texto variante="cuerpo">
-          Ya usaste Conecta con esa cuenta de Google. Podés entrar con ella, pero lo que hiciste como invitado se va a
-          borrar y no se puede recuperar.
-        </Texto>
-        {datos.listo ? (
-          <Texto variante="chico" color={colores.textoSuave}>
-            Se borran {datos.tributos} cedulones, {datos.pagos} pagos, {datos.reclamos} reclamos y {datos.sesiones}{' '}
-            estacionamientos de este invitado.
-          </Texto>
-        ) : null}
-        {!credencial ? (
-          <Aviso
-            tono="alerta"
-            mensaje="No recibimos los datos de esa cuenta. Cerrá este aviso y volvé a tocar Vincular con Google."
-          />
-        ) : null}
-        {cambio.error ? <Aviso tono="peligro" rol="alert" mensaje={cambio.error.message} testID="error-cambio-cuenta" /> : null}
-      </Dialogo>
     </Pantalla>
   );
 }
 
+const ANCHO_DOS_COLUMNAS = 1200;
+
 const estilos = StyleSheet.create({
   columna: { gap: espacio.l, width: '100%', maxWidth: 760 },
+  columnas: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.xl },
+  columnaDoble: { flex: 1, minWidth: 0, gap: espacio.l },
   bloque: { gap: espacio.m },
   perfil: { flexDirection: 'row', alignItems: 'center', gap: espacio.m },
   avatar: {
@@ -454,7 +302,6 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarInvitado: { backgroundColor: colores.celesteClaro },
   flexible: { flex: 1, minWidth: 0, gap: 2 },
   etiqueta: { paddingTop: espacio.xs },
   separador: { height: 1, backgroundColor: colores.borde },

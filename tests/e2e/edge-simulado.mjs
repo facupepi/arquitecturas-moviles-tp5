@@ -13,8 +13,8 @@
 //   POST tareas          admin; diaria y resumen devuelven conteos; simulador aplica planificarPaso
 //
 // No verifica la firma del token (el emulador de Auth no firma), pero decodifica el payload y aplica
-// el mismo criterio que exigirAdmin de Supabase: un anónimo recibe 403 aunque tenga documento en
-// administradores, igual que en las reglas.
+// el mismo criterio que verificarUsuario de Supabase: una sesión anónima recibe 403 en todas las
+// funciones (aunque tenga documento en administradores), igual que en las reglas.
 //
 // Modo compartido (varios agentes contra los mismos emuladores): cada agente usa su propio proyecto
 // demo-* de Firestore y llama con el prefijo /p/<proyecto>, por ejemplo
@@ -142,12 +142,15 @@ function verificarUsuario(req) {
     throw new ErrorHttp(401, 'sin-sesion', 'La sesión no es válida o venció.');
   }
   const proveedor = payload.firebase?.sign_in_provider ?? 'desconocido';
-  return { uid: sub, anonimo: proveedor === 'anonymous', proveedor, nombre: typeof payload.name === 'string' ? payload.name : null };
+  if (proveedor === 'anonymous') {
+    throw new ErrorHttp(403, 'permiso', 'Ingresá con tu cuenta de Google para usar Conecta.');
+  }
+  return { uid: sub, proveedor, nombre: typeof payload.name === 'string' ? payload.name : null };
 }
 
-// Mismo criterio que _shared/firebase-auth.ts: anónimo o sin documento en administradores → 403.
+// Mismo criterio que _shared/firebase-auth.ts: sin documento en administradores → 403.
 async function exigirAdmin(db, id) {
-  if (id.anonimo || !(await db.doc(`${C.administradores}/${id.uid}`).get()).exists) {
+  if (!(await db.doc(`${C.administradores}/${id.uid}`).get()).exists) {
     throw new ErrorHttp(403, 'permiso', 'Esta operación corresponde al personal municipal.');
   }
 }
@@ -174,14 +177,14 @@ async function alta(db, id) {
   if (!actual.exists) {
     creado = await crearSiFalta(refPerfil, {
       ...perfilBase,
-      anonimo: id.anonimo,
+      anonimo: false,
       creadoEn: FieldValue.serverTimestamp(),
       actualizadoEn: FieldValue.serverTimestamp(),
       altaEn: FieldValue.serverTimestamp(),
     });
   }
   if (!creado) {
-    const datos = { nombre, anonimo: id.anonimo, actualizadoEn: FieldValue.serverTimestamp() };
+    const datos = { nombre, anonimo: false, actualizadoEn: FieldValue.serverTimestamp() };
     const existente = actual.exists ? actual : await refPerfil.get();
     if (!existente.get('altaEn')) datos.altaEn = FieldValue.serverTimestamp();
     await refPerfil.update(datos);

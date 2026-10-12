@@ -1,7 +1,7 @@
 // Raíz de la app (WP5, 7.4). Reemplaza heredado:src/App.jsx y la parte de sesión de AuthGate.
 // - useSesion(): mientras no está listo, Cargando.
-// - Al montar, completarRedireccion(): si un vínculo por redirect chocó con una cuenta existente,
-//   guarda la credencial y abre #/cuenta?vinculo=existente (Cuenta ofrece cambiar de cuenta).
+// - Al montar, completarRedireccion(): termina un ingreso con Google por redirect (PWA de iOS o
+//   popup bloqueado).
 // - Sin usuario: Ingreso (con la leyenda arriba). Con usuario: ProveedorMunicipal > Marco > Enrutador
 //   y, cuando el almacén queda listo, los servicios diferidos (Analytics, Performance, Remote Config)
 //   con refrescarPush al terminar.
@@ -16,7 +16,6 @@ import { ProveedorNavegacion, useRuta } from './navegacion/ProveedorNavegacion';
 import Enrutador from './navegacion/Enrutador';
 import { cargarPantalla } from './navegacion/pantallas';
 import { EN_DESARROLLO, RUTA_GALERIA } from './navegacion/rutasApp';
-import { guardarCredencialPendiente } from './navegacion/vinculoPendiente';
 import LimiteError from './navegacion/LimiteError';
 import Marco from './marco/Marco';
 import LeyendaPrototipo, { ContextoLeyenda } from './marco/LeyendaPrototipo';
@@ -104,23 +103,17 @@ function GaleriaSinSesion() {
 
 function Contenido() {
   const { usuario, listo } = useSesion();
-  const { ruta, navegar } = useRuta();
+  const { ruta } = useRuta();
 
   useEffect(() => {
     if (redireccionRevisada) return;
     redireccionRevisada = true;
     Promise.resolve()
       .then(() => completarRedireccion())
-      .then((resultado) => {
-        if (resultado?.cuentaExistente) {
-          guardarCredencialPendiente(resultado.cuentaExistente);
-          navegar('cuenta', null, { vinculo: 'existente' });
-        }
-      })
       .catch(() => {
-        // Un redirect fallido no impide usar la app: el ingreso como invitado siempre funciona.
+        // Un redirect fallido deja la pantalla de Ingreso, donde se puede volver a intentar.
       });
-  }, [navegar]);
+  }, []);
 
   if (EN_DESARROLLO && ruta.nombre === RUTA_GALERIA && !usuario) return <GaleriaSinSesion />;
   if (!listo) return <Cargando pantallaCompleta mensaje="Cargando…" />;

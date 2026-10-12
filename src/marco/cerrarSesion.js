@@ -1,15 +1,15 @@
-// "Cerrar sesión" desde el marco (menú de cuenta y menú lateral), WP5.
-// - Cuenta de Google: sesion.salir() (8.2).
-// - Invitado: no puede volver a entrar a su cuenta anónima, así que no se cierra la sesión acá:
-//   se abre Cuenta con ?salir=1 para que muestre el diálogo que ofrece vincular con Google o
-//   borrar los datos y salir (dialogo-invitado-salir, S1).
+// "Cerrar sesión" desde el marco (menú de cuenta y menú lateral), WP5: sesion.salir() (8.2).
+// Deja el aviso "Cerraste la sesión" para la pantalla de Ingreso, igual que Mi cuenta.
 import { salir } from '../datos/sesion';
+import { dejarAvisoSalida } from '../pantallas/cuenta/avisoSalida';
 
-export async function cerrarSesionDesdeMarco(usuario, navegar) {
-  if (!usuario || usuario.anonimo) {
-    navegar('cuenta', null, { salir: '1' });
-    return { tipo: 'dialogo-invitado' };
+export async function cerrarSesionDesdeMarco() {
+  dejarAvisoSalida('salida');
+  try {
+    await salir();
+  } catch (e) {
+    dejarAvisoSalida(null);
+    throw e;
   }
-  await salir();
   return { tipo: 'salio' };
 }

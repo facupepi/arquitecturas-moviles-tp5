@@ -127,7 +127,7 @@ test.describe('Inicio', () => {
     await expect(page).toHaveURL(/#\/contactos$/);
     await expect(page.getByTestId('pantalla-contactos')).toBeVisible();
 
-    // Enlace profundo #/tributos con la app recién abierta (la sesión del invitado persiste).
+    // Enlace profundo #/tributos con la app recién abierta (la sesión de Google persiste).
     await page.goto('/#/tributos');
     await expect(page.getByTestId('pantalla-tributos')).toBeVisible({ timeout: 30_000 });
     await expect(page).toHaveURL(/#\/tributos$/);

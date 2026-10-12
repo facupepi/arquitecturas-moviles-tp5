@@ -4,7 +4,7 @@ import {
   doc, getDoc, getDocs, collection, collectionGroup, query, orderBy, limit,
   setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp,
 } from 'firebase/firestore';
-import { crearEntorno, vecino, google, sembrar, ts, assertSucceeds, assertFails } from './_entorno.mjs';
+import { crearEntorno, vecino, google, anonimo, sembrar, ts, assertSucceeds, assertFails } from './_entorno.mjs';
 
 let entorno;
 
@@ -128,7 +128,7 @@ describe('avance del admin', () => {
   });
 
   it('un admin con cuenta anónima no avanza el reclamo', async () => {
-    const db = vecino(entorno, 'admin-anonimo');
+    const db = anonimo(entorno, 'admin-anonimo');
     await assertFails(loteAvance(db, { reclamoId: 'semilla-reclamo-1', estado: 'en_proceso', eventoId: 'ev-reclamo-0005' }).commit());
   });
 
@@ -144,7 +144,7 @@ describe('avance del admin', () => {
     const consulta = (db) => getDocs(query(collectionGroup(db, 'reclamos'), orderBy('creadoEn', 'desc'), limit(50)));
     await assertSucceeds(consulta(google(entorno, 'admin-google')));
     await assertFails(consulta(vecino(entorno, 'u1')));
-    await assertFails(consulta(vecino(entorno, 'admin-anonimo')));
+    await assertFails(consulta(anonimo(entorno, 'admin-anonimo')));
     await assertSucceeds(getDocs(collection(vecino(entorno, 'u1'), 'usuarios/u1/reclamos')));
     await assertFails(getDocs(collection(vecino(entorno, 'u2'), 'usuarios/u1/reclamos')));
   });

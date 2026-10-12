@@ -26,8 +26,8 @@ function Opcion({ icono, titulo, onPress, testID }) {
 export default function MenuCuenta({ visible, usuario, arriba = 64, onCerrar, onMiCuenta, onCerrarSesion }) {
   useDevolverFoco(!!visible);
   useEscape(!!visible, onCerrar);
-  const nombre = usuario?.nombre || (usuario?.anonimo ? 'Invitado' : 'Vecino');
-  const tipo = usuario?.anonimo ? 'Cuenta de invitado' : 'Cuenta de Google';
+  const nombre = usuario?.nombre || 'Vecino';
+  const tipo = usuario?.email || 'Cuenta de Google';
   return (
     <Modal visible={!!visible} transparent animationType="none" onRequestClose={onCerrar} aria-label="Menú de cuenta" testID="menu-cuenta">
       <View style={estilos.capa}>

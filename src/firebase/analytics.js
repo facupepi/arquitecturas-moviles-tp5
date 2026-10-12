@@ -9,7 +9,6 @@ import { USAR_EMULADORES, DESARROLLO, firebaseConfig } from './config.js';
 
 export const EVENTOS = Object.freeze({
   LOGIN: 'login',
-  VINCULAR: 'vincular_cuenta',
   PANTALLA: 'screen_view',
   RECLAMO_CREADO: 'reclamo_creado',
   TRIBUTO_PAGADO: 'tributo_pagado',

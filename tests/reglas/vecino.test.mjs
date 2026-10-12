@@ -7,7 +7,7 @@ let entorno;
 
 function perfil(cambios = {}) {
   return {
-    nombre: 'Vecino', anonimo: true, creadoEn: serverTimestamp(), actualizadoEn: serverTimestamp(),
+    nombre: 'Vecino', anonimo: false, creadoEn: serverTimestamp(), actualizadoEn: serverTimestamp(),
     preferencias: PREFERENCIAS, cercania: null, privacidadAceptadaEn: null, ...cambios,
   };
 }

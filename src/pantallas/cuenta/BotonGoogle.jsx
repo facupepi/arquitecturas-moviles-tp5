@@ -1,4 +1,4 @@
-// Botón "Continuar con Google" / "Vincular con Google" (S1). Mismo alto y comportamiento que
+// Botón "Continuar con Google" (S1). Mismo alto y comportamiento que
 // <Boton> de src/ui, pero con el logo de Google (el SVG de heredado:AuthGate.jsx) dibujado con
 // <Image> y una URI de datos, así sigue siendo React Native puro (sin <svg> en JSX).
 import React from 'react';

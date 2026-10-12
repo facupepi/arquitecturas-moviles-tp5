@@ -1,5 +1,5 @@
 // Autenticación (WP4, sección 5.2). Toma de heredado:src/firebase.js el popup con respaldo de redirect
-// y la tabla de mensajes por código, ahora también para vincular una cuenta de invitado con Google.
+// y la tabla de mensajes por código. Solo se ingresa con una cuenta de Google: no hay acceso anónimo.
 import { useSyncExternalStore } from 'react';
 import {
   initializeAuth,
@@ -9,11 +9,8 @@ import {
   connectAuthEmulator,
   onIdTokenChanged,
   GoogleAuthProvider,
-  signInAnonymously,
   signInWithPopup,
   signInWithRedirect,
-  linkWithPopup,
-  linkWithRedirect,
   getRedirectResult,
   signInWithCredential,
   signOut,
@@ -41,24 +38,21 @@ const MARCA_REDIRECCION = 'conecta:redireccion';
 // ---------------------------------------------------------------------------------------------
 // Sesión observable
 
-/** Usuario = { uid, nombre, email, anonimo, proveedor: 'anonymous' | 'google.com' } */
+/** Usuario = { uid, nombre, email, proveedor: 'google.com' } */
 function aUsuario(u) {
   if (!u) return null;
   const datosGoogle = u.providerData?.find((p) => p?.providerId === 'google.com') ?? null;
-  const google = !!datosGoogle;
   return {
     uid: u.uid,
-    // Al vincular un invitado, displayName y email pueden quedar vacíos en el usuario aunque los
-    // traiga la cuenta de Google: se usan los del proveedor (pedido de S1).
+    // displayName y email pueden venir solo en los datos del proveedor: se usan como respaldo.
     nombre: u.displayName || datosGoogle?.displayName || null,
     email: u.email || datosGoogle?.email || null,
-    anonimo: u.isAnonymous,
-    proveedor: u.isAnonymous ? 'anonymous' : google ? 'google.com' : (u.providerData?.[0]?.providerId || 'anonymous'),
+    proveedor: datosGoogle ? 'google.com' : (u.providerData?.[0]?.providerId || 'desconocido'),
   };
 }
 
 const iguales = (a, b) => a === b || (!!a && !!b && a.uid === b.uid && a.nombre === b.nombre
-  && a.email === b.email && a.anonimo === b.anonimo && a.proveedor === b.proveedor);
+  && a.email === b.email && a.proveedor === b.proveedor);
 
 let estadoSesion = { usuario: null, listo: false };
 const oyentesSesion = new Set();
@@ -71,11 +65,15 @@ function publicarSesion(u) {
   for (const oyente of oyentesSesion) oyente();
 }
 
-// onIdTokenChanged (no onAuthStateChanged): también se dispara al vincular, porque cambia el token
-// aunque el uid sea el mismo. La comparación de campos evita dibujar de nuevo con cada renovación.
+// onIdTokenChanged (no onAuthStateChanged): también avisa si cambian el nombre o el correo con el
+// token. La comparación de campos evita dibujar de nuevo con cada renovación.
+// Una sesión anónima guardada por una versión anterior (que tenía ingreso como invitado) ya no se
+// admite: se cierra y la app muestra el ingreso con Google. Las reglas y Supabase también la rechazan.
 onIdTokenChanged(auth, (u) => {
-  if (huboSesionGuardada === null) huboSesionGuardada = !!u;
-  publicarSesion(u);
+  const usuario = u?.isAnonymous ? null : u;
+  if (u?.isAnonymous) signOut(auth).catch(() => {});
+  if (huboSesionGuardada === null) huboSesionGuardada = !!usuario;
+  publicarSesion(usuario);
 });
 
 const suscribirSesion = (oyente) => {
@@ -98,10 +96,6 @@ export function sesionActual() {
 export function habiaSesionAlIniciar() {
   return huboSesionGuardada === true;
 }
-
-// Después de vincular, el objeto User cambia en el lugar: se vuelve a leer por las dudas de que el
-// SDK no notifique (onIdTokenChanged igual lo hace cuando cambia el token).
-const refrescarSesion = () => publicarSesion(auth.currentUser);
 
 // ---------------------------------------------------------------------------------------------
 // Ayudantes de redirección
@@ -139,14 +133,10 @@ const MENSAJES_AUTH = {
   'auth/popup-blocked': 'El navegador bloqueó la ventana de Google.',
   'auth/unauthorized-domain': 'El ingreso con Google no está disponible en esta dirección. Contactá a atención ciudadana.',
   'auth/operation-not-allowed': 'Este modo de ingreso no está disponible en este momento. Intentá más tarde.',
-  'auth/admin-restricted-operation': 'El ingreso como invitado no está disponible en este momento. Probá con Google.',
   'auth/network-request-failed': 'No se pudo conectar con el servicio de ingreso. Revisá tu conexión.',
   'auth/user-disabled': 'Esta cuenta está deshabilitada. Contactá a atención ciudadana.',
   'auth/too-many-requests': 'Hubo demasiados intentos seguidos. Esperá unos minutos y probá de nuevo.',
   'auth/quota-exceeded': 'El servicio de ingreso está saturado. Probá en unos minutos.',
-  'auth/credential-already-in-use': 'Esa cuenta de Google ya tiene datos. ¿Querés entrar con ella?',
-  'auth/email-already-in-use': 'Esa cuenta de Google ya tiene datos. ¿Querés entrar con ella?',
-  'auth/provider-already-linked': 'Tu cuenta ya está vinculada con Google.',
   'auth/requires-recent-login': 'Por seguridad, volvé a ingresar y repetí la operación.',
   'auth/user-token-expired': 'Tu sesión venció. Volvé a ingresar.',
   'auth/web-storage-unsupported': 'Tu navegador bloquea el almacenamiento que necesita el ingreso. Revisá las cookies o salí del modo privado.',
@@ -161,8 +151,6 @@ const CODIGO_APP = {
   'auth/too-many-requests': 'cuota',
   'auth/quota-exceeded': 'cuota',
   'auth/popup-blocked': 'popup-bloqueado',
-  'auth/credential-already-in-use': 'cuenta-existente',
-  'auth/email-already-in-use': 'cuenta-existente',
   'auth/web-storage-unsupported': 'no-soportado',
   'auth/operation-not-supported-in-this-environment': 'no-soportado',
   'auth/user-token-expired': 'sin-sesion',
@@ -189,16 +177,7 @@ function aErrorApp(e, datos = null) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Ingreso, vínculo y salida
-
-export async function ingresarComoInvitado() {
-  try {
-    const credencial = await signInAnonymously(auth);
-    return credencial.user;
-  } catch (e) {
-    throw aErrorApp(e);
-  }
-}
+// Ingreso y salida
 
 /**
  * Popup de Google. Con el popup bloqueado, o dentro de la PWA instalada de iOS (donde el popup no
@@ -206,50 +185,21 @@ export async function ingresarComoInvitado() {
  */
 export async function ingresarConGoogle() {
   try {
-    if (esPwaIos()) return await redirigir('ingreso', () => signInWithRedirect(auth, proveedorGoogle, browserPopupRedirectResolver));
+    if (esPwaIos()) return await redirigir(() => signInWithRedirect(auth, proveedorGoogle, browserPopupRedirectResolver));
     try {
       const credencial = await signInWithPopup(auth, proveedorGoogle, browserPopupRedirectResolver);
       return credencial.user;
     } catch (e) {
       if (!POPUP_BLOQUEADO.has(e?.code)) throw e;
-      return await redirigir('ingreso', () => signInWithRedirect(auth, proveedorGoogle, browserPopupRedirectResolver));
+      return await redirigir(() => signInWithRedirect(auth, proveedorGoogle, browserPopupRedirectResolver));
     }
   } catch (e) {
     throw aErrorApp(e);
   }
 }
 
-/**
- * Vincula al invitado actual con Google: conserva el uid y sus datos. Si esa cuenta de Google ya
- * existe, lanza ErrorApp('cuenta-existente') con la credencial en datos.credencial para ofrecer
- * entrar con ella (sesion.cambiarACuentaExistente).
- */
-export async function vincularConGoogle() {
-  const usuario = auth.currentUser;
-  if (!usuario) throw new ErrorApp('sin-sesion');
-  try {
-    if (esPwaIos()) return await redirigir('vinculo', () => linkWithRedirect(usuario, proveedorGoogle, browserPopupRedirectResolver));
-    try {
-      const credencial = await linkWithPopup(usuario, proveedorGoogle, browserPopupRedirectResolver);
-      refrescarSesion();
-      return credencial.user;
-    } catch (e) {
-      if (!POPUP_BLOQUEADO.has(e?.code)) throw e;
-      return await redirigir('vinculo', () => linkWithRedirect(usuario, proveedorGoogle, browserPopupRedirectResolver));
-    }
-  } catch (e) {
-    if (e?.code === 'auth/credential-already-in-use' || e?.code === 'auth/email-already-in-use') {
-      throw new ErrorApp('cuenta-existente', undefined, {
-        datos: { credencial: GoogleAuthProvider.credentialFromError(e) },
-        causa: e,
-      });
-    }
-    throw aErrorApp(e);
-  }
-}
-
-async function redirigir(tipo, iniciar) {
-  marcarRedireccion(tipo);
+async function redirigir(iniciar) {
+  marcarRedireccion('ingreso');
   try {
     await iniciar(); // la página navega a Google; esta promesa no se resuelve en la práctica
     return null;
@@ -261,11 +211,9 @@ async function redirigir(tipo, iniciar) {
 }
 
 /**
- * Termina un ingreso o un vínculo por redirect. Solo trabaja si existe la marca de sessionStorage,
- * así no carga el iframe de Auth en cada arranque.
- * Devuelve { tipo: 'ingreso' | 'vinculo' | null, cuentaExistente?, error? }:
- *  - cuentaExistente: credencial de Google si el vínculo falló porque esa cuenta ya tenía datos.
- *  - error: ErrorApp de cualquier otra falla (no lanza, para no romper el arranque de App.jsx).
+ * Termina un ingreso por redirect. Solo trabaja si existe la marca de sessionStorage, así no carga
+ * el iframe de Auth en cada arranque. Devuelve { tipo: 'ingreso' | null, error? }; no lanza, para
+ * no romper el arranque de App.jsx.
  */
 export async function completarRedireccion() {
   const marca = leerMarca();
@@ -273,30 +221,10 @@ export async function completarRedireccion() {
   borrarMarca();
   try {
     const resultado = await getRedirectResult(auth, browserPopupRedirectResolver);
-    if (!resultado) return { tipo: null };
-    const tipo = resultado.operationType === 'link' ? 'vinculo' : 'ingreso';
-    if (tipo === 'vinculo') {
-      await resultado.user.getIdToken(true);
-      refrescarSesion();
-    }
-    return { tipo };
+    return { tipo: resultado ? 'ingreso' : null };
   } catch (e) {
-    if (e?.code === 'auth/credential-already-in-use' || e?.code === 'auth/email-already-in-use') {
-      return { tipo: 'vinculo', cuentaExistente: GoogleAuthProvider.credentialFromError(e) };
-    }
     console.warn('[Auth] No se pudo completar la redirección:', e?.code || e);
-    return { tipo: marca === 'vinculo' ? 'vinculo' : 'ingreso', error: aErrorApp(e) };
-  }
-}
-
-/** Entra con una credencial ya obtenida (la de cuentaExistente). Lo orquesta src/datos/sesion.js. */
-export async function ingresarConCredencial(credencial) {
-  if (!credencial) throw new ErrorApp('desconocido', 'No recibimos los datos de la cuenta de Google. Volvé a intentar.');
-  try {
-    const resultado = await signInWithCredential(auth, credencial);
-    return resultado.user;
-  } catch (e) {
-    throw aErrorApp(e);
+    return { tipo: 'ingreso', error: aErrorApp(e) };
   }
 }
 

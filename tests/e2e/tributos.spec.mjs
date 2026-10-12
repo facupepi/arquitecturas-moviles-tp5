@@ -1,6 +1,6 @@
 // Tributos (S4, sección 8.7): T1 cedulón con código de pago e impresión, T2 pago simulado con
 // confirmación, T3 historial y estados, T4 estado "por vencer" y recordatorios de vencimiento.
-// Datos: los que escribe vecino/alta (datosInicialesVecino de shared/catalogo.mjs) para cada invitado
+// Datos: los que escribe vecino/alta (datosInicialesVecino de shared/catalogo.mjs) para cada vecino
 // nuevo: T-0999 vencido, T-1001 por vencer (2 días), T-1002 pendiente (8 días) y T-1000 pagado.
 import { Timestamp } from 'firebase-admin/firestore';
 import { test, expect, irA } from './fixtures.mjs';

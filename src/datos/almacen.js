@@ -321,11 +321,9 @@ export function crearAlmacen(usuarioInicial) {
       comprobarListo();
     }, alFallar('perfil', 'perfil')),
 
-    esAdmin: () => (estado.usuario.anonimo
-      ? (actualizar({ esAdmin: false }), () => {})
-      : repositorio.suscribirEsAdmin(estado.usuario.uid, (existe) => {
-        actualizar({ esAdmin: Boolean(existe) && !estado.usuario.anonimo });
-      }, () => actualizar({ esAdmin: false }))),
+    esAdmin: () => repositorio.suscribirEsAdmin(estado.usuario.uid, (existe) => {
+      actualizar({ esAdmin: Boolean(existe) });
+    }, () => actualizar({ esAdmin: false })),
 
     tributos: () => repositorio.suscribirTributos(estado.usuario.uid, (tributos) => {
       crudo.tributos = tributos;
@@ -368,8 +366,8 @@ export function crearAlmacen(usuarioInicial) {
   // ---------- Alta del vecino ----------
   function asegurar(perfil) {
     const usuario = estado.usuario;
-    // Solo hay gracia si esta vez el alta escribió datos (perfil sin altaEn o que cambió de tipo).
-    const escribeDatos = !perfil?.altaEn || perfil.anonimo !== Boolean(usuario.anonimo);
+    // Solo hay gracia si esta vez el alta escribió datos (mismo criterio que asegurarAlta).
+    const escribeDatos = repositorio.necesitaAlta(perfil);
     const terminar = () => {
       if (!activo || estado.usuario.uid !== usuario.uid || estado.altaTerminada) return;
       if (escribeDatos) altaTerminadaEn = Date.now();
@@ -495,17 +493,13 @@ export function crearAlmacen(usuarioInicial) {
     cerca.reanudada = false;
   }
 
-  // Mismo uid, otros datos (vínculo con Google: cambia anonimo y nombre).
+  // Mismo uid, otros datos (por ejemplo, cambió el nombre de la cuenta de Google).
   function cambiarUsuario(usuario) {
     if (!usuario || usuario.uid !== estado.usuario.uid) return;
     const anterior = estado.usuario;
-    if (anterior.anonimo === usuario.anonimo && anterior.nombre === usuario.nombre
-      && anterior.email === usuario.email && anterior.proveedor === usuario.proveedor) return;
+    if (anterior.nombre === usuario.nombre && anterior.email === usuario.email
+      && anterior.proveedor === usuario.proveedor) return;
     actualizar({ usuario });
-    if (anterior.anonimo !== usuario.anonimo) {
-      if (activo) abrir('esAdmin', aperturas.esAdmin);
-      if (recibido.perfil) asegurar(estado.perfil);
-    }
   }
 
   return {
@@ -549,7 +543,7 @@ export function ProveedorMunicipal({ usuario, children }) {
 
   useEffect(() => {
     if (almacen && usuario) almacen.cambiarUsuario(usuario);
-  }, [almacen, usuario, usuario?.anonimo, usuario?.nombre, usuario?.email, usuario?.proveedor]);
+  }, [almacen, usuario, usuario?.nombre, usuario?.email, usuario?.proveedor]);
 
   return createElement(ContextoMunicipal.Provider, { value: almacen }, children);
 }

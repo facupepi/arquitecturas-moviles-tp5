@@ -22,14 +22,17 @@ export async function crearEntorno() {
   return entorno;
 }
 
-// Vecino invitado (cuenta anónima), como entra la mayoría.
+// Vecino con cuenta de Google: el único modo de ingreso (no hay invitados).
 export function vecino(entorno, uid) {
-  return entorno.authenticatedContext(uid, { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+  return entorno.authenticatedContext(uid, { firebase: { sign_in_provider: 'google.com' } }).firestore();
 }
 
-// Usuario con cuenta de Google (el único que puede ser admin).
-export function google(entorno, uid) {
-  return entorno.authenticatedContext(uid, { firebase: { sign_in_provider: 'google.com' } }).firestore();
+// Lo mismo que vecino; se usa donde importa remarcar que es una cuenta de Google (admin).
+export const google = vecino;
+
+// Sesión anónima: ya no se ofrece en la app y las reglas la rechazan en todo lo que no es público.
+export function anonimo(entorno, uid) {
+  return entorno.authenticatedContext(uid, { firebase: { sign_in_provider: 'anonymous' } }).firestore();
 }
 
 export function sinSesion(entorno) {

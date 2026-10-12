@@ -6,12 +6,24 @@
 // caché que usan sus pantallas): así se comprueba el objetivo de la demo, "el celular del vecino
 // cambia en menos de 2 s sin recargar", sin depender de las pantallas de otros paquetes.
 import { Timestamp } from 'firebase-admin/firestore';
-import { test, expect, irA, hacerAdmin } from './fixtures.mjs';
+import { test, expect, irA, hacerAdmin, PROYECTO } from './fixtures.mjs';
+import { PERFILES } from '../../scripts/emuladores.mjs';
 import { revisarAccesibilidad } from './accesibilidad.mjs';
 import { codigoReclamo } from '../../shared/dominio.mjs';
 import { catalogo } from '../../shared/catalogo.mjs';
 
 const MAXIMO_MS = 2000;
+const { auth: PUERTO_AUTH, firestore: PUERTO_FIRESTORE, edge: PUERTO_EDGE } = PERFILES.e2e.puertos;
+
+/** Sesión anónima nueva en el emulador de Auth (como la que dejaba la versión con invitados). */
+async function sesionAnonima() {
+  const r = await fetch(`http://127.0.0.1:${PUERTO_AUTH}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=demo-clave`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ returnSecureToken: true }),
+  });
+  const datos = await r.json();
+  if (!r.ok || !datos.idToken) throw new Error(`El emulador de Auth no creó la sesión anónima: ${JSON.stringify(datos)}`);
+  return { uid: datos.localId, token: datos.idToken };
+}
 
 async function abrirPanel(page, pestana) {
   await irA(page, '#/panel');
@@ -112,27 +124,29 @@ test.describe('Panel municipal', () => {
     await expect(page.getByTestId('pantalla-panel')).toHaveCount(0);
   });
 
-  test('un invitado con documento de administrador no ve el panel ni puede usar sus comandos', async ({ vecino, adminDb }) => {
-    const { page, uid } = vecino;
-    await hacerAdmin(adminDb, uid, 'Invitado con documento');
+  test('una sesión anónima con documento de administrador es rechazada por las reglas y las funciones', async ({ adminDb, adminAuth }) => {
+    const { uid, token } = await sesionAnonima();
+    await hacerAdmin(adminDb, uid, 'Anónimo con documento');
     try {
-      await irA(page, '#/panel');
-      await expect.poll(() => page.evaluate(() => window.location.hash), { timeout: 10_000 }).toBe('#/inicio');
-      await expect(page.getByTestId('pantalla-panel')).toHaveCount(0);
-      // Las reglas y la Edge Function aplican el mismo criterio: un anónimo no es admin.
-      const codigos = await page.evaluate(async () => {
-        const repo = await import('/src/datos/repositorio.js');
-        const probar = async (fn) => { try { await fn(); return 'ok'; } catch (e) { return e.codigo ?? String(e); } };
-        return {
-          bicicletas: await probar(() => repo.cambiarBicicletas({ estacionId: 'b1', bicicletas: 1 })),
-          tarea: await probar(() => repo.ejecutarTarea('diaria')),
-        };
-      });
-      expect(codigos.bicicletas).toBe('permiso');
-      expect(codigos.tarea).not.toBe('ok');
-      expect((await adminDb.doc('estaciones/b1').get()).get('bicicletas')).not.toBe(1);
+      const encabezados = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+      // Reglas de Firestore (API REST del emulador con el token anónimo): ni su propio documento de
+      // administrador, ni su perfil, ni la bandeja de eventos.
+      const documentos = `http://127.0.0.1:${PUERTO_FIRESTORE}/v1/projects/${PROYECTO}/databases/(default)/documents`;
+      for (const ruta of [`administradores/${uid}`, `usuarios/${uid}`, 'eventos']) {
+        const r = await fetch(`${documentos}/${ruta}`, { headers: encabezados });
+        expect(r.status, ruta).toBe(403);
+      }
+      // Edge Functions (edge-simulado, mismo criterio que verificarUsuario de Supabase): 403 permiso.
+      const funciones = `http://127.0.0.1:${PUERTO_EDGE}/p/${PROYECTO}/functions/v1`;
+      for (const [ruta, cuerpo] of [['tareas', { tarea: 'diaria' }], ['despachar', {}], ['vecino/alta', {}]]) {
+        const r = await fetch(`${funciones}/${ruta}`, { method: 'POST', headers: encabezados, body: JSON.stringify(cuerpo) });
+        expect(r.status, ruta).toBe(403);
+        expect((await r.json()).error?.codigo, ruta).toBe('permiso');
+      }
+      expect((await adminDb.doc(`usuarios/${uid}`).get()).exists).toBe(false);
     } finally {
       await adminDb.doc(`administradores/${uid}`).delete();
+      await adminAuth.deleteUser(uid).catch(() => {});
     }
   });
 

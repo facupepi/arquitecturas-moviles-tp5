@@ -5,7 +5,7 @@ import { register } from 'node:module';
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { crearEntorno, vecino, google, sembrar, ts, PREFERENCIAS, MIN } from './_entorno.mjs';
+import { crearEntorno, vecino, sembrar, ts, PREFERENCIAS, MIN } from './_entorno.mjs';
 
 register('./_cargador.mjs', import.meta.url);
 
@@ -26,8 +26,8 @@ let entorno;
 let almacen;
 const base = catalogo(Date.now());
 
-function como(uid, proveedor = 'anonymous') {
-  fijarDb(proveedor === 'google.com' ? google(entorno, uid) : vecino(entorno, uid));
+function como(uid) {
+  fijarDb(vecino(entorno, uid));
   fijarUsuario(uid);
 }
 
@@ -65,7 +65,7 @@ before(async () => {
     }
     await setDoc(doc(db, 'administradores/admin-google'), { nombre: 'Admin', alta: ts(Date.now()) });
     await setDoc(doc(db, 'usuarios/ana'), {
-      nombre: 'Ana', anonimo: true, creadoEn: ts(Date.now()), actualizadoEn: ts(Date.now()), altaEn: ts(Date.now()),
+      nombre: 'Ana', anonimo: false, creadoEn: ts(Date.now()), actualizadoEn: ts(Date.now()), altaEn: ts(Date.now()),
       preferencias: PREFERENCIAS, cercania: null, privacidadAceptadaEn: null,
     });
     const dia = 24 * 60 * MIN;
@@ -87,7 +87,7 @@ before(async () => {
   });
   como('ana');
   funciones.fijarRespuesta(async () => ({ creado: false }));
-  almacen = crearAlmacen({ uid: 'ana', anonimo: true, nombre: 'Ana', email: null, proveedor: 'anonymous' });
+  almacen = crearAlmacen({ uid: 'ana', nombre: 'Ana', email: null, proveedor: 'google.com' });
   almacen.iniciar();
 });
 
@@ -232,11 +232,12 @@ describe('almacén', () => {
     assert.equal(almacen.obtener().alerta, null);
   });
 
-  it('cambiarUsuario con anonimo distinto vuelve a llamar vecino/alta (vínculo)', async () => {
+  it('cambiarUsuario con otro nombre lo actualiza sin volver a llamar vecino/alta', async () => {
     funciones.llamadas.length = 0;
-    almacen.cambiarUsuario({ uid: 'ana', anonimo: false, nombre: 'Ana G', email: 'ana@ejemplo.com', proveedor: 'google.com' });
-    await esperar(() => funciones.llamadas.some((l) => l.ruta === 'vecino/alta'));
-    assert.equal(almacen.obtener().usuario.anonimo, false);
+    almacen.cambiarUsuario({ uid: 'ana', nombre: 'Ana G', email: 'ana@ejemplo.com', proveedor: 'google.com' });
+    await esperar((e) => e.usuario.nombre === 'Ana G');
+    await new Promise((r) => setTimeout(r, 200));
+    assert.equal(funciones.llamadas.filter((l) => l.ruta === 'vecino/alta').length, 0);
   });
 });
 
@@ -268,12 +269,6 @@ describe('sesión y push', () => {
     await sesion.borrarCuentaYSalir();
     assert.ok(llamadasAuth.includes('salir'));
   });
-
-  it('vincular pide un token nuevo después de vincular', async () => {
-    llamadasAuth.length = 0;
-    await sesion.vincular();
-    assert.deepEqual(llamadasAuth, ['vincular', 'token:true']);
-  });
 });
 
 describe('React: ProveedorMunicipal y useMunicipal', () => {
@@ -285,7 +280,7 @@ describe('React: ProveedorMunicipal y useMunicipal', () => {
       const { listo, zonas } = useMunicipal((s) => ({ listo: s.listo, zonas: s.preferencias.zonas }));
       return createElement('span', null, `${listo}|${zonas.join(',')}`);
     }
-    const html = renderToString(createElement(ProveedorMunicipal, { usuario: { uid: 'ana', anonimo: true } }, createElement(Lector)));
+    const html = renderToString(createElement(ProveedorMunicipal, { usuario: { uid: 'ana', proveedor: 'google.com' } }, createElement(Lector)));
     assert.match(html, /false\|centro,parque/);
     assert.throws(() => renderToString(createElement(Lector)), /fuera de <ProveedorMunicipal>/);
   });

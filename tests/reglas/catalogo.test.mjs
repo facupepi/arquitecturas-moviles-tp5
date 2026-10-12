@@ -3,7 +3,7 @@ import { describe, it, before, after } from 'node:test';
 import {
   doc, getDoc, getDocs, collection, setDoc, updateDoc, writeBatch, serverTimestamp,
 } from 'firebase/firestore';
-import { crearEntorno, vecino, google, sinSesion, sembrar, ts, assertSucceeds, assertFails, MIN } from './_entorno.mjs';
+import { crearEntorno, vecino, google, anonimo, sinSesion, sembrar, ts, assertSucceeds, assertFails, MIN } from './_entorno.mjs';
 
 let entorno;
 
@@ -172,7 +172,7 @@ describe('catálogo público', () => {
   });
 
   it('un admin con cuenta anónima se rechaza', async () => {
-    const db = vecino(entorno, 'admin-anonimo');
+    const db = anonimo(entorno, 'admin-anonimo');
     await assertFails(updateDoc(doc(db, 'estaciones/b1'), { bicicletas: 3, estado: 'operativa', actualizadoEn: serverTimestamp() }));
     const lote = writeBatch(db);
     lote.update(doc(db, 'alarmas/a3'), {

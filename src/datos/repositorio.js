@@ -225,8 +225,8 @@ export function suscribirEventos(limite = 20, alCambiar, alFallar) {
 
 // ===================== Alta del vecino =====================
 
-// Promesas memorizadas por uid y anonimo (C8): los comandos del perfil esperan altaLista(uid).
-const altas = new Map();          // `${uid}|${anonimo}` → { promesa, fallo }
+// Promesas memorizadas por uid (C8): los comandos del perfil esperan altaLista(uid).
+const altas = new Map();          // uid → { promesa, fallo }
 const ultimaAlta = new Map();     // uid → promesa
 const REINTENTO_ALTA_MS = 60_000;
 
@@ -236,14 +236,14 @@ export function altaLista(uid) {
 
 // Para cuando se borra la cuenta o se sale: la próxima sesión vuelve a evaluar el alta.
 export function olvidarAlta(uid) {
-  for (const clave of altas.keys()) if (clave.startsWith(`${uid}|`)) altas.delete(clave);
+  altas.delete(uid);
   ultimaAlta.delete(uid);
 }
 
 function perfilPorDefecto(usuario) {
   return {
     nombre: String(usuario.nombre ?? '').slice(0, 80),
-    anonimo: Boolean(usuario.anonimo),
+    anonimo: false,               // campo del perfil (reglas y vecino/alta); ya no hay invitados
     creadoEn: serverTimestamp(),
     actualizadoEn: serverTimestamp(),
     preferencias: { ...PREFERENCIAS_POR_DEFECTO, tipos: [...PREFERENCIAS_POR_DEFECTO.tipos], zonas: [...PREFERENCIAS_POR_DEFECTO.zonas] },
@@ -252,19 +252,26 @@ function perfilPorDefecto(usuario) {
   };
 }
 
-// Llama vecino/alta solo si falta altaEn o cambió anonimo (vínculo reciente). Si falla y el
-// perfil no existe, lo crea con preferencias por defecto. La promesa se resuelve igual.
+/**
+ * true si hay que llamar a vecino/alta: falta altaEn, o el perfil quedó marcado como anónimo (lo
+ * escribió una versión anterior que tenía invitados) y el alta lo corrige.
+ */
+export function necesitaAlta(perfil) {
+  return !perfil?.altaEn || perfil.anonimo === true;
+}
+
+// Llama vecino/alta solo si necesitaAlta(perfil). Si falla y el perfil no existe, lo crea con
+// preferencias por defecto. La promesa se resuelve igual.
 export function asegurarAlta(usuario, perfil) {
   if (!usuario?.uid) return Promise.resolve({ creado: false });
-  const anonimo = Boolean(usuario.anonimo);
-  const clave = `${usuario.uid}|${anonimo}`;
+  const clave = usuario.uid;
   const previa = altas.get(clave);
   if (previa && !(previa.fallo && Date.now() - previa.fallo > REINTENTO_ALTA_MS)) return previa.promesa;
 
-  const necesitaAlta = !perfil?.altaEn || perfil.anonimo !== anonimo;
+  const hacerAlta = necesitaAlta(perfil);
   const entrada = { promesa: null, fallo: 0 };
   entrada.promesa = (async () => {
-    if (!necesitaAlta) return { creado: false };
+    if (!hacerAlta) return { creado: false };
     try {
       const datos = await llamarFuncion('vecino/alta');
       return { creado: Boolean(datos?.creado) };

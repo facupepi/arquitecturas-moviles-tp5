@@ -51,12 +51,12 @@ export default function EncabezadoInstitucional() {
   const muestraLogo = width >= 340;
   const muestra147 = width >= 380;
   const nombreCorto = (usuario?.nombre || '').split(' ')[0];
-  const inicial = (usuario?.nombre || (usuario?.anonimo ? 'I' : 'V')).slice(0, 1).toUpperCase();
+  const inicial = (usuario?.nombre || 'V').slice(0, 1).toUpperCase();
 
   const cerrarSesion = async () => {
     setMenuAbierto(false);
     try {
-      await cerrarSesionDesdeMarco(usuario, navegar);
+      await cerrarSesionDesdeMarco();
     } catch {
       aviso.mostrar('No se pudo cerrar la sesión. Intentá de nuevo.', 'peligro');
     }
@@ -130,7 +130,7 @@ export default function EncabezadoInstitucional() {
           </BotonIcono>
           <Pressable
             role="button"
-            aria-label={`Mi cuenta, ${usuario?.nombre || (usuario?.anonimo ? 'invitado' : 'vecino')}`}
+            aria-label={`Mi cuenta, ${usuario?.nombre || 'vecino'}`}
             aria-haspopup="dialog"
             aria-expanded={menuAbierto}
             onPress={conFoco(() => setMenuAbierto(true))}
@@ -144,7 +144,7 @@ export default function EncabezadoInstitucional() {
             </View>
             {escritorio ? (
               <Texto variante="chico" peso="700" color={colores.blanco} numberOfLines={1} estilo={estilos.nombreCuenta}>
-                {nombreCorto || (usuario?.anonimo ? 'Invitado' : 'Mi cuenta')}
+                {nombreCorto || 'Mi cuenta'}
               </Texto>
             ) : null}
           </Pressable>

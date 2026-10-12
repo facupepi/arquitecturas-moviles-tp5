@@ -54,7 +54,7 @@ export default function MenuLateral({ alElegir }) {
   const cerrarSesion = async () => {
     alElegir?.();
     try {
-      await cerrarSesionDesdeMarco(usuario, navegar);
+      await cerrarSesionDesdeMarco();
     } catch {
       aviso.mostrar('No se pudo cerrar la sesión. Intentá de nuevo.', 'peligro');
     }

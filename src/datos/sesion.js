@@ -1,8 +1,6 @@
 // Orquestación de sesión y push (WP3, sección 4.7). Único lugar que combina Auth, mensajería,
 // repositorio y Supabase, para que el grafo de imports quede sin ciclos.
-import {
-  cerrarSesionFirebase, ingresarConCredencial, obtenerTokenId, vincularConGoogle,
-} from '../firebase/auth';
+import { cerrarSesionFirebase } from '../firebase/auth';
 import {
   borrarTokenPush, estadoPushLocal, guardarTokenLocal, obtenerTokenPush,
 } from '../firebase/mensajeria';
@@ -62,7 +60,7 @@ async function desactivarPushSinErrores() {
   }
 }
 
-// Con cuenta de Google: apaga el push de este dispositivo (sin propagar errores) y cierra sesión.
+// Cierra la sesión: apaga el push de este dispositivo (sin propagar errores) y cierra sesión.
 export async function salir() {
   await desactivarPushSinErrores();
   await cerrarSesionFirebase();
@@ -79,19 +77,4 @@ export async function borrarCuentaYSalir() {
   }
   await borrarDatosEnServidor();
   await cerrarSesionFirebase();
-}
-
-// Vincula al invitado con Google (conserva el uid). El cambio de usuario.anonimo hace que el
-// almacén vuelva a llamar asegurarAlta, que sincroniza nombre y anonimo.
-export async function vincular() {
-  await vincularConGoogle();
-  await obtenerTokenId(true);
-}
-
-// El invitado elige entrar con una cuenta de Google que ya tenía datos: se borran sus datos y
-// el usuario anónimo, y el teléfono deja de recibir sus push.
-export async function cambiarACuentaExistente(credencial) {
-  await desactivarPushSinErrores();
-  await borrarDatosEnServidor();
-  await ingresarConCredencial(credencial);
 }

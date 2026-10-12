@@ -3,10 +3,11 @@
 //   import { test, expect } from './fixtures.mjs';
 //   test('…', async ({ vecino, admin, adminDb, nuevoVecino, sembrarVecino, geolocalizar, adelantarReloj }) => { … });
 //
-// - vecino          { page, uid, contexto }: la `page` de la prueba, que entra como invitado (anónimo) y
-//                   espera html[data-listo="true"]. Cada prueba tiene un uid nuevo: sus datos no se cruzan
-//                   con los de otra prueba ni con los de otro agente.
-// - nuevoVecino()   otro invitado en un contexto aparte (otro "celular"), mismo dispositivo emulado.
+// - vecino          { page, uid, contexto, sub }: la `page` de la prueba, que entra con una cuenta de
+//                   Google NUEVA del emulador de Auth (ingresarGoogleFalso de 5.2, sub único por prueba)
+//                   y espera html[data-listo="true"]. Cada prueba tiene un uid nuevo: sus datos no se
+//                   cruzan con los de otra prueba ni con los de otro agente. No hay acceso anónimo.
+// - nuevoVecino()   otra cuenta de Google nueva en un contexto aparte (otro "celular"), mismo dispositivo.
 // - admin           { page, uid, contexto }: usuario Google del emulador (ingresarGoogleFalso de 5.2) con
 //                   documento administradores/{uid}, en un contexto aparte. El sub es 'admin-e2e', o
 //                   'admin-e2e-<agente>' en el modo compartido.
@@ -41,6 +42,7 @@ export const PROYECTO = process.env.E2E_PROYECTO || AGENTE?.proyecto || PROYECTO
 export const PROYECTO_USUARIOS = PROYECTO_DEMO;
 export const SUB_ADMIN = AGENTE?.subAdmin ?? 'admin-e2e';
 export const NOMBRE_ADMIN = 'Admin E2E';
+export const NOMBRE_VECINO = 'Vecino E2E';
 const CLAVE_API = 'demo-clave'; // la de .env.e2e; el emulador acepta cualquiera
 
 if (!PROYECTO.startsWith('demo-')) throw new Error(`Las pruebas e2e solo corren contra proyectos demo-* (llegó ${PROYECTO}).`);
@@ -63,20 +65,12 @@ async function abrirApp(page) {
   await page.locator('#root').waitFor({ state: 'attached' });
 }
 
-/**
- * Entra como invitado con la misma función que usa el botón "Entrar como invitado"
- * (ingresarComoInvitado de src/firebase/auth.js, cargada del Vite de la prueba), así no depende
- * de la pantalla de Ingreso. Devuelve el uid.
- */
-export async function entrarComoInvitado(page, { esperar = true } = {}) {
-  await abrirApp(page);
-  const uid = await page.evaluate(async () => {
-    const modulo = await import('/src/firebase/auth.js');
-    const usuario = await modulo.ingresarComoInvitado();
-    return usuario.uid;
-  });
-  if (esperar) await esperarListo(page);
-  return uid;
+let contadorSubs = 0;
+/** sub de Google único para esta corrida, este agente y este proceso (cuenta nueva en el emulador). */
+export function subNuevo(prefijo = 'vecino') {
+  contadorSubs += 1;
+  const azar = Math.random().toString(36).slice(2, 8);
+  return `${prefijo}-${AGENTE?.nombre ?? 'local'}-${process.pid}-${Date.now().toString(36)}-${contadorSubs}-${azar}`;
 }
 
 /**
@@ -150,8 +144,9 @@ export const test = base.extend({
   },
 
   vecino: async ({ page }, use) => {
-    const uid = await entrarComoInvitado(page);
-    await use({ page, uid, contexto: page.context() });
+    const sub = subNuevo();
+    const uid = await entrarConGoogleFalso(page, sub, NOMBRE_VECINO);
+    await use({ page, uid, contexto: page.context(), sub });
   },
 
   nuevoVecino: async ({ browser, opcionesContexto }, use) => {
@@ -160,8 +155,9 @@ export const test = base.extend({
       const contexto = await browser.newContext(opcionesContexto);
       contextos.push(contexto);
       const page = await contexto.newPage();
-      const uid = await entrarComoInvitado(page);
-      return { page, uid, contexto };
+      const sub = subNuevo();
+      const uid = await entrarConGoogleFalso(page, sub, NOMBRE_VECINO);
+      return { page, uid, contexto, sub };
     });
     for (const c of contextos) await c.close().catch(() => {});
   },

@@ -40,7 +40,8 @@ async function alta(id: Identidad): Promise<{ creado: boolean; tributos: number;
   const iniciales = datosInicialesVecino(ahora) as Record<string, unknown>;
   const nombre = (id.nombre ?? "").trim().slice(0, 80) || "Vecino";
 
-  // Perfil: update si existe (sincroniza nombre y anonimo después de vincular), set si no.
+  // Perfil: update si existe (sincroniza el nombre y corrige anonimo de un perfil viejo), set si no.
+  // anonimo queda en false: es un campo del perfil (reglas), y ya no hay sesiones anónimas.
   const perfil = await obtener(ruta);
   let creado = false;
   if (!perfil) {
@@ -50,7 +51,7 @@ async function alta(id: Identidad): Promise<{ creado: boolean; tributos: number;
       soloSiNoExiste: true,
       datos: {
         nombre,
-        anonimo: id.anonimo,
+        anonimo: false,
         creadoEn: HORA_SERVIDOR,
         actualizadoEn: HORA_SERVIDOR,
         altaEn: HORA_SERVIDOR,
@@ -65,7 +66,7 @@ async function alta(id: Identidad): Promise<{ creado: boolean; tributos: number;
   if (!creado) {
     // Existía (o lo creó el cliente en paralelo): solo los campos que maneja el servidor.
     const actual = perfil ?? await obtener(ruta);
-    const datos: Record<string, unknown> = { nombre, anonimo: id.anonimo, actualizadoEn: HORA_SERVIDOR };
+    const datos: Record<string, unknown> = { nombre, anonimo: false, actualizadoEn: HORA_SERVIDOR };
     if (!actual?.datos.altaEn) datos.altaEn = HORA_SERVIDOR;
     const [r] = await escribirLote([{ tipo: "update", ruta, datos }]);
     if (r === "error") throw new Error("No se pudo actualizar el perfil");

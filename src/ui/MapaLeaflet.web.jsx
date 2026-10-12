@@ -104,11 +104,24 @@ export default function MapaLeaflet({ puntos = [], seleccionado, onSeleccionar, 
     capas.current = L.layerGroup().addTo(instancia);
     mapa.current = instancia;
 
-    const observador = typeof ResizeObserver === 'function' ? new ResizeObserver(() => instancia.invalidateSize()) : null;
+    // Un aviso de tamaño puede llegar después de desmontar: sin esta guarda, Leaflet intenta
+    // recalcular un mapa ya destruido y falla al leer la posición de sus capas.
+    let vigente = true;
+    const observador =
+      typeof ResizeObserver === 'function'
+        ? new ResizeObserver(() => {
+            if (vigente) instancia.invalidateSize({ pan: false });
+          })
+        : null;
     observador?.observe(nodo);
 
     return () => {
+      vigente = false;
       observador?.disconnect();
+      // Detener primero cualquier desplazamiento o zoom en curso: si la animación sigue
+      // después de remove(), Leaflet accede a capas que ya no existen.
+      instancia.stop();
+      instancia.off();
       instancia.remove();
       nodo.remove();
       mapa.current = null;
@@ -173,9 +186,11 @@ export default function MapaLeaflet({ puntos = [], seleccionado, onSeleccionar, 
     // (al montarse dentro de Suspense, Leaflet puede haber tomado un tamaño provisorio).
     if (!encuadrado.current && limites.length) {
       encuadrado.current = true;
-      instancia.invalidateSize();
-      if (limites.length === 1) instancia.setView(limites[0], 16);
-      else instancia.fitBounds(limites, { padding: [28, 28], maxZoom: 16 });
+      // Encuadre instantáneo: evita una animación que puede quedar viva si el vecino sale de
+      // la pantalla enseguida.
+      instancia.invalidateSize({ pan: false });
+      if (limites.length === 1) instancia.setView(limites[0], 16, { animate: false });
+      else instancia.fitBounds(limites, { padding: [28, 28], maxZoom: 16, animate: false });
     }
   }, [puntos, seleccionado, ubicacion]);
 

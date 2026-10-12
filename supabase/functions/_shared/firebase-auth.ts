@@ -21,7 +21,6 @@ export class ErrorHttp extends Error {
 
 export type Identidad = {
   uid: string;
-  anonimo: boolean;
   proveedor: string;
   nombre: string | null;
 };
@@ -54,9 +53,13 @@ export async function verificarUsuario(req: Request): Promise<Identidad> {
     throw new ErrorHttp(401, "sin-sesion", "La sesión no es válida.");
   }
   const firebase = (payload.firebase ?? {}) as { sign_in_provider?: string };
+  // Solo se ingresa con Google: una sesión anónima (de la versión que tenía invitados, o creada a
+  // mano contra la API de Auth) no usa ninguna función. Mismo criterio que las reglas de Firestore.
+  if (firebase.sign_in_provider === "anonymous") {
+    throw new ErrorHttp(403, "permiso", "Ingresá con tu cuenta de Google para usar Conecta.");
+  }
   return {
     uid: sub,
-    anonimo: firebase.sign_in_provider === "anonymous",
     proveedor: firebase.sign_in_provider ?? "desconocido",
     nombre: typeof payload.name === "string" ? payload.name : null,
   };
@@ -86,9 +89,10 @@ export function verificarCron(req: Request): boolean {
   return dif === 0;
 }
 
-// Admin = cuenta no anónima con administradores/{uid} en Firestore. MISMO criterio que esAdmin() de las reglas.
+// Admin = cuenta no anónima (verificarUsuario ya rechaza las anónimas) con administradores/{uid} en
+// Firestore. MISMO criterio que esAdmin() de las reglas.
 export async function exigirAdmin(id: Identidad, firestore: { obtener(r: string): Promise<unknown> }) {
-  if (id.anonimo || !(await firestore.obtener(`administradores/${id.uid}`))) {
+  if (!(await firestore.obtener(`administradores/${id.uid}`))) {
     throw new ErrorHttp(403, "permiso", "Esta operación corresponde al personal municipal.");
   }
 }

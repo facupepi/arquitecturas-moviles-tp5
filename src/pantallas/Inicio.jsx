@@ -56,7 +56,7 @@ const ATAJOS = [
     ruta: 'contactos', params: { categoria: 'salud' }, claves: 'hospital salud guardia medico iturraspe',
   },
   {
-    id: 'cuenta', titulo: 'Mi cuenta y privacidad', detalle: 'Vincular con Google, instalar la app o borrar tus datos',
+    id: 'cuenta', titulo: 'Mi cuenta y privacidad', detalle: 'Tu perfil, instalar la app o borrar tus datos',
     icono: 'usuario', ruta: 'cuenta', claves: 'cuenta perfil google privacidad datos borrar instalar sesion salir',
   },
 ];

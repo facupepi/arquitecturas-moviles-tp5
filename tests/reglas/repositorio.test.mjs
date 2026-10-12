@@ -5,7 +5,7 @@ import { register } from 'node:module';
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { crearEntorno, vecino, google, sembrar, ts, PREFERENCIAS, MIN } from './_entorno.mjs';
+import { crearEntorno, vecino, sembrar, ts, PREFERENCIAS, MIN } from './_entorno.mjs';
 
 register('./_cargador.mjs', import.meta.url);
 
@@ -22,18 +22,16 @@ const TODOS_LOS_DIAS = { dias: [1, 2, 3, 4, 5, 6, 7], desde: 0, hasta: 24 };
 const SIN_HORARIO = { dias: [], desde: 0, hasta: 24 };
 
 // Cambia el usuario de turno: Firestore autenticado con su token y auth.currentUser.
-function como(uid, { proveedor = 'anonymous' } = {}) {
-  const clave = `${uid}|${proveedor}`;
-  if (!contextos.has(clave)) {
-    contextos.set(clave, proveedor === 'google.com' ? google(entorno, uid) : vecino(entorno, uid));
-  }
+function como(uid) {
+  const clave = uid;
+  if (!contextos.has(clave)) contextos.set(clave, vecino(entorno, uid));
   fijarDb(contextos.get(clave));
   fijarUsuario(uid);
 }
 
 function perfil(nombre) {
   return {
-    nombre, anonimo: true, creadoEn: ts(Date.now()), actualizadoEn: ts(Date.now()), altaEn: ts(Date.now()),
+    nombre, anonimo: false, creadoEn: ts(Date.now()), actualizadoEn: ts(Date.now()), altaEn: ts(Date.now()),
     preferencias: PREFERENCIAS, cercania: null, privacidadAceptadaEn: null,
   };
 }
@@ -295,18 +293,19 @@ describe('perfil, notificaciones y dispositivos', () => {
   it('asegurarAlta crea el perfil si vecino/alta falla y el perfil no existe', async () => {
     como('nuevo');
     funciones.fijarRespuesta(async () => { throw Object.assign(new Error('Failed to fetch'), { name: 'TypeError' }); });
-    const r = await repo.asegurarAlta({ uid: 'nuevo', anonimo: true, nombre: '' }, null);
+    const r = await repo.asegurarAlta({ uid: 'nuevo', nombre: '' }, null);
     assert.equal(r.creado, true);
-    assert.equal(await repo.altaLista('nuevo'), await repo.asegurarAlta({ uid: 'nuevo', anonimo: true }, null));
+    assert.equal(await repo.altaLista('nuevo'), await repo.asegurarAlta({ uid: 'nuevo' }, null));
     const p = await leer('usuarios/nuevo');
     assert.deepEqual(p.preferencias.zonas, ['centro', 'parque']);
+    assert.equal(p.anonimo, false, 'el perfil de respaldo nunca es anónimo');
     funciones.fijarRespuesta(async () => ({ creado: true }));
     funciones.llamadas.length = 0;
-    // Con altaEn y el mismo anonimo no se llama a la función.
-    await repo.asegurarAlta({ uid: 'ana', anonimo: true }, { altaEn: Date.now(), anonimo: true });
+    // Con altaEn no se llama a la función.
+    await repo.asegurarAlta({ uid: 'ana' }, { altaEn: Date.now(), anonimo: false });
     assert.equal(funciones.llamadas.length, 0);
-    // Un vínculo reciente (anonimo cambió) sí la llama.
-    await repo.asegurarAlta({ uid: 'ana', anonimo: false }, { altaEn: Date.now(), anonimo: true });
+    // Un perfil que quedó marcado anónimo (versión con invitados) sí la llama, para corregirlo.
+    await repo.asegurarAlta({ uid: 'beto' }, { altaEn: Date.now(), anonimo: true });
     assert.deepEqual(funciones.llamadas.map((l) => l.ruta), ['vecino/alta']);
     funciones.fijarRespuesta(async () => ({}));
   });
@@ -334,7 +333,7 @@ describe('panel municipal', () => {
     como('ana');
     const reclamoId = id(30);
     await repo.crearReclamo({ categoria: 'limpieza', direccion: 'Plaza General Paz', descripcion: 'Contenedor desbordado hace días.' }, reclamoId);
-    como('admin-google', { proveedor: 'google.com' });
+    como('admin-google');
     funciones.llamadas.length = 0;
     const req = id(31);
     await repo.avanzarReclamo({ uid: 'ana', reclamoId, estadoActual: 'recibido', nota: 'Cuadrilla asignada.' }, req);
@@ -365,7 +364,7 @@ describe('panel municipal', () => {
   });
 
   it('cambiarBicicletas, configurarDemo y restablecerDemo', async () => {
-    como('admin-google', { proveedor: 'google.com' });
+    como('admin-google');
     await repo.cambiarBicicletas({ estacionId: 'b1', bicicletas: 1, estado: 'operativa' });
     assert.equal((await leer('estaciones/b1')).bicicletas, 1);
     await assert.rejects(repo.cambiarBicicletas({ estacionId: 'b1', bicicletas: 999 }), (e) => e.campo === 'bicicletas');

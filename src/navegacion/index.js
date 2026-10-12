@@ -8,11 +8,5 @@
 // El Enrutador se importa aparte (./Enrutador) desde App.jsx.
 export { ProveedorNavegacion, useRuta, useRutaOpcional, normalizarRuta } from './ProveedorNavegacion';
 export { useTituloDocumento, NOMBRE_APP } from './useTituloDocumento';
-export {
-  guardarCredencialPendiente,
-  leerCredencialPendiente,
-  limpiarCredencialPendiente,
-  escucharCredencialPendiente,
-} from './vinculoPendiente';
 export { ARCHIVO_POR_RUTA, esRutaConocida } from './rutasApp';
 export { parsearHash, construirHash, rutaSegura } from '../../shared/rutas.mjs';

@@ -1,7 +1,7 @@
 // Administración: administradores solo desde la consola, bandeja de eventos y config de la demo.
 import { describe, it, before, after } from 'node:test';
 import { doc, getDoc, getDocs, collection, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { crearEntorno, vecino, google, sembrar, ts, assertSucceeds, assertFails } from './_entorno.mjs';
+import { crearEntorno, vecino, google, anonimo, sembrar, ts, assertSucceeds, assertFails } from './_entorno.mjs';
 
 let entorno;
 
@@ -89,6 +89,6 @@ describe('municipal/config', () => {
   it('un vecino o un admin anónimo no cambian la config', async () => {
     await assertFails(updateDoc(doc(vecino(entorno, 'u1'), 'municipal/config'), { simuladorActivo: true, actualizadoEn: serverTimestamp() }));
     await sembrar(entorno, (db) => setDoc(doc(db, 'administradores/admin-anonimo'), { nombre: 'x', alta: ts(Date.now()) }));
-    await assertFails(updateDoc(doc(vecino(entorno, 'admin-anonimo'), 'municipal/config'), { simuladorActivo: true, actualizadoEn: serverTimestamp() }));
+    await assertFails(updateDoc(doc(anonimo(entorno, 'admin-anonimo'), 'municipal/config'), { simuladorActivo: true, actualizadoEn: serverTimestamp() }));
   });
 });

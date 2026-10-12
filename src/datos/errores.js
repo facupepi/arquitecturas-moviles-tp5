@@ -4,7 +4,7 @@
 export const CODIGOS = Object.freeze([
   'sin-sesion', 'sin-conexion', 'app-check', 'permiso', 'validacion', 'no-encontrado', 'ya-pagado',
   'patente-ocupada', 'fuera-de-horario', 'sesion-vencida', 'maximo-alcanzado', 'adjunto-invalido',
-  'cuenta-existente', 'popup-bloqueado', 'no-soportado', 'cuota', 'servidor', 'desconocido',
+  'popup-bloqueado', 'no-soportado', 'cuota', 'servidor', 'desconocido',
 ]);
 
 export const MENSAJES = Object.freeze({
@@ -20,7 +20,6 @@ export const MENSAJES = Object.freeze({
   'sesion-vencida': 'La sesión venció. Iniciá una nueva.',
   'maximo-alcanzado': 'El máximo por sesión es de 4 horas.',
   'adjunto-invalido': 'El archivo adjunto no es válido.',
-  'cuenta-existente': 'Esa cuenta de Google ya tiene datos. ¿Querés entrar con ella?',
   'popup-bloqueado': 'El navegador bloqueó la ventana de Google.',
   'no-soportado': 'Tu navegador no admite esta función.',
   cuota: 'El servicio está saturado. Probá en unos minutos.',
@@ -78,7 +77,6 @@ const POR_CODIGO_FIREBASE = {
   'resource-exhausted': 'cuota',
   'not-found': 'no-encontrado',
   'auth/network-request-failed': 'sin-conexion',
-  'auth/credential-already-in-use': 'cuenta-existente',
   'auth/popup-blocked': 'popup-bloqueado',
   'auth/too-many-requests': 'cuota',
   'auth/quota-exceeded': 'cuota',

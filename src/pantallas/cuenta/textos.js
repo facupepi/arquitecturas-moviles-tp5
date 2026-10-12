@@ -29,7 +29,7 @@ export const PRIVACIDAD_COMPLETA = [
   {
     titulo: 'Qué guardamos',
     texto:
-      'El nombre de tu cuenta, el tipo de cuenta (invitado o Google), tus preferencias de avisos, '
+      'El nombre de tu cuenta de Google, tus preferencias de avisos, '
       + 'tus cedulones y pagos simulados, tus reclamos con sus fotos o PDF, tus estacionamientos y tus notificaciones. '
       + 'Si activás los avisos en un dispositivo, guardamos un código de ese navegador para poder enviarte notificaciones.',
   },
