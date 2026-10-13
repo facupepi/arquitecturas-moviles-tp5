@@ -120,5 +120,19 @@ No hubo errores de Firestore ni de Supabase. La foto se subió y se mostró, el 
 2. El panel municipal no permite archivar ni eliminar avisos. Los cinco avisos de prueba siguen en la lista del panel hasta que venza su vigencia.
 3. El simulador municipal está encendido en producción, por lo que la disponibilidad de las estaciones puede cambiar sola. Eso impide garantizar que el valor restaurado de la estación b7 se mantenga.
 4. El horario estricto está desactivado en producción, de modo que se puede iniciar un estacionamiento fuera del horario de cobro de la zona.
-5. En el navegador sin interfaz las pantallas de Alarmas y de Preferencias informan «Bloqueaste las notificaciones», aun después de conceder el permiso desde Playwright. Es un efecto del entorno de prueba y figura en las capturas alarmas-zonas y notificaciones-preferencias.
-6. La política de seguridad de contenido bloquea una imagen de `googletagmanager.com`. No afecta a la aplicación, pero ensucia la consola del panel.
+5. En el modo sin interfaz clásico de Chromium, `Notification.permission` vale `denied` aunque Playwright conceda el permiso, y las pantallas de Alarmas y de Preferencias informan «Bloqueaste las notificaciones». Es un efecto del entorno de prueba: esas dos capturas se rehicieron con el modo sin interfaz nuevo (`channel: "chromium"`), que respeta el permiso.
+6. La política de seguridad de contenido bloqueaba una imagen de `googletagmanager.com`. Se agregó ese dominio a `img-src` en `firebase.json`.
+
+## Notificación push con la aplicación cerrada
+
+Prueba hecha el 12 de octubre de 2026 a las 22:33 (hora de Córdoba) contra la versión publicada, con una cuenta de prueba que se borró al terminar.
+
+| Paso | Detalle |
+|---|---|
+| Navegador del vecino | Google Chrome 142 instalado en la PC, sin interfaz y con un perfil temporal propio. El modo incógnito no admite la Push API, por eso el perfil es persistente |
+| Activación | Preferencias, «Avisos en este dispositivo». La suscripción quedó en `fcm.googleapis.com` y el dispositivo se registró en Firestore |
+| Aplicación cerrada | Se cerraron todas las pestañas. Solo quedó el service worker |
+| Disparo | Desde el panel municipal, con la cuenta administradora, se avanzó el reclamo R-0E579C a Resuelto con una nota |
+| Resultado | El service worker mostró «Tu reclamo R-0E579C pasó a Resuelto», con la nota en el cuerpo y el identificador del evento como etiqueta, **2,4 segundos** después del toque en el panel |
+
+Chrome sin interfaz no conserva las notificaciones mostradas, así que la llamada a `showNotification` se registró desde el propio service worker. En un intento anterior, el avance a En proceso, el evento quedó «enviado» con un destinatario 1,5 segundos después del toque.

@@ -22,7 +22,7 @@ La aplicación reúne siete servicios en una sola pantalla de inicio.
 
 El vecino entra con su cuenta de Google, la misma en el celular y en la computadora; no hay acceso como invitado. La aplicación se instala en la pantalla de inicio del teléfono y funciona sin conexión con los últimos datos.
 
-Una cuenta de Google registrada como administradora accede además al panel municipal de demostración, que reemplaza a los sistemas del municipio para avanzar reclamos, activar alarmas, cambiar la disponibilidad de bicicletas, publicar avisos y controlar la simulación.
+Una cuenta de Google registrada como administradora accede además al panel municipal, que reemplaza a los sistemas del municipio para avanzar reclamos, activar alarmas, cambiar la disponibilidad de bicicletas, publicar avisos y controlar la simulación.
 
 ## Arquitectura
 
@@ -105,7 +105,7 @@ En desarrollo, App Check necesita un token de depuración registrado en la conso
 
 La prueba de humo y la de carga solo miran lo público: no inician sesión ni crean cuentas en producción. La prueba de humo acepta el token de depuración de App Check en la variable `APPCHECK_TOKEN_HUMO`, que nunca se versiona.
 
-En la versión del 7 de octubre de 2026, las pruebas de dominio dieron 83 de 83, las de reglas 116 de 116 y las de extremo a extremo 67 de 67 en Pixel 7 y en iPhone 13.
+En la versión final, las pruebas de dominio dieron 83 de 83, las de reglas 123 de 123 y las de extremo a extremo 66 de 66 en Pixel 7 y en iPhone 13. El 12 de octubre de 2026, contra la dirección publicada, la prueba de humo dio 30 de 30 en los cinco navegadores y la de carga quedó por debajo de 3 segundos en las siete repeticiones. El detalle está en `docs/pruebas/`.
 
 **Capturas para el informe.** `npm run capturas` genera las pantallas a 390 por 844 píxeles con escala 2. Con el modo compartido de los emuladores encendido (`npm run e2e:compartido`), recorre la aplicación con una cuenta de Google ficticia del emulador y usa un administrador ficticio para el panel, en un proyecto propio que se vacía al terminar. Con `node scripts/capturas.mjs --url <dirección>` solo captura la pantalla de ingreso de la aplicación publicada, porque entrar exige una cuenta de Google real. El modo compartido se apaga con `npm run e2e:compartido:apagar`.
 
@@ -165,8 +165,8 @@ La demostración usa dos dispositivos.
 **Antes de la clase**
 
 1. El día anterior, entrar al panel de Supabase para que el proyecto gratuito no quede en pausa por inactividad.
-2. En B, abrir el panel municipal, pestaña Demo, y tocar "Restablecer valores de demo".
-3. En la misma pestaña, tocar "Usar valores para la clase", que deja el aviso de estacionamiento en 14 minutos y el simulador apagado.
+2. En B, abrir el panel municipal, pestaña Simulación, y tocar "Restablecer valores iniciales".
+3. En la misma pestaña, tocar "Usar valores para probar", que deja el aviso de estacionamiento en 14 minutos y el simulador apagado.
 4. Si la clase es fuera del horario de cobro, apagar "Cobro de estacionamiento solo en horario".
 5. Grabar un video de respaldo de los pasos siguientes.
 
@@ -182,7 +182,7 @@ La demostración usa dos dispositivos.
 | 6 | A | En Reclamos, cargar uno con una foto y buscarlo por su código | El reclamo aparece como Recibido con su código y su adjunto |
 | 7 | B | En la pestaña Reclamos, avanzar ese reclamo a En proceso con una nota | La línea de tiempo de A cambia sola, muestra la respuesta de la Municipalidad y llega la notificación push |
 | 8 | A y B | En A, seguir la zona Parque y activar "Avisarme si se activa una alarma cerca". En B, pestaña Alarmas, activar la Alarma Parque Cincuentenario | A muestra el aviso en la aplicación y, con la aplicación cerrada, la notificación push, que al tocarla abre esa alarma en el mapa |
-| 9 | A y B | En A, estacionar 15 minutos en la zona Municipalidad. En B, pestaña Demo, tocar "Enviar recordatorios ahora" | El temporizador corre, cerca de un minuto después aparece el aviso de sesión por vencer, y luego se extiende 15 minutos y se termina la sesión |
+| 9 | A y B | En A, estacionar 15 minutos en la zona Municipalidad. En B, pestaña Simulación, tocar "Enviar recordatorios ahora" | El temporizador corre, cerca de un minuto después aparece el aviso de sesión por vencer, y luego se extiende 15 minutos y se termina la sesión |
 | 10 | A | En Atención al vecino, tocar "Llamar al 147" y "WhatsApp" | Se abre el marcador del teléfono y una conversación de WhatsApp con el canal municipal |
 | 11 | A y B | En Notificaciones, revisar el historial y cambiar la frecuencia a Resumen diario. En B, tocar "Enviar resumen ahora" | Cada notificación lleva a su servicio, y el resumen llega a los vecinos que eligieron esa frecuencia |
 | 12 | A | En Mi cuenta, tocar "Borrar mis datos" | El borrado elimina del servidor la cuenta y todos sus datos, y vuelve a la pantalla de ingreso |
