@@ -144,11 +144,39 @@ export function tributoDesdeDoc(snap) {
   };
 }
 
+// Tarjeta enmascarada de un pago: solo { red, ultimos4 }, o null (pagos anteriores a las tarjetas
+// guardadas, o un valor que no tiene esa forma). Nunca pasa otro dato de la tarjeta.
+export function tarjetaEnmascarada(t) {
+  if (!t || typeof t !== 'object' || typeof t.ultimos4 !== 'string' || !/^[0-9]{4}$/.test(t.ultimos4)) return null;
+  return { red: textoONull(t.red) ?? 'Tarjeta', ultimos4: t.ultimos4 };
+}
+
 // `medio`: el que se eligió en la pasarela; null en pagos anteriores a que existiera.
+// `tarjeta`: la tarjeta guardada con la que se pagó, enmascarada ({ red, ultimos4 }) o null.
 export function pagoDesdeDoc(snap) {
   const d = desdeDoc(snap);
   if (!d) return null;
-  return { ...d, importe: numero(d.importe), medio: textoONull(d.medio), creadoEn: msONull(d.creadoEn) ?? 0 };
+  return {
+    ...d, importe: numero(d.importe), medio: textoONull(d.medio), tarjeta: tarjetaEnmascarada(d.tarjeta),
+    creadoEn: msONull(d.creadoEn) ?? 0,
+  };
+}
+
+// Tarjeta guardada (medio de pago). Se arma campo por campo: aunque el documento trajera algo de
+// más, a la interfaz solo llega lo que se muestra.
+export function tarjetaDesdeDoc(snap) {
+  const d = desdeDoc(snap);
+  if (!d) return null;
+  return {
+    id: d.id,
+    tipo: textoONull(d.tipo),
+    red: textoONull(d.red) ?? 'Tarjeta',
+    ultimos4: textoONull(d.ultimos4) ?? '',
+    titular: textoONull(d.titular) ?? '',
+    vence: textoONull(d.vence) ?? '',
+    creadoEn: msONull(d.creadoEn) ?? 0,
+    pendiente: d.pendiente,
+  };
 }
 
 export function reclamoDesdeDoc(snap, opciones) {

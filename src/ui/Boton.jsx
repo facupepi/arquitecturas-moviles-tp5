@@ -1,7 +1,8 @@
 // Botón (WP5, 7.2). Medidas y colores de heredado:src/components.jsx:3-55.
 // Alto mínimo 48. Con `cargando` muestra un indicador y queda deshabilitado.
 // Con `href` abre el enlace con abrirEnlace (tel:, mailto:, sms: en la misma ventana; https: aparte).
-import React from 'react';
+// `ref` llega al Pressable (para llevarle el foco).
+import React, { forwardRef } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { colores, espacio, medidas, radios, tipografia } from '../tema/tokens';
 import { abrirEnlace } from '../plataforma/enlaces';
@@ -19,7 +20,7 @@ const VARIANTES = {
   peligro: { fondo: colores.peligro, fondoActivo: '#86132c', texto: colores.blanco, borde: colores.peligro },
 };
 
-export default function Boton({
+const Boton = forwardRef(function Boton({
   titulo,
   onPress,
   variante = 'primario',
@@ -31,7 +32,7 @@ export default function Boton({
   ancho = 'auto',
   etiquetaAccesible,
   testID,
-}) {
+}, ref) {
   const v = VARIANTES[variante] ?? VARIANTES.primario;
   const inactivo = deshabilitado || cargando;
   const esExterno = externo ?? (typeof href === 'string' && /^https?:/i.test(href));
@@ -50,6 +51,7 @@ export default function Boton({
 
   return (
     <Pressable
+      ref={ref}
       role={href ? 'link' : 'button'}
       onPress={conFoco(alPresionar)}
       disabled={inactivo}
@@ -89,7 +91,9 @@ export default function Boton({
       ) : null}
     </Pressable>
   );
-}
+});
+
+export default Boton;
 
 const estilos = StyleSheet.create({
   base: {

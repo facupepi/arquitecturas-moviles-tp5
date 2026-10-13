@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   convertirFechas, desdeDoc, configDesdeDoc, estacionDesdeDoc, alarmaDesdeDoc, perfilDesdeDoc,
   tributoDesdeDoc, reclamoDesdeDoc, reclamoDeGrupoDesdeDoc, sesionDesdeDoc, notificacionDesdeDoc,
-  avisoDesdeDoc, contactoDesdeDoc, eventoDesdeDoc, metaDe,
+  avisoDesdeDoc, contactoDesdeDoc, eventoDesdeDoc, metaDe, pagoDesdeDoc, tarjetaDesdeDoc, tarjetaEnmascarada,
 } from '../../src/datos/mapeadores.js';
 
 // Timestamp falso con la misma interfaz que usa el mapeador.
@@ -145,4 +145,26 @@ test('pago, sesión y tributo de grupo agregan el uid del dueño', async () => {
   const t = tributoDeGrupoDesdeDoc(snap('T-0999', { importe: 18500, vence: ts(1), pagadoEn: null }, { padre: 'vecino-9' }));
   assert.deepEqual([t.uid, t.vence, t.pagadoEn], ['vecino-9', 1, null]);
   assert.equal(pagoDeGrupoDesdeDoc(snap('nada', {}, { existe: false })), null);
+});
+
+test('pago con tarjeta: solo red y últimos 4; los pagos anteriores quedan sin tarjeta', () => {
+  const p = pagoDesdeDoc(snap('pago-3', {
+    tipo: 'tributo', importe: 100, creadoEn: ts(1), medio: 'credito', tarjeta: { red: 'Visa', ultimos4: '4242', otro: 'x' },
+  }));
+  assert.equal(p.medio, 'credito');
+  assert.deepEqual(p.tarjeta, { red: 'Visa', ultimos4: '4242' });
+  assert.equal(pagoDesdeDoc(snap('pago-4', { tipo: 'tributo', importe: 1, medio: 'billetera' })).tarjeta, null);
+  assert.equal(tarjetaEnmascarada({ red: 'Visa', ultimos4: '4242424242424242' }), null);
+  assert.equal(tarjetaEnmascarada('4242'), null);
+  assert.deepEqual(tarjetaEnmascarada({ ultimos4: '0005' }), { red: 'Tarjeta', ultimos4: '0005' });
+});
+
+test('tarjetaDesdeDoc arma la tarjeta campo por campo (nada de más llega a la interfaz)', () => {
+  const t = tarjetaDesdeDoc(snap('tarjeta-1', {
+    tipo: 'debito', red: 'Mastercard', ultimos4: '8210', titular: 'Ana Pérez', vence: '08/30', creadoEn: ts(5), numero: '5200828282828210',
+  }, { pendiente: true }));
+  assert.deepEqual(t, {
+    id: 'tarjeta-1', tipo: 'debito', red: 'Mastercard', ultimos4: '8210', titular: 'Ana Pérez', vence: '08/30', creadoEn: 5, pendiente: true,
+  });
+  assert.equal(tarjetaDesdeDoc(snap('x', {}, { existe: false })), null);
 });

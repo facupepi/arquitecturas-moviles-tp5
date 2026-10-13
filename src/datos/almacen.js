@@ -44,6 +44,7 @@ function estadoInicial(usuario) {
     reclamos: [],
     sesiones: [],
     notificaciones: [],
+    tarjetas: [],                 // tarjetas guardadas (medios de pago), enmascaradas
     noLeidas: 0,
     hayMas: { reclamos: false, notificaciones: false, pagos: false, estacionamiento: false },
     cercania: { activa: false, siguiendo: false, error: null },
@@ -356,6 +357,10 @@ export function crearAlmacen(usuarioInicial) {
       });
       procesarEntregas('notificaciones', personales, meta, describir.personal);
     }, alFallar('notificaciones')),
+
+    tarjetas: () => repositorio.suscribirTarjetas(estado.usuario.uid, (tarjetas) => {
+      actualizar({ tarjetas, ...limpiarError('tarjetas') });
+    }, alFallar('tarjetas')),
 
     avisosLeidos: () => repositorio.suscribirAvisosLeidos(estado.usuario.uid, (leidos) => {
       crudo.leidos = leidos;

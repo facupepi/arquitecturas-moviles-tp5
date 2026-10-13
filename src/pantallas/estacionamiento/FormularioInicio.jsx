@@ -1,6 +1,6 @@
 // Inicio de una sesión de estacionamiento (S6, E2): patente, tiempo, importe en vivo y la pasarela
-// de pago en el diálogo: elegir el medio → "Pagar $X" → "Procesando el pago…" → "Pago aprobado"
-// con el comprobante; "Listo" cierra y lleva el foco a la sesión nueva. La patente se valida en el cliente con normalizarPatente (la
+// de pago en el diálogo: elegir una tarjeta guardada (o cargar una ahí mismo) → "Pagar $X" →
+// "Procesando el pago…" → "Pago aprobado" con el comprobante; "Listo" cierra y lleva el foco a la sesión nueva. La patente se valida en el cliente con normalizarPatente (la
 // misma expresión que las reglas) y el error va debajo del campo; "patente ocupada" también.
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -17,7 +17,8 @@ import { dinero, fechaHora, hora } from '../../../shared/formato.mjs';
 import MediosDePago from '../pagos/MediosDePago';
 import Procesando from '../pagos/Procesando';
 import ComprobantePago from '../pagos/ComprobantePago';
-import { conProcesamiento, etiquetaMedio, useMedioPago } from '../pagos/pasarela';
+import AltaEnPago, { dialogoAlta } from '../pagos/AltaEnPago';
+import { conProcesamiento, etiquetaTarjeta, useMedioPago } from '../pagos/pasarela';
 import { MS_MINUTO, OPCIONES_MINUTOS, horarioEstricto, importeSeguro, textoMinutos, zonaEnHorario } from './util';
 
 const OPCIONES = OPCIONES_MINUTOS.map((n) => ({ valor: String(n), etiqueta: textoMinutos(n) }));
@@ -35,12 +36,12 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
   const [errorPatente, setErrorPatente] = useState(null);
   const [errorBoton, setErrorBoton] = useState(null);
   const [confirmacion, setConfirmacion] = useState(null);   // { requestId, patente, minutos, zona, importe }
-  const [aprobado, setAprobado] = useState(null);           // { sesion, medio, fecha }: último paso de la pasarela
+  const [aprobado, setAprobado] = useState(null);           // { sesion, tarjeta, fecha }: último paso de la pasarela
 
   // La pasarela muestra "Procesando el pago…" al menos 1,5 s; la traza mide solo el registro.
   const inicio = useComando(conProcesamiento(iniciarEstacionamiento, TRAZAS.INICIO_ESTACIONAMIENTO), {
     evento: EVENTOS.ESTACIONAMIENTO_INICIADO,
-    parametrosEvento: (_r, datos) => ({ zona: datos?.zonaId, minutos: datos?.minutos, medio: datos?.medio }),
+    parametrosEvento: (_r, datos) => ({ zona: datos?.zonaId, minutos: datos?.minutos, medio: datos?.tarjeta?.tipo }),
   });
 
   const min = Number(minutos);
@@ -103,13 +104,13 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
       setTimeout(() => refMedios.current?.focus?.(), 0);
       return;
     }
-    const elegido = medio.valor;
+    const tarjeta = medio.tarjeta;
     const sesion = await inicio.ejecutar(
-      { zonaId: confirmacion.zona.id, patente: confirmacion.patente, minutos: confirmacion.minutos, medio: elegido },
+      { zonaId: confirmacion.zona.id, patente: confirmacion.patente, minutos: confirmacion.minutos, tarjeta },
       confirmacion.requestId,
     );
     if (!sesion) return;
-    setAprobado({ sesion, medio: elegido, fecha: Date.now() });
+    setAprobado({ sesion, tarjeta, fecha: Date.now() });
   };
 
   const cerrarConfirmacion = () => {
@@ -118,6 +119,7 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
     setConfirmacion(null);
     setAprobado(null);
     inicio.limpiar();
+    medio.reiniciar();   // descarta lo que se haya escrito en el alta de tarjeta
     // Con el pago aprobado, el foco pasa al título de la sesión nueva.
     if (sesion) alIniciar?.(sesion);
   };
@@ -131,8 +133,12 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
       testID: 'confirmar-estacionamiento',
     },
   ];
+  const alta = confirmacion && medio.agregando && !inicio.ocupado && !aprobado ? dialogoAlta(medio) : null;
   if (inicio.ocupado) {
     accionesDialogo = [];
+  } else if (alta) {
+    tituloDialogo = alta.titulo;
+    accionesDialogo = alta.acciones;
   } else if (aprobado) {
     tituloDialogo = 'Comprobante de pago';
     accionesDialogo = [{ titulo: 'Listo', onPress: cerrarConfirmacion, testID: 'listo-estacionamiento' }];
@@ -216,15 +222,17 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
         visible={!!confirmacion}
         titulo={tituloDialogo}
         onCerrar={cerrarConfirmacion}
-        cerrable={!inicio.ocupado}
+        cerrable={!inicio.ocupado && !alta?.ocupado}
         testID="dialogo-estacionamiento"
-        pie={errorDialogo && !inicio.ocupado && !aprobado ? (
+        pie={alta ? alta.pie : errorDialogo && !inicio.ocupado && !aprobado ? (
           <Aviso tono="peligro" rol="alert" titulo="No se pudo iniciar" mensaje={errorDialogo.message} testID="error-estacionamiento" />
         ) : null}
         acciones={accionesDialogo}
       >
         {confirmacion && inicio.ocupado ? (
-          <Procesando importe={confirmacion.importe} medio={medio.valor} />
+          <Procesando importe={confirmacion.importe} tarjeta={medio.tarjeta} />
+        ) : alta ? (
+          <AltaEnPago medio={medio} />
         ) : confirmacion && aprobado ? (
           <ComprobantePago
             enfocar
@@ -236,7 +244,7 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
               { etiqueta: 'Tiempo', valor: textoMinutos(aprobado.sesion.minutos) },
               { etiqueta: 'Termina a las', valor: `${hora(aprobado.sesion.fin)} h` },
               { etiqueta: 'Importe', valor: dinero(aprobado.sesion.importe) },
-              { etiqueta: 'Medio de pago', valor: etiquetaMedio(aprobado.medio), testID: 'comprobante-medio' },
+              { etiqueta: 'Medio de pago', valor: etiquetaTarjeta(aprobado.tarjeta), testID: 'comprobante-medio' },
               { etiqueta: 'Fecha y hora', valor: fechaHora(aprobado.fecha) },
             ]}
           />
@@ -249,7 +257,7 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
               <FilaDato etiqueta="Termina aproximadamente" valor={`${hora(Date.now() + confirmacion.minutos * MS_MINUTO)} h`} />
               <FilaDato etiqueta="Importe" valor={dinero(confirmacion.importe)} testID="confirmacion-importe" />
             </View>
-            <MediosDePago ref={refMedios} valor={medio.valor} onCambio={medio.elegir} error={medio.error} />
+            <MediosDePago ref={refMedios} medio={medio} />
             <Texto variante="chico" color={colores.textoSuave} testID="numero-operacion">
               {`Número de operación: ${comprobante('EST', confirmacion.requestId)}`}
             </Texto>

@@ -1,7 +1,7 @@
 // Sesión activa (S6, E3 y E4): temporizador HH:MM:SS (el `ahora` de useAhora(1000) de la pantalla, role="timer"), hora de fin,
 // aviso visual cuando faltan menos de config.avisoEstacionamientoMin minutos (la notificación local
 // la dispara el almacén, no esta pantalla), "Extender 15/30 min" con su importe y "Terminar ahora".
-// La extensión se paga con la pasarela: medio → "Pagar $X" → "Procesando el pago…" → comprobante.
+// La extensión se paga con la pasarela: tarjeta guardada → "Pagar $X" → "Procesando el pago…" → comprobante.
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { colores, espacio, radios, tipografia } from '../../tema/tokens';
@@ -17,7 +17,8 @@ import { dinero, duracion, fechaHora, hora } from '../../../shared/formato.mjs';
 import MediosDePago from '../pagos/MediosDePago';
 import Procesando from '../pagos/Procesando';
 import ComprobantePago from '../pagos/ComprobantePago';
-import { conProcesamiento, etiquetaMedio, useMedioPago } from '../pagos/pasarela';
+import AltaEnPago, { dialogoAlta } from '../pagos/AltaEnPago';
+import { conProcesamiento, etiquetaTarjeta, useMedioPago } from '../pagos/pasarela';
 import { EXTENSIONES, MS_MINUTO, importeSeguro, recordatorioPorVencer, textoMinutos } from './util';
 
 function textoRestante(ms) {
@@ -36,13 +37,13 @@ export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar =
   const refMedios = useRef(null);
   const medio = useMedioPago();
   const [extension, setExtension] = useState(null);   // { requestId, minutos, importe }
-  const [aprobada, setAprobada] = useState(null);     // { fin, medio, fecha }: último paso de la pasarela
+  const [aprobada, setAprobada] = useState(null);     // { fin, tarjeta, fecha }: último paso de la pasarela
   const [finalizando, setFinalizando] = useState(false);
 
   // La pasarela muestra "Procesando el pago…" al menos 1,5 s.
   const extender = useComando(conProcesamiento(extenderEstacionamiento), {
     evento: EVENTOS.ESTACIONAMIENTO_EXTENDIDO,
-    parametrosEvento: (_r, _id, minutos, _req, medioElegido) => ({ minutos, medio: medioElegido }),
+    parametrosEvento: (_r, _id, minutos, _req, tarjeta) => ({ minutos, medio: tarjeta?.tipo }),
   });
   // Al terminar bien, la sesión pasa al historial y esta tarjeta se desmonta: el aviso lo da alExito.
   const finalizar = useComando(finalizarEstacionamiento, {
@@ -80,10 +81,10 @@ export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar =
       setTimeout(() => refMedios.current?.focus?.(), 0);
       return;
     }
-    const elegido = medio.valor;
-    const nueva = await extender.ejecutar(sesion.id, extension.minutos, extension.requestId, elegido);
+    const tarjeta = medio.tarjeta;
+    const nueva = await extender.ejecutar(sesion.id, extension.minutos, extension.requestId, tarjeta);
     if (!nueva) return;
-    setAprobada({ fin: nueva.fin, medio: elegido, fecha: Date.now() });
+    setAprobada({ fin: nueva.fin, tarjeta, fecha: Date.now() });
   };
 
   const cerrarExtension = () => {
@@ -91,6 +92,7 @@ export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar =
     setExtension(null);
     setAprobada(null);
     extender.limpiar();
+    medio.reiniciar();   // descarta lo que se haya escrito en el alta de tarjeta
   };
 
   let tituloExtension = 'Extender estacionamiento';
@@ -102,8 +104,12 @@ export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar =
       testID: 'confirmar-extension',
     },
   ];
+  const alta = extension && medio.agregando && !extender.ocupado && !aprobada ? dialogoAlta(medio) : null;
   if (extender.ocupado) {
     accionesExtension = [];
+  } else if (alta) {
+    tituloExtension = alta.titulo;
+    accionesExtension = alta.acciones;
   } else if (aprobada) {
     tituloExtension = 'Comprobante de pago';
     accionesExtension = [{ titulo: 'Listo', onPress: cerrarExtension, testID: 'listo-extension' }];
@@ -222,15 +228,17 @@ export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar =
         visible={!!extension}
         titulo={tituloExtension}
         onCerrar={cerrarExtension}
-        cerrable={!extender.ocupado}
+        cerrable={!extender.ocupado && !alta?.ocupado}
         testID="dialogo-extension"
-        pie={extender.error && !extender.ocupado && !aprobada ? (
+        pie={alta ? alta.pie : extender.error && !extender.ocupado && !aprobada ? (
           <Aviso tono="peligro" rol="alert" titulo="No se pudo extender" mensaje={extender.error.message} testID="error-extension" />
         ) : null}
         acciones={accionesExtension}
       >
         {extension && extender.ocupado ? (
-          <Procesando importe={extension.importe} medio={medio.valor} />
+          <Procesando importe={extension.importe} tarjeta={medio.tarjeta} />
+        ) : alta ? (
+          <AltaEnPago medio={medio} />
         ) : extension && aprobada ? (
           <ComprobantePago
             enfocar
@@ -241,7 +249,7 @@ export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar =
               { etiqueta: 'Tiempo extra', valor: textoMinutos(extension.minutos) },
               { etiqueta: 'Ahora termina a las', valor: `${hora(aprobada.fin)} h` },
               { etiqueta: 'Importe', valor: dinero(extension.importe) },
-              { etiqueta: 'Medio de pago', valor: etiquetaMedio(aprobada.medio), testID: 'comprobante-medio' },
+              { etiqueta: 'Medio de pago', valor: etiquetaTarjeta(aprobada.tarjeta), testID: 'comprobante-medio' },
               { etiqueta: 'Fecha y hora', valor: fechaHora(aprobada.fecha) },
             ]}
           />
@@ -253,7 +261,7 @@ export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar =
               <FilaDato etiqueta="Nuevo fin" valor={`${hora(sesion.fin + extension.minutos * MS_MINUTO)} h`} />
               <FilaDato etiqueta="Importe" valor={dinero(extension.importe)} />
             </View>
-            <MediosDePago ref={refMedios} valor={medio.valor} onCambio={medio.elegir} error={medio.error} />
+            <MediosDePago ref={refMedios} medio={medio} />
             <Texto variante="chico" color={colores.textoSuave} testID="numero-operacion">
               {`Número de operación: ${comprobante('EXT', extension.requestId)}`}
             </Texto>

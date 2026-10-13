@@ -1,6 +1,7 @@
-// Vecinos de ejemplo con actividad cargada: cedulones pagos e impagos, pagos con distintos medios,
-// reclamos en cada estado, estacionamientos terminados y uno en curso, y notificaciones. Sirven
-// para que el panel municipal muestre movimiento y para las capturas del informe.
+// Vecinos de ejemplo con actividad cargada: tarjetas guardadas (crédito y débito), cedulones pagos e
+// impagos, pagos con esas tarjetas, reclamos en cada estado, estacionamientos terminados y uno en
+// curso, y notificaciones. Sirven para que el panel municipal muestre movimiento y para las capturas
+// del informe. Las tarjetas salen de números de prueba: se guardan solo los últimos 4 dígitos.
 //
 //   node scripts/vecinos-ejemplo.mjs --emulador            (FIRESTORE_EMULATOR_HOST y FIREBASE_AUTH_EMULATOR_HOST)
 //   node scripts/vecinos-ejemplo.mjs --produccion          (GOOGLE_APPLICATION_CREDENTIALS fuera del repositorio)
@@ -17,7 +18,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { catalogo, datosInicialesVecino } from '../shared/catalogo.mjs';
 import { COLECCIONES as C, PREFERENCIAS_POR_DEFECTO } from '../shared/constantes.mjs';
-import { codigoReclamo, comprobante, costoEstacionamiento } from '../shared/dominio.mjs';
+import { codigoReclamo, comprobante, costoEstacionamiento, validarTarjeta } from '../shared/dominio.mjs';
 import { aFirestore, documentosVecino } from './sembrar.mjs';
 
 const MIN = 60 * 1000;
@@ -52,10 +53,20 @@ const { zonasEstacionamiento } = catalogo(ahora);
 const zona = (id) => zonasEstacionamiento.find((z) => z.id === id);
 
 // ---------- Fábricas ----------
-function pago(tipo, refId, importe, medio, creadoEn) {
+// Tarjeta guardada a partir de un número de prueba: validarTarjeta deja tipo, red, últimos 4,
+// titular y vencimiento (el número completo no se escribe en ningún lado).
+function tarjeta(id, tipo, numero, titular, haceDias) {
+  return { id, ...validarTarjeta({ tipo, numero, titular, vence: '08/30' }, ahora), creadoEn: ahora - haceDias * DIA };
+}
+
+// `t`: la tarjeta guardada con la que se pagó. El pago guarda el tipo (medio) y la tarjeta enmascarada.
+function pago(tipo, refId, importe, t, creadoEn) {
   const id = randomUUID();
   const prefijo = { tributo: 'REC', estacionamiento: 'EST', extension: 'EXT' }[tipo];
-  return { id, tipo, refId, importe, comprobante: comprobante(prefijo, id), medio, proveedor: 'pasarela-simulada', creadoEn };
+  return {
+    id, tipo, refId, importe, comprobante: comprobante(prefijo, id), medio: t.tipo,
+    tarjeta: { red: t.red, ultimos4: t.ultimos4 }, proveedor: 'pasarela-simulada', creadoEn,
+  };
 }
 
 function reclamo({ categoria, direccion, descripcion, estado, haceDias, nota = null, estacionId = null }) {
@@ -71,9 +82,9 @@ function reclamo({ categoria, direccion, descripcion, estado, haceDias, nota = n
   };
 }
 
-function sesion({ zonaId, patente, minutos, inicio, medio, finalizadaAntes = 0 }) {
+function sesion({ zonaId, patente, minutos, inicio, tarjeta: t, finalizadaAntes = 0 }) {
   const z = zona(zonaId);
-  const p = pago('estacionamiento', null, costoEstacionamiento(z.tarifaHora, minutos), medio, inicio);
+  const p = pago('estacionamiento', null, costoEstacionamiento(z.tarifaHora, minutos), t, inicio);
   p.refId = p.id;
   const fin = inicio + minutos * MIN - finalizadaAntes;
   return {
@@ -94,19 +105,19 @@ function notificacion(titulo, cuerpo, tipo, destino, haceHoras, leida) {
 }
 
 // Paga un cedulón de los datos iniciales: marca el tributo y devuelve el pago.
-function pagarTributo(tributos, tributoId, medio, haceDias) {
+function pagarTributo(tributos, tributoId, tarjetaUsada, haceDias) {
   const t = tributos.find((x) => x.id === tributoId);
-  const p = pago('tributo', tributoId, t.importe, medio, ahora - haceDias * DIA);
-  Object.assign(t, { pagadoEn: p.creadoEn, comprobante: p.comprobante, pagoId: p.id, medio });
+  const p = pago('tributo', tributoId, t.importe, tarjetaUsada, ahora - haceDias * DIA);
+  Object.assign(t, { pagadoEn: p.creadoEn, comprobante: p.comprobante, pagoId: p.id, medio: p.medio });
   return p;
 }
 
 // Cedulón ya pago de los datos iniciales (T-1000): pago propio de cada vecino, con su comprobante.
-function semilla(medio) {
+function semilla(tarjetaUsada) {
   const base = datosInicialesVecino(ahora);
   base.tributos.push({ id: 'T-1000', concepto: 'Tasa de servicios municipales', periodo: '09/2026', cuenta: 'Cuenta municipal',
     importe: 18500, vence: ahora - 20 * DIA, pagadoEn: null, comprobante: null, pagoId: null, medio: null });
-  base.pagos = [pagarTributo(base.tributos, 'T-1000', medio, 22)];
+  base.pagos = [pagarTributo(base.tributos, 'T-1000', tarjetaUsada, 22)];
   return base;
 }
 
@@ -115,18 +126,20 @@ function vecinos() {
   const lista = [];
 
   {
-    const base = semilla('debito');
-    const pagos = [...base.pagos, pagarTributo(base.tributos, 'T-1001', 'credito', 1)];
+    const visa = tarjeta('tarjeta-1', 'credito', '4242 4242 4242 4242', 'Lucía Fernández', 40);
+    const debito = tarjeta('tarjeta-2', 'debito', '5200 8282 8282 8210', 'Lucía Fernández', 35);
+    const base = semilla(debito);
+    const pagos = [...base.pagos, pagarTributo(base.tributos, 'T-1001', visa, 1)];
     const reclamos = [
       reclamo({ categoria: 'bacheo', direccion: 'Bv. 25 de Mayo 1850', descripcion: 'Pozo grande en la calzada, frente al número 1850.',
         estado: 'en_proceso', haceDias: 3, nota: 'La cuadrilla de bacheo pasa esta semana.' }),
       reclamo({ categoria: 'alumbrado', direccion: 'Iturraspe 1200', descripcion: 'Dos luminarias apagadas en la cuadra desde hace una semana.',
         estado: 'resuelto', haceDias: 9, nota: 'Se reemplazaron las lámparas.' }),
     ];
-    const s1 = sesion({ zonaId: 'p1', patente: 'AE482KD', minutos: 60, inicio: ahora - 2 * DIA - 4 * HORA, medio: 'billetera' });
-    const s2 = sesion({ zonaId: 'p3', patente: 'AE482KD', minutos: 90, inicio: ahora - 5 * DIA - 6 * HORA, medio: 'credito', finalizadaAntes: 20 * MIN });
+    const s1 = sesion({ zonaId: 'p1', patente: 'AE482KD', minutos: 60, inicio: ahora - 2 * DIA - 4 * HORA, tarjeta: debito });
+    const s2 = sesion({ zonaId: 'p3', patente: 'AE482KD', minutos: 90, inicio: ahora - 5 * DIA - 6 * HORA, tarjeta: visa, finalizadaAntes: 20 * MIN });
     lista.push({
-      uid: 'ejemplo-lucia', nombre: 'Lucía Fernández', base, pagos: [...pagos, s1.pago, s2.pago], reclamos,
+      uid: 'ejemplo-lucia', nombre: 'Lucía Fernández', base, tarjetas: [visa, debito], pagos: [...pagos, s1.pago, s2.pago], reclamos,
       estacionamiento: [s1.sesion, s2.sesion],
       notificaciones: [
         notificacion(`Tu reclamo ${reclamos[0].codigo} pasó a En proceso`, 'Nota de la Municipalidad: La cuadrilla de bacheo pasa esta semana.', 'reclamos', `#/reclamos/${reclamos[0].id}`, 50, false),
@@ -137,17 +150,19 @@ function vecinos() {
   }
 
   {
-    const base = semilla('credito');
-    const pagos = [...base.pagos, pagarTributo(base.tributos, 'T-1002', 'billetera', 2), pagarTributo(base.tributos, 'T-1001', 'debito', 2)];
+    const master = tarjeta('tarjeta-1', 'credito', '5555 5555 5555 4444', 'Martín Gómez', 60);
+    const debito = tarjeta('tarjeta-2', 'debito', '4000 0566 5566 5556', 'Martín Gómez', 12);
+    const base = semilla(master);
+    const pagos = [...base.pagos, pagarTributo(base.tributos, 'T-1002', debito, 2), pagarTributo(base.tributos, 'T-1001', debito, 2)];
     const reclamos = [
       reclamo({ categoria: 'limpieza', direccion: 'Plaza Vélez Sarsfield', descripcion: 'Contenedor desbordado en la esquina de la plaza.',
         estado: 'recibido', haceDias: 0.2 }),
     ];
     // Sesión en curso: termina dentro de 45 minutos y bloquea la patente.
-    const activa = sesion({ zonaId: 'p2', patente: 'AC345BD', minutos: 120, inicio: ahora - 75 * MIN, medio: 'debito' });
-    const vieja = sesion({ zonaId: 'p1', patente: 'AC345BD', minutos: 30, inicio: ahora - 3 * DIA - 2 * HORA, medio: 'transferencia' });
+    const activa = sesion({ zonaId: 'p2', patente: 'AC345BD', minutos: 120, inicio: ahora - 75 * MIN, tarjeta: debito });
+    const vieja = sesion({ zonaId: 'p1', patente: 'AC345BD', minutos: 30, inicio: ahora - 3 * DIA - 2 * HORA, tarjeta: master });
     lista.push({
-      uid: 'ejemplo-martin', nombre: 'Martín Gómez', base, pagos: [...pagos, activa.pago, vieja.pago], reclamos,
+      uid: 'ejemplo-martin', nombre: 'Martín Gómez', base, tarjetas: [master, debito], pagos: [...pagos, activa.pago, vieja.pago], reclamos,
       estacionamiento: [activa.sesion, vieja.sesion], bloqueo: { patente: 'AC345BD', sesionId: activa.sesion.id, fin: activa.sesion.fin },
       notificaciones: [],
       preferencias: { zonas: ['centro'] },
@@ -155,8 +170,9 @@ function vecinos() {
   }
 
   {
-    const base = semilla('transferencia');
-    const pagos = [...base.pagos, pagarTributo(base.tributos, 'T-0999', 'transferencia', 6)];
+    const amex = tarjeta('tarjeta-1', 'credito', '3782 822463 10005', 'Sofía Romero', 90);
+    const base = semilla(amex);
+    const pagos = [...base.pagos, pagarTributo(base.tributos, 'T-0999', amex, 6)];
     const reclamos = [
       reclamo({ categoria: 'bicicletas', direccion: 'Parque Cincuentenario', descripcion: 'La estación tiene un anclaje roto que no traba la bicicleta.',
         estado: 'resuelto', haceDias: 6, nota: 'Se reparó el anclaje.', estacionId: 'b3' }),
@@ -164,7 +180,7 @@ function vecinos() {
         estado: 'en_proceso', haceDias: 1.5, nota: 'Espacios verdes programó la poda.' }),
     ];
     lista.push({
-      uid: 'ejemplo-sofia', nombre: 'Sofía Romero', base, pagos, reclamos, estacionamiento: [],
+      uid: 'ejemplo-sofia', nombre: 'Sofía Romero', base, tarjetas: [amex], pagos, reclamos, estacionamiento: [],
       notificaciones: [
         notificacion(`Tu reclamo ${reclamos[0].codigo} pasó a Resuelto`, 'Nota de la Municipalidad: Se reparó el anclaje.', 'reclamos', `#/reclamos/${reclamos[0].id}`, 90, true),
       ],
@@ -173,14 +189,16 @@ function vecinos() {
   }
 
   {
-    const base = semilla('billetera');
+    const debito = tarjeta('tarjeta-1', 'debito', '4000 0566 5566 5556', 'Javier Ortiz', 50);
+    const credito = tarjeta('tarjeta-2', 'credito', '2223 0031 2200 3222', 'Javier Ortiz', 20);
+    const base = semilla(debito);
     const reclamos = [
       reclamo({ categoria: 'alumbrado', direccion: 'Libertador Sur 450', descripcion: 'El semáforo peatonal no enciende la luz verde.',
         estado: 'recibido', haceDias: 0.6 }),
     ];
-    const s = sesion({ zonaId: 'p3', patente: 'AB123CD', minutos: 45, inicio: ahora - 1 * DIA - 3 * HORA, medio: 'credito' });
+    const s = sesion({ zonaId: 'p3', patente: 'AB123CD', minutos: 45, inicio: ahora - 1 * DIA - 3 * HORA, tarjeta: credito });
     lista.push({
-      uid: 'ejemplo-javier', nombre: 'Javier Ortiz', base, pagos: [...base.pagos, s.pago], reclamos, estacionamiento: [s.sesion],
+      uid: 'ejemplo-javier', nombre: 'Javier Ortiz', base, tarjetas: [debito, credito], pagos: [...base.pagos, s.pago], reclamos, estacionamiento: [s.sesion],
       notificaciones: [], preferencias: { zonas: ['sur'] },
     });
   }
@@ -190,7 +208,7 @@ function vecinos() {
 
 // ---------- Escritura ----------
 const sinId = ({ id, ...resto }) => resto;
-const DATOS = [C.tributos, C.pagos, C.reclamos, C.estacionamiento, C.notificaciones, C.avisosLeidos];
+const DATOS = [C.tributos, C.pagos, C.reclamos, C.estacionamiento, C.notificaciones, C.avisosLeidos, C.tarjetas];
 
 // Borra los datos de una cuenta (y los bloqueos de patente de sus sesiones), sin tocar el perfil ni
 // los dispositivos registrados para las notificaciones.
@@ -226,6 +244,7 @@ async function cargarVecino(v, { conPerfil = true } = {}) {
   }
   const escribir = (col, docs) => docs.forEach((d) => lote.set(ref.collection(col).doc(d.id), aFirestore(sinId(d))));
   escribir(C.tributos, v.base.tributos);
+  escribir(C.tarjetas, v.tarjetas ?? []);
   escribir(C.pagos, v.pagos);
   escribir(C.reclamos, v.reclamos);
   escribir(C.estacionamiento, v.estacionamiento);
@@ -235,7 +254,7 @@ async function cargarVecino(v, { conPerfil = true } = {}) {
 }
 
 const lista = vecinos();
-const resumen = (v) => `${v.pagos.length} pagos, ${v.reclamos.length} reclamos, ${v.estacionamiento.length} estacionamientos`;
+const resumen = (v) => `${(v.tarjetas ?? []).length} tarjetas, ${v.pagos.length} pagos, ${v.reclamos.length} reclamos, ${v.estacionamiento.length} estacionamientos`;
 if (valor('--cuenta')) {
   // Los datos de Lucía, en una cuenta real con su propio nombre.
   const usuario = await auth.getUser(valor('--cuenta'));

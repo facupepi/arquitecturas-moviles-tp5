@@ -38,6 +38,10 @@ function perfil(nombre) {
 
 const id = (n) => `req-${String(n).padStart(4, '0')}-${Math.random().toString(36).slice(2, 10)}`;
 
+// Tarjetas guardadas como las entrega el almacén (lo que la pasarela le pasa al repositorio).
+const VISA = { id: 'tarjeta-1', tipo: 'credito', red: 'Visa', ultimos4: '4242', titular: 'Ana', vence: '08/30' };
+const DEBITO = { id: 'tarjeta-2', tipo: 'debito', red: 'Mastercard', ultimos4: '8210', titular: 'Ana', vence: '08/30' };
+
 async function leer(ruta) {
   let datos;
   await sembrar(entorno, async (db) => { const s = await getDoc(doc(db, ruta)); datos = s.exists() ? s.data() : null; });
@@ -88,36 +92,45 @@ before(async () => {
 after(async () => { await entorno?.cleanup(); });
 
 describe('tributos', () => {
-  it('pagarTributo crea el pago, marca el tributo y deja la notificación', async () => {
+  it('pagarTributo crea el pago con la tarjeta enmascarada, marca el tributo y deja la notificación', async () => {
     como('ana');
     const req = id(1);
-    const pago = await repo.pagarTributo('T-1001', req, 'billetera');
+    const pago = await repo.pagarTributo('T-1001', req, DEBITO);
     assert.equal(pago.importe, 18500);
-    assert.equal(pago.medio, 'billetera');
+    assert.equal(pago.medio, 'debito');
+    assert.deepEqual(pago.tarjeta, { red: 'Mastercard', ultimos4: '8210' });
     assert.match(pago.comprobante, /^REC-[A-Z0-9]{8}$/);
     const tributo = await leer('usuarios/ana/tributos/T-1001');
     assert.equal(tributo.pagoId, req);
-    assert.equal(tributo.medio, 'billetera');
-    assert.equal((await leer(`usuarios/ana/pagos/${req}`)).medio, 'billetera');
+    assert.equal(tributo.medio, 'debito');
+    const guardado = await leer(`usuarios/ana/pagos/${req}`);
+    assert.equal(guardado.medio, 'debito');
+    assert.deepEqual(guardado.tarjeta, { red: 'Mastercard', ultimos4: '8210' });
+    assert.deepEqual(Object.keys(guardado).sort(), ['comprobante', 'creadoEn', 'importe', 'medio', 'proveedor', 'refId', 'tarjeta', 'tipo']);
     assert.ok(tributo.pagadoEn);
-    assert.ok(await leer(`usuarios/ana/notificaciones/pago-${req}`));
+    const notificacion = await leer(`usuarios/ana/notificaciones/pago-${req}`);
+    assert.match(notificacion.cuerpo, /con tarjeta de débito Mastercard ••••\s8210\./);
     // Reintento con el mismo requestId: devuelve el mismo pago sin duplicar.
-    const otra = await repo.pagarTributo('T-1001', req, 'billetera');
+    const otra = await repo.pagarTributo('T-1001', req, DEBITO);
     assert.equal(otra.id, req);
-    await esperarError(repo.pagarTributo('T-1001', id(2), 'credito'), 'ya-pagado');
-    await esperarError(repo.pagarTributo('T-9999', id(3), 'credito'), 'no-encontrado');
-    // Sin medio o con uno que no está en la lista, ni siquiera intenta escribir.
-    await assert.rejects(repo.pagarTributo('T-0999', id(6)), (e) => e.codigo === 'validacion' && e.campo === 'medio');
-    await assert.rejects(repo.pagarTributo('T-0999', id(7), 'efectivo'), (e) => e.codigo === 'validacion' && e.campo === 'medio');
+    await esperarError(repo.pagarTributo('T-1001', id(2), VISA), 'ya-pagado');
+    await esperarError(repo.pagarTributo('T-9999', id(3), VISA), 'no-encontrado');
+    // Sin tarjeta, con un medio suelto, con una tarjeta inválida o vencida, ni siquiera intenta escribir.
+    const sinTarjeta = (e) => e.codigo === 'validacion' && e.campo === 'medio';
+    await assert.rejects(repo.pagarTributo('T-0999', id(6)), sinTarjeta);
+    await assert.rejects(repo.pagarTributo('T-0999', id(7), 'credito'), sinTarjeta);
+    await assert.rejects(repo.pagarTributo('T-0999', id(8), { ...VISA, tipo: 'billetera' }), sinTarjeta);
+    await assert.rejects(repo.pagarTributo('T-0999', id(9), { ...VISA, ultimos4: '4242424242424242' }), sinTarjeta);
+    await assert.rejects(repo.pagarTributo('T-0999', id(30), { ...VISA, vence: '01/20' }), sinTarjeta);
   });
 
   it('sin sesión o sin red no intenta pagar', async () => {
     fijarUsuario(null);
-    await esperarError(repo.pagarTributo('T-1001', id(4), 'credito'), 'sin-sesion');
+    await esperarError(repo.pagarTributo('T-1001', id(4), VISA), 'sin-sesion');
     como('beto');
     red.estado.enLinea = false;
     try {
-      await esperarError(repo.pagarTributo('T-1001', id(5), 'credito'), 'sin-conexion');
+      await esperarError(repo.pagarTributo('T-1001', id(5), VISA), 'sin-conexion');
     } finally {
       red.estado.enLinea = true;
     }
@@ -130,21 +143,23 @@ describe('estacionamiento', () => {
   it('iniciarEstacionamiento escribe sesión, bloqueo y pago aceptados por las reglas', async () => {
     como('ana');
     const req = id(10);
-    sesionAna = await repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'ab 123 cd', minutos: 30, medio: 'debito' }, req);
-    assert.equal((await leer(`usuarios/ana/pagos/${req}`)).medio, 'debito');
+    sesionAna = await repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'ab 123 cd', minutos: 30, tarjeta: DEBITO }, req);
+    const pago = await leer(`usuarios/ana/pagos/${req}`);
+    assert.equal(pago.medio, 'debito');
+    assert.deepEqual(pago.tarjeta, { red: 'Mastercard', ultimos4: '8210' });
     assert.equal(sesionAna.patente, 'AB123CD');
     assert.equal(sesionAna.importe, 400);
     assert.ok(Math.abs(sesionAna.fin - (Date.now() + 30 * MIN)) < 5000);
     const bloqueo = await leer('bloqueosPatente/AB123CD');
     assert.deepEqual(Object.keys(bloqueo).sort(), ['fin', 'sesionId']);
     assert.equal(bloqueo.sesionId, req);
-    const repetida = await repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'AB123CD', minutos: 30, medio: 'debito' }, req);
+    const repetida = await repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'AB123CD', minutos: 30, tarjeta: DEBITO }, req);
     assert.equal(repetida.id, req, 'el reintento devuelve la misma sesión');
   });
 
   it('otro vecino con la misma patente recibe patente-ocupada con la hora de fin', async () => {
     como('beto');
-    await assert.rejects(repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'AB123CD', minutos: 15, medio: 'credito' }, id(11)), (e) => {
+    await assert.rejects(repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'AB123CD', minutos: 15, tarjeta: VISA }, id(11)), (e) => {
       assert.equal(e.codigo, 'patente-ocupada');
       assert.equal(e.datos.fin, sesionAna.fin);
       assert.match(e.message, /hasta las \d\d:\d\d\./);
@@ -154,35 +169,38 @@ describe('estacionamiento', () => {
 
   it('valida patente, minutos y horario antes de escribir', async () => {
     como('beto');
-    await assert.rejects(repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'X1', minutos: 15, medio: 'credito' }, id(12)), (e) => e.codigo === 'validacion' && e.campo === 'patente');
-    await assert.rejects(repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'XYZ123', minutos: 20, medio: 'credito' }, id(13)), (e) => e.codigo === 'validacion' && e.campo === 'minutos');
-    await esperarError(repo.iniciarEstacionamiento({ zonaId: 'cerrada', patente: 'XYZ123', minutos: 15, medio: 'credito' }, id(14)), 'fuera-de-horario');
-    await esperarError(repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'XYZ123', minutos: 15, medio: 'credito' }, 'corto'), 'validacion');
+    await assert.rejects(repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'X1', minutos: 15, tarjeta: VISA }, id(12)), (e) => e.codigo === 'validacion' && e.campo === 'patente');
+    await assert.rejects(repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'XYZ123', minutos: 20, tarjeta: VISA }, id(13)), (e) => e.codigo === 'validacion' && e.campo === 'minutos');
+    await esperarError(repo.iniciarEstacionamiento({ zonaId: 'cerrada', patente: 'XYZ123', minutos: 15, tarjeta: VISA }, id(14)), 'fuera-de-horario');
+    await esperarError(repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'XYZ123', minutos: 15, tarjeta: VISA }, 'corto'), 'validacion');
     await assert.rejects(repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'XYZ123', minutos: 15 }, id(20)), (e) => e.codigo === 'validacion' && e.campo === 'medio');
+    await assert.rejects(repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'XYZ123', minutos: 15, medio: 'billetera' }, id(31)), (e) => e.codigo === 'validacion' && e.campo === 'medio');
   });
 
   it('extenderEstacionamiento suma el tiempo y controla el máximo', async () => {
     como('ana');
-    await assert.rejects(repo.extenderEstacionamiento(sesionAna.id, 15, id(21), 'cheque'), (e) => e.codigo === 'validacion' && e.campo === 'medio');
+    await assert.rejects(repo.extenderEstacionamiento(sesionAna.id, 15, id(21), 'transferencia'), (e) => e.codigo === 'validacion' && e.campo === 'medio');
     const reqExtension = id(15);
-    const extendida = await repo.extenderEstacionamiento(sesionAna.id, 15, reqExtension, 'transferencia');
-    assert.equal((await leer(`usuarios/ana/pagos/${reqExtension}`)).medio, 'transferencia');
+    const extendida = await repo.extenderEstacionamiento(sesionAna.id, 15, reqExtension, VISA);
+    const pagoExtension = await leer(`usuarios/ana/pagos/${reqExtension}`);
+    assert.equal(pagoExtension.medio, 'credito');
+    assert.deepEqual(pagoExtension.tarjeta, { red: 'Visa', ultimos4: '4242' });
     assert.equal(extendida.minutos, 45);
     assert.equal(extendida.importe, 600);
     assert.equal(extendida.fin, sesionAna.fin + 15 * MIN);
     assert.equal(extendida.extensiones, 1);
     const bloqueo = await leer('bloqueosPatente/AB123CD');
     assert.equal(bloqueo.fin.toMillis(), extendida.fin);
-    await esperarError(repo.extenderEstacionamiento(sesionAna.id, 210, id(16), 'credito'), 'maximo-alcanzado');
+    await esperarError(repo.extenderEstacionamiento(sesionAna.id, 210, id(16), VISA), 'maximo-alcanzado');
   });
 
   it('finalizarEstacionamiento libera la patente para otro vecino', async () => {
     como('ana');
     await repo.finalizarEstacionamiento(sesionAna.id);
-    await esperarError(repo.extenderEstacionamiento(sesionAna.id, 15, id(17), 'credito'), 'sesion-vencida');
+    await esperarError(repo.extenderEstacionamiento(sesionAna.id, 15, id(17), VISA), 'sesion-vencida');
     await esperarError(repo.finalizarEstacionamiento(sesionAna.id), 'sesion-vencida');
     como('beto');
-    const deBeto = await repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'AB123CD', minutos: 15, medio: 'billetera' }, id(18));
+    const deBeto = await repo.iniciarEstacionamiento({ zonaId: 'p1', patente: 'AB123CD', minutos: 15, tarjeta: DEBITO }, id(18));
     assert.equal(deBeto.importe, 200);
   });
 
@@ -191,8 +209,62 @@ describe('estacionamiento', () => {
       simuladorActivo: false, simuladorCadaMin: 2, horarioEstricto: false, avisoEstacionamientoMin: 5, ultimaSimulacion: null, actualizadoEn: ts(Date.now()),
     }));
     como('caro');
-    const sesion = await repo.iniciarEstacionamiento({ zonaId: 'cerrada', patente: 'CAR001', minutos: 60, medio: 'credito' }, id(19));
+    const sesion = await repo.iniciarEstacionamiento({ zonaId: 'cerrada', patente: 'CAR001', minutos: 60, tarjeta: VISA }, id(19));
     assert.equal(sesion.importe, 600);
+  });
+});
+
+describe('tarjetas guardadas', () => {
+  it('guardarTarjeta escribe solo tipo, red, últimos 4, titular y vencimiento; la escucha la trae', async () => {
+    como('caro');
+    const vistas = [];
+    const cancelar = repo.suscribirTarjetas('caro', (lista) => vistas.push(lista));
+    const t = await repo.guardarTarjeta({ tipo: 'credito', numero: '4242 4242 4242 4242', titular: ' Caro  Díaz ', vence: '0830' });
+    assert.equal(t.id, 'tarjeta-1');
+    const guardada = await leer('usuarios/caro/tarjetas/tarjeta-1');
+    assert.deepEqual(Object.keys(guardada).sort(), ['creadoEn', 'red', 'tipo', 'titular', 'ultimos4', 'vence']);
+    assert.deepEqual({ ...guardada, creadoEn: null }, {
+      tipo: 'credito', red: 'Visa', ultimos4: '4242', titular: 'Caro Díaz', vence: '08/30', creadoEn: null,
+    });
+    assert.ok(!JSON.stringify(guardada).includes('424242'), 'el número completo no se guarda');
+    const segunda = await repo.guardarTarjeta({ tipo: 'debito', numero: '5200828282828210', titular: 'Caro Díaz', vence: '12/29' });
+    assert.equal(segunda.id, 'tarjeta-2');
+    // La misma tarjeta otra vez: error debajo del número, sin escribir.
+    await assert.rejects(repo.guardarTarjeta({ tipo: 'credito', numero: '4242424242424242', titular: 'Caro', vence: '08/30' }),
+      (e) => e.codigo === 'validacion' && e.campo === 'numero' && /ya está guardada/.test(e.message));
+    // Validación del dominio: Luhn y vencimiento.
+    await assert.rejects(repo.guardarTarjeta({ tipo: 'credito', numero: '4242424242424241', titular: 'Caro', vence: '08/30' }),
+      (e) => e.codigo === 'validacion' && e.campo === 'numero');
+    await assert.rejects(repo.guardarTarjeta({ tipo: 'credito', numero: '4242424242424242', titular: 'Caro', vence: '01/20' }),
+      (e) => e.codigo === 'validacion' && e.campo === 'vence');
+    await new Promise((r) => { setTimeout(r, 300); });
+    cancelar();
+    const ultima = vistas.at(-1);
+    assert.deepEqual(ultima.map((x) => [x.id, x.ultimos4]), [['tarjeta-1', '4242'], ['tarjeta-2', '8210']]);
+  });
+
+  it('hasta 5 tarjetas; quitarTarjeta libera el lugar', async () => {
+    como('caro');
+    const numeros = ['378282246310005', '5555555555554444', '4000056655665556'];
+    for (const numero of numeros) await repo.guardarTarjeta({ tipo: 'credito', numero, titular: 'Caro Díaz', vence: '08/30' });
+    await assert.rejects(repo.guardarTarjeta({ tipo: 'debito', numero: '2223003122003222', titular: 'Caro Díaz', vence: '08/30' }),
+      (e) => e.codigo === 'validacion' && e.campo === 'tarjetas' && /hasta 5/.test(e.message));
+    await repo.quitarTarjeta('tarjeta-3');
+    assert.equal(await leer('usuarios/caro/tarjetas/tarjeta-3'), null);
+    const nueva = await repo.guardarTarjeta({ tipo: 'debito', numero: '2223003122003222', titular: 'Caro Díaz', vence: '08/30' });
+    assert.equal(nueva.id, 'tarjeta-3');
+    assert.equal(nueva.red, 'Mastercard');
+    await esperarError(repo.quitarTarjeta('otra-cosa'), 'no-encontrado');
+  });
+
+  it('sin red no guarda la tarjeta', async () => {
+    como('beto');
+    red.estado.enLinea = false;
+    try {
+      await esperarError(repo.guardarTarjeta({ tipo: 'credito', numero: '4242424242424242', titular: 'Beto', vence: '08/30' }), 'sin-conexion');
+    } finally {
+      red.estado.enLinea = true;
+    }
   });
 });
 

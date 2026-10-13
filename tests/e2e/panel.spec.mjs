@@ -345,7 +345,7 @@ test.describe('Panel municipal', () => {
     await expect(page.getByTestId(`envio-aviso-${snap.docs[0].id}`)).toContainText('Avisado');
   });
 
-  test('pagos: el pago de un vecino aparece en vivo, con su medio, y se filtra por tipo y comprobante', async ({ vecino, admin, adminDb }) => {
+  test('pagos: el pago de un vecino aparece en vivo, con su tarjeta enmascarada, y se filtra por tipo y comprobante', async ({ vecino, admin, adminDb }) => {
     const { page } = admin;
     await abrirPanel(page, 'pagos');
     const hoy = page.getByTestId('recaudado-hoy-valor');
@@ -353,18 +353,18 @@ test.describe('Panel municipal', () => {
     await expect(page.getByTestId('lista-pagos-panel').or(page.getByTestId('vacio-pagos-panel'))).toBeVisible({ timeout: 30_000 });
     const antes = await hoy.textContent();
 
-    // El vecino paga un cedulón (lo que escribe la pasarela, con el medio elegido).
+    // El vecino paga un cedulón (lo que escribe la pasarela: el medio y la tarjeta enmascarada).
     // El comprobante sale de los primeros 8 caracteres del id: que sean únicos en cada corrida.
     const id = `${Date.now().toString(36)}-e2e-pago`;
     const codigo = comprobante('REC', id);
     await adminDb.doc(`usuarios/${vecino.uid}/pagos/${id}`).set({
       tipo: 'tributo', refId: 'T-1001', importe: 18500, comprobante: codigo, proveedor: 'pasarela-simulada',
-      medio: 'debito', creadoEn: Timestamp.now(),
+      medio: 'debito', tarjeta: { red: 'Mastercard', ultimos4: '8210' }, creadoEn: Timestamp.now(),
     });
     const fila = page.getByTestId(`pago-panel-${id}`);
     await expect(fila).toBeVisible({ timeout: 10_000 });
     await expect(fila).toContainText(codigo);
-    await expect(fila).toContainText('Tarjeta de débito');
+    await expect(fila).toContainText('Tarjeta de débito Mastercard •••• 8210');
     await expect(fila).toContainText(codigoVecino(vecino.uid));
     await expect(fila).not.toContainText(/Vecino E2E|@ejemplo\.test/);
     await expect.poll(() => hoy.textContent(), { timeout: 10_000 }).not.toBe(antes);

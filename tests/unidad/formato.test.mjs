@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dinero, fecha, fechaHora, hora, tiempoRelativo, duracion } from '../../shared/formato.mjs';
+import {
+  dinero, fecha, fechaHora, hora, tiempoRelativo, duracion, enmascarada, textoTarjeta, textoMedioPago,
+} from '../../shared/formato.mjs';
 
 const MIN = 60 * 1000;
 const HORA = 60 * MIN;
@@ -63,4 +65,19 @@ test('duracion: HH:MM:SS para el temporizador', () => {
   assert.equal(duracion(3661.9), '01:01:01', 'trunca');
   assert.equal(duracion(-5), '00:00:00');
   assert.equal(duracion(NaN), '00:00:00');
+});
+
+test('tarjetas y medios de pago siempre enmascarados (espacio duro entre los puntos y los dígitos)', () => {
+  const sp = (t) => t.replace(/\u00a0/g, ' ');
+  assert.ok(enmascarada('4242').includes('\u00a0'));
+  assert.equal(sp(enmascarada('4242')), '•••• 4242');
+  assert.equal(enmascarada('4242424242424242'), '');
+  assert.equal(sp(textoTarjeta({ tipo: 'credito', red: 'Visa', ultimos4: '4242' })), 'Visa crédito •••• 4242');
+  assert.equal(sp(textoTarjeta({ tipo: 'debito', red: 'Tarjeta', ultimos4: '1117' })), 'Tarjeta de débito •••• 1117');
+  assert.equal(sp(textoMedioPago('credito', { red: 'Visa', ultimos4: '4242' })), 'Tarjeta de crédito Visa •••• 4242');
+  assert.equal(sp(textoMedioPago('debito', { red: 'Tarjeta', ultimos4: '1117' })), 'Tarjeta de débito •••• 1117');
+  assert.equal(textoMedioPago('debito'), 'Tarjeta de débito');
+  assert.equal(textoMedioPago('billetera'), 'Billetera virtual', 'pagos anteriores');
+  assert.equal(textoMedioPago('transferencia'), 'Transferencia bancaria');
+  assert.equal(textoMedioPago(null), null);
 });

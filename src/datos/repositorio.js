@@ -14,16 +14,16 @@ import { ErrorApp, desdeFirebase } from './errores';
 import {
   alarmaDesdeDoc, avisoDesdeDoc, configDesdeDoc, contactoDesdeDoc, estacionDesdeDoc, eventoDesdeDoc,
   infoDesdeDoc, metaDe, notificacionDesdeDoc, pagoDesdeDoc, perfilDesdeDoc, reclamoDeGrupoDesdeDoc,
-  reclamoDesdeDoc, sesionDesdeDoc, tributoDesdeDoc, zonaDesdeDoc,
+  reclamoDesdeDoc, sesionDesdeDoc, tarjetaDesdeDoc, tributoDesdeDoc, zonaDesdeDoc,
 } from './mapeadores';
 import {
   codigoReclamo, comprobante, costoEstacionamiento, enHorario, minutosValidos,
-  normalizarPatente, siguienteEstadoReclamo, validarPreferencias, validarReclamo,
+  normalizarPatente, pagoConTarjeta, siguienteEstadoReclamo, validarPreferencias, validarReclamo, validarTarjeta,
 } from '../../shared/dominio.mjs';
 import {
-  COLECCIONES as C, ETIQUETAS, LIMITES, MEDIOS_PAGO, PREFERENCIAS_POR_DEFECTO, TIPOS_AVISO, ZONAS,
+  COLECCIONES as C, IDS_TARJETA, LIMITES, PREFERENCIAS_POR_DEFECTO, TIPOS_AVISO, ZONAS,
 } from '../../shared/constantes.mjs';
-import { dinero } from '../../shared/formato.mjs';
+import { dinero, textoMedioPago } from '../../shared/formato.mjs';
 
 const MIN = 60_000;
 const ESPERA_COMMIT_MS = 2500;
@@ -46,6 +46,9 @@ function validar(fn) {
   }
 }
 
+// "Tarjeta de crédito Visa" → "tarjeta de crédito Visa" (para usarlo en medio de una oración).
+const conMinuscula = (texto) => (texto ? texto.charAt(0).toLowerCase() + texto.slice(1) : '');
+
 function errorCampo(campo, mensaje) {
   return new ErrorApp('validacion', mensaje, { campo });
 }
@@ -56,9 +59,10 @@ function validarIdSolicitud(requestId) {
   }
 }
 
-// Medio elegido en la pasarela. Solo se guarda cuál fue: nunca datos de tarjetas ni de cuentas.
-function validarMedio(medio) {
-  if (!MEDIOS_PAGO.includes(medio)) throw errorCampo('medio', 'Elegí un medio de pago.');
+// Tarjeta guardada elegida en la pasarela → lo que registra el pago: { medio, tarjeta: { red, ultimos4 } }.
+// El número completo nunca llega acá (no se guarda en ningún lado).
+function medioDePago(tarjeta) {
+  return validar(() => pagoConTarjeta(tarjeta));
 }
 
 function exigirConexion(mensaje) {
@@ -209,6 +213,13 @@ export function suscribirNotificaciones(uid, limite = 50, alCambiar, alFallar) {
   return escucharColeccion(query(coleccionDe(uid, C.notificaciones), orderBy('creadoEn', 'desc'), limit(limite)), notificacionDesdeDoc, alCambiar, alFallar, { metadatos: true });
 }
 
+// Tarjetas guardadas, de la más vieja a la más nueva (son 5 como máximo).
+export function suscribirTarjetas(uid, alCambiar, alFallar) {
+  return escucharColeccion(query(coleccionDe(uid, C.tarjetas), limit(LIMITES.tarjetas)), tarjetaDesdeDoc, (items, meta) => {
+    alCambiar([...items].sort((a, b) => (a.creadoEn - b.creadoEn) || a.id.localeCompare(b.id)), meta);
+  }, alFallar, { metadatos: true });
+}
+
 export function suscribirAvisosLeidos(uid, alCambiar, alFallar) {
   return onSnapshot(
     query(coleccionDe(uid, C.avisosLeidos), limit(300)),
@@ -349,6 +360,39 @@ export async function aceptarPrivacidad() {
   ));
 }
 
+// ===================== Tarjetas guardadas (medios de pago) =====================
+
+const igualTarjeta = (a, b) => a.tipo === b.tipo && a.red === b.red && a.ultimos4 === b.ultimos4 && a.vence === b.vence;
+
+/**
+ * Guarda una tarjeta de crédito o de débito: { tipo, numero, titular, vence }. El número completo
+ * se usa solo para validarlo (Luhn) y sacar la red y los últimos 4: lo que se escribe es
+ * { tipo, red, ultimos4, titular, vence, creadoEn }. No se pide código de seguridad.
+ * Ocupa el primer lugar libre de IDS_TARJETA (hasta 5 tarjetas).
+ */
+export async function guardarTarjeta(datos) {
+  const uid = uidActual();
+  const tarjeta = validar(() => validarTarjeta(datos ?? {}, Date.now()));
+  exigirConexion('Para guardar la tarjeta necesitás conexión. Revisá tu red e intentá de nuevo.');
+  await altaLista(uid);
+  return conErrores(async () => {
+    const guardadas = (await getDocs(coleccionDe(uid, C.tarjetas))).docs.map((d) => ({ id: d.id, ...d.data() }));
+    if (guardadas.some((t) => igualTarjeta(t, tarjeta))) throw errorCampo('numero', 'Esa tarjeta ya está guardada.');
+    const id = IDS_TARJETA.find((x) => !guardadas.some((t) => t.id === x));
+    if (!id) {
+      throw new ErrorApp('validacion', `Podés guardar hasta ${LIMITES.tarjetas} tarjetas. Quitá una para agregar otra.`, { campo: 'tarjetas' });
+    }
+    await setDoc(refDe(uid, C.tarjetas, id), { ...tarjeta, creadoEn: serverTimestamp() });
+    return { id, ...tarjeta, creadoEn: Date.now(), pendiente: false };
+  });
+}
+
+export async function quitarTarjeta(id) {
+  const uid = uidActual();
+  if (!IDS_TARJETA.includes(id)) throw new ErrorApp('no-encontrado', 'No encontramos esa tarjeta.');
+  await conErrores(() => escribirSinBloquear(deleteDoc(refDe(uid, C.tarjetas, id)), 'quitar la tarjeta'));
+}
+
 // ===================== Reclamos =====================
 
 export async function crearReclamo({ categoria, direccion, descripcion, estacionId = null, archivos = [] } = {}, requestId, { alProgreso } = {}) {
@@ -420,10 +464,11 @@ export async function urlAdjunto(uid, ruta) {
 
 // ===================== Tributos =====================
 
-export async function pagarTributo(tributoId, requestId, medio) {
+// `tarjeta`: la tarjeta guardada elegida en la pasarela ({ tipo, red, ultimos4, vence? }).
+export async function pagarTributo(tributoId, requestId, tarjeta) {
   const uid = uidActual();
   validarIdSolicitud(requestId);
-  validarMedio(medio);
+  const { medio, tarjeta: enmascarada } = medioDePago(tarjeta);
   if (typeof tributoId !== 'string' || !tributoId) throw new ErrorApp('no-encontrado');
   exigirConexion('Para pagar necesitás conexión. Revisá tu red e intentá de nuevo.');
   return conErrores(() => runTransaction(db, async (tx) => {
@@ -438,18 +483,18 @@ export async function pagarTributo(tributoId, requestId, medio) {
     const importe = tributo.importe;
     const codigoComprobante = comprobante('REC', requestId);
     tx.set(refPago, {
-      tipo: 'tributo', refId: tributoId, importe, comprobante: codigoComprobante, medio,
+      tipo: 'tributo', refId: tributoId, importe, comprobante: codigoComprobante, medio, tarjeta: enmascarada,
       proveedor: PROVEEDOR_PAGO, creadoEn: serverTimestamp(),
     });
     tx.update(refTributo, { pagadoEn: serverTimestamp(), comprobante: codigoComprobante, pagoId: requestId, medio });
     tx.set(refDe(uid, C.notificaciones, `pago-${requestId}`), {
       titulo: 'Pago registrado',
-      cuerpo: `${tributo.concepto ?? 'Tributo'} ${tributo.periodo ?? ''}: ${dinero(importe)} con ${ETIQUETAS.mediosPago[medio].toLowerCase()}. Comprobante ${codigoComprobante}.`.replace(/\s+/g, ' ').slice(0, 500),
+      cuerpo: `${tributo.concepto ?? 'Tributo'} ${tributo.periodo ?? ''}: ${dinero(importe)} con ${conMinuscula(textoMedioPago(medio, enmascarada))}. Comprobante ${codigoComprobante}.`.replace(/\s+/g, ' ').slice(0, 500),
       tipo: 'tributos', zona: null, destino: `#/tributos/${tributoId}`, enlace: null,
       creadoEn: serverTimestamp(), leida: false, leidaEn: null, origen: 'vecino',
     });
     return {
-      id: requestId, tipo: 'tributo', refId: tributoId, importe, comprobante: codigoComprobante, medio,
+      id: requestId, tipo: 'tributo', refId: tributoId, importe, comprobante: codigoComprobante, medio, tarjeta: enmascarada,
       proveedor: PROVEEDOR_PAGO, creadoEn: Date.now(), pendiente: false,
     };
   }));
@@ -469,10 +514,10 @@ function sesionLocal(id, datos, inicioMs) {
   };
 }
 
-export async function iniciarEstacionamiento({ zonaId, patente, minutos, medio } = {}, requestId) {
+export async function iniciarEstacionamiento({ zonaId, patente, minutos, tarjeta } = {}, requestId) {
   const uid = uidActual();
   validarIdSolicitud(requestId);
-  validarMedio(medio);
+  const { medio, tarjeta: enmascarada } = medioDePago(tarjeta);
   const pat = validar(() => normalizarPatente(patente));
   const min = validar(() => minutosValidos(Number(minutos)));
   if (typeof zonaId !== 'string' || !zonaId) throw errorCampo('zonaId', 'Elegí una zona.');
@@ -506,16 +551,16 @@ export async function iniciarEstacionamiento({ zonaId, patente, minutos, medio }
     tx.set(refBloqueo, { sesionId: requestId, fin });
     tx.set(refDe(uid, C.pagos, requestId), {
       tipo: 'estacionamiento', refId: requestId, importe, comprobante: comprobante('EST', requestId), medio,
-      proveedor: PROVEEDOR_PAGO, creadoEn: serverTimestamp(),
+      tarjeta: enmascarada, proveedor: PROVEEDOR_PAGO, creadoEn: serverTimestamp(),
     });
     return sesionLocal(requestId, datos, ahora);
   }), permisoConReloj);
 }
 
-export async function extenderEstacionamiento(sesionId, minutosExtra, requestId, medio) {
+export async function extenderEstacionamiento(sesionId, minutosExtra, requestId, tarjeta) {
   const uid = uidActual();
   validarIdSolicitud(requestId);
-  validarMedio(medio);
+  const { medio, tarjeta: enmascarada } = medioDePago(tarjeta);
   const extra = validar(() => minutosValidos(Number(minutosExtra)));
   if (typeof sesionId !== 'string' || !sesionId) throw new ErrorApp('no-encontrado');
   exigirConexion('Para extender necesitás conexión. Revisá tu red e intentá de nuevo.');
@@ -545,7 +590,7 @@ export async function extenderEstacionamiento(sesionId, minutosExtra, requestId,
     tx.set(doc(db, C.bloqueos, actual.patente), { sesionId, fin });
     tx.set(refPago, {
       tipo: 'extension', refId: sesionId, importe: importeExtra, comprobante: comprobante('EXT', requestId), medio,
-      proveedor: PROVEEDOR_PAGO, creadoEn: serverTimestamp(),
+      tarjeta: enmascarada, proveedor: PROVEEDOR_PAGO, creadoEn: serverTimestamp(),
     });
     const ahora = Date.now();
     return {

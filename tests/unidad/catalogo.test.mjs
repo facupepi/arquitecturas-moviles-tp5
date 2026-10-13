@@ -5,6 +5,7 @@ import { catalogo, datosInicialesVecino } from '../../shared/catalogo.mjs';
 import {
   ZONAS, CATEGORIAS_RECLAMO, TIPOS_AVISO, TIPOS_NOTIFICACION, FRECUENCIAS, TIPOS_ARCHIVO,
   CATEGORIAS_CONTACTO, ESTADOS_ESTACION, PREFERENCIAS_POR_DEFECTO, ETIQUETAS, LIMITES, MEDIOS_PAGO,
+  MEDIOS_PAGO_ANTERIORES, REDES_TARJETA, IDS_TARJETA, COLECCIONES,
 } from '../../shared/constantes.mjs';
 import { estadoTributo, validarPreferencias, luhnValido, codigoPagoTributo } from '../../shared/dominio.mjs';
 import { destinoValido } from '../../shared/rutas.mjs';
@@ -146,7 +147,10 @@ test('etiquetas para todos los valores enumerados', () => {
   for (const t of TIPOS_NOTIFICACION) assert.ok(ETIQUETAS.tipos[t], t);
   for (const f of FRECUENCIAS) assert.ok(ETIQUETAS.frecuencias[f], f);
   for (const e of ['pagado', 'vencido', 'por_vencer', 'pendiente']) assert.ok(ETIQUETAS.estadosTributo[e], e);
-  assert.deepEqual(Object.keys(ETIQUETAS.mediosPago).sort(), [...MEDIOS_PAGO].sort());
+  // La pasarela ofrece solo tarjetas; los medios anteriores conservan su etiqueta para los pagos viejos.
+  assert.deepEqual([...MEDIOS_PAGO], ['credito', 'debito']);
+  assert.deepEqual(Object.keys(ETIQUETAS.mediosPago).sort(), [...MEDIOS_PAGO, ...MEDIOS_PAGO_ANTERIORES].sort());
+  for (const m of MEDIOS_PAGO) assert.ok(ETIQUETAS.tiposTarjeta[m], m);
   assert.deepEqual([...TIPOS_NOTIFICACION], [...TIPOS_AVISO, 'alarmas', 'tributos', 'estacionamiento', 'reclamos']);
   assert.ok(!TIPOS_AVISO.includes('alarmas'), 'el panel no publica avisos de tipo alarmas');
 });
@@ -155,7 +159,7 @@ test('etiquetas para todos los valores enumerados', () => {
 const LISTAS_DE_LAS_REGLAS = {
   zonas: ZONAS, categorias: CATEGORIAS_RECLAMO, tiposAvisoPanel: TIPOS_AVISO,
   tiposNotificacion: TIPOS_NOTIFICACION, frecuencias: FRECUENCIAS, tiposArchivo: TIPOS_ARCHIVO,
-  mediosPago: MEDIOS_PAGO,
+  mediosPago: MEDIOS_PAGO, redesTarjeta: REDES_TARJETA, idsTarjeta: IDS_TARJETA,
 };
 
 function listaDeLasReglas(reglas, nombre) {
@@ -191,4 +195,12 @@ test('las preferencias por defecto pasan la validación', () => {
   assert.deepEqual(validarPreferencias(PREFERENCIAS_POR_DEFECTO), {
     tipos: [...PREFERENCIAS_POR_DEFECTO.tipos], zonas: [...PREFERENCIAS_POR_DEFECTO.zonas], frecuencia: 'inmediata', push: false,
   });
+});
+
+test('tarjetas guardadas: tope, lugares fijos y colección', () => {
+  assert.equal(IDS_TARJETA.length, LIMITES.tarjetas);
+  assert.equal(new Set(IDS_TARJETA).size, IDS_TARJETA.length);
+  assert.equal(COLECCIONES.tarjetas, 'tarjetas');
+  // El vecino nuevo arranca sin tarjetas: datosInicialesVecino no las trae.
+  assert.equal(v.tarjetas, undefined);
 });

@@ -1,10 +1,10 @@
 // Tributos (S4, sección 8.7): T1 cedulón con código de pago e impresión, T2 pago con la pasarela
-// (medio → procesando → aprobado y comprobante), T3 historial y estados, T4 estado "por vencer" y
-// recordatorios de vencimiento.
+// (tarjeta guardada → procesando → aprobado y comprobante; sin tarjetas, el alta en el mismo diálogo),
+// T3 historial y estados, T4 estado "por vencer" y recordatorios de vencimiento.
 // Datos: los que escribe vecino/alta (datosInicialesVecino de shared/catalogo.mjs) para cada vecino
 // nuevo: T-0999 vencido, T-1001 por vencer (2 días) y T-1002 pendiente (8 días). Sin pagos previos.
 import { Timestamp } from 'firebase-admin/firestore';
-import { test, expect, irA } from './fixtures.mjs';
+import { test, expect, irA, sembrarTarjeta, TARJETAS_PRUEBA } from './fixtures.mjs';
 import { revisarAccesibilidad } from './accesibilidad.mjs';
 import { datosInicialesVecino } from '../../shared/catalogo.mjs';
 import { codigoPagoTributo, comprobante, luhnValido } from '../../shared/dominio.mjs';
@@ -120,7 +120,7 @@ test.describe('Tributos', () => {
     await page.emulateMedia({ media: 'screen' });
   });
 
-  test('pasarela: elige el medio, procesa, aprueba y deja el comprobante (T2)', async ({ vecino, adminDb }) => {
+  test('pasarela: sin tarjetas la carga en el mismo pago, elige, procesa, aprueba y deja el comprobante (T2)', async ({ vecino, adminDb }) => {
     const { page, uid } = vecino;
     await abrirTributos(page);
 
@@ -132,69 +132,106 @@ test.describe('Tributos', () => {
     await expect(page.locator('[role="dialog"]')).toHaveCount(0);
     expect((await tributoEnDb(adminDb, uid, 'T-1001')).pagadoEn).toBeNull();
 
-    // Pasarela: importe, los cuatro medios como radios, sin campos de tarjeta, y el número de
-    // operación (requestId) generado al abrirla.
+    // Pasarela de un vecino sin tarjetas: importe, el aviso con "Agregar tarjeta", ningún campo y el
+    // número de operación (requestId) generado al abrirla.
     await page.getByTestId('pagar-T-1001').click();
     dialogo = await esperarDialogo(page, 'dialogo-pago');
     await expect(page.getByTestId('importe-pago')).toHaveText(importe(SEMILLA['T-1001'].importe));
-    const medios = page.getByRole('radiogroup', { name: 'Elegí cómo pagar' });
-    await expect(medios.getByRole('radio')).toHaveText([
-      /Tarjeta de crédito/, /Tarjeta de débito/, /Billetera virtual/, /Transferencia bancaria/,
-    ]);
-    await expect(medios.getByRole('radio', { checked: true })).toHaveCount(0);
+    await expect(page.getByTestId('sin-tarjetas-pago')).toContainText('Todavía no tenés tarjetas guardadas');
     await expect(dialogo.locator('input, textarea')).toHaveCount(0);
-    await expect(page.getByTestId('confirmar-pago')).toContainText('Pagar');
+    await expect(page.getByTestId('nota-seguridad-pago')).toHaveText('Guardamos solo los últimos 4 dígitos. Nunca te pedimos el código de seguridad.');
     const requestId = (await page.getByTestId('numero-operacion').getAttribute('data-operacion'))?.match(UUID)?.[0];
     expect(requestId).toBeTruthy();
-    // Las opciones tienen al menos 48 px de alto (área táctil).
+
+    // Sin tarjeta no paga: el error queda junto al aviso.
+    await page.getByTestId('confirmar-pago').click();
+    await expect(page.getByTestId('medio-error')).toHaveText('Agregá una tarjeta de crédito o de débito para pagar.');
+    expect((await tributoEnDb(adminDb, uid, 'T-1001')).pagadoEn).toBeNull();
+    await revisarAccesibilidad(page, 'pago-sin-tarjetas');
+
+    // "Agregar tarjeta" carga la tarjeta en el mismo diálogo, sin código de seguridad.
+    await page.getByTestId('agregar-tarjeta-pago').click();
+    await expect(dialogo.getByRole('heading', { name: 'Agregar tarjeta' })).toBeVisible();
+    await expect(page.getByTestId('tarjeta-tipo-credito')).toBeFocused();
+    await expect(dialogo.locator('input')).toHaveCount(3);
+    await expect(dialogo).not.toContainText(/CVV|CVC/);
+    await expect(page.getByTestId('confirmar-pago')).toHaveCount(0);
+    // Vacío: un error debajo de cada campo y el foco en el primero.
+    await page.getByTestId('guardar-tarjeta').click();
+    await expect(dialogo).toContainText('Elegí si es de crédito o de débito.');
+    await expect(dialogo).toContainText('Ingresá el número de la tarjeta.');
+    await expect(dialogo).toContainText('Ingresá el nombre como figura en la tarjeta.');
+    await expect(dialogo).toContainText('Ingresá el vencimiento.');
+    await expect(page.getByTestId('tarjeta-numero')).toHaveAttribute('aria-invalid', 'true');
+    await revisarAccesibilidad(page, 'pago-alta-tarjeta');
+    await page.getByTestId('tarjeta-tipo-debito').click();
+    await page.getByTestId('tarjeta-numero').fill('5200828282828210');
+    await expect(page.getByTestId('tarjeta-numero')).toHaveValue('5200 8282 8282 8210');
+    await page.getByTestId('tarjeta-titular').fill('Vecina Prueba');
+    await page.getByTestId('tarjeta-vence').fill('0830');
+    await expect(page.getByTestId('tarjeta-vence')).toHaveValue('08/30');
+    await page.getByTestId('guardar-tarjeta').click();
+
+    // De vuelta en el pago, con la tarjeta nueva elegida.
+    await expect(dialogo.getByRole('heading', { name: 'Pagar cedulón' })).toBeVisible();
+    const medios = page.getByRole('radiogroup', { name: 'Elegí cómo pagar' });
+    await expect(medios.getByRole('radio')).toHaveText([/Mastercard débito ••••\s8210/]);
+    await expect(page.getByTestId('medio-tarjeta-1')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByTestId('medio-tarjeta-1')).toBeFocused();
+    await expect(dialogo.locator('input, textarea')).toHaveCount(0);
+    // En Firestore, solo lo que se muestra: nunca el número completo.
+    const guardada = (await adminDb.doc(`usuarios/${uid}/tarjetas/tarjeta-1`).get()).data();
+    expect(Object.keys(guardada).sort()).toEqual(['creadoEn', 'red', 'tipo', 'titular', 'ultimos4', 'vence']);
+    expect(guardada).toMatchObject({ tipo: 'debito', red: 'Mastercard', ultimos4: '8210', titular: 'Vecina Prueba', vence: '08/30' });
+    expect(JSON.stringify(guardada)).not.toContain('52008282');
+
+    // Otra tarjeta guardada (desde otro dispositivo) aparece en vivo. Radios accesibles: área táctil
+    // de 48 px o más, una sola elegida, y las flechas pasan a la siguiente.
+    await sembrarTarjeta(adminDb, uid, TARJETAS_PRUEBA.credito);
+    await expect(medios.getByRole('radio')).toHaveText([/Mastercard débito ••••\s8210/, /Visa crédito ••••\s4242/]);
+    await expect(medios.getByRole('radio', { checked: true })).toHaveCount(1);
     for (const caja of await medios.getByRole('radio').evaluateAll((ns) => ns.map((n) => n.getBoundingClientRect().height))) {
       expect(caja).toBeGreaterThanOrEqual(48);
     }
-
-    // Sin medio no paga: el error queda junto a las opciones.
-    await page.getByTestId('confirmar-pago').click();
-    await expect(page.getByTestId('medio-error')).toHaveText('Elegí un medio de pago para continuar.');
-    expect((await tributoEnDb(adminDb, uid, 'T-1001')).pagadoEn).toBeNull();
+    await page.getByTestId('medio-tarjeta-1').focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByTestId('medio-tarjeta-2')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByTestId('medio-tarjeta-1')).toHaveAttribute('aria-checked', 'false');
     await revisarAccesibilidad(page, 'confirmar-pago');
 
-    // Elegir el medio limpia el error (también con el teclado: flecha abajo pasa a la siguiente opción).
-    await page.getByTestId('medio-credito').click();
-    await expect(page.getByTestId('medio-error')).toHaveCount(0);
-    await page.getByTestId('medio-credito').focus();
-    await page.keyboard.press('ArrowDown');
-    await expect(page.getByTestId('medio-debito')).toHaveAttribute('aria-checked', 'true');
-    await expect(page.getByTestId('medio-credito')).toHaveAttribute('aria-checked', 'false');
-
-    // Pagar: "Procesando el pago…" con el medio, sin poder cerrar el diálogo.
+    // Pagar: "Procesando el pago…" con la tarjeta, sin poder cerrar el diálogo.
     await page.getByTestId('confirmar-pago').click();
     const procesando = page.getByTestId('procesando-pago');
     await expect(procesando).toBeVisible();
     await expect(procesando).toContainText('Procesando el pago…');
     await expect(procesando).toHaveAttribute('role', 'status');
-    await expect(page.getByTestId('procesando-pago-medio')).toContainText('tarjeta de débito');
+    await expect(page.getByTestId('procesando-pago-medio')).toContainText('tarjeta de crédito Visa •••• 4242');
     await expect(page.getByTestId('dialogo-pago-cerrar')).toHaveCount(0);
 
-    // "Pago aprobado" y el comprobante con el medio y el número de operación.
+    // "Pago aprobado" y el comprobante con la tarjeta enmascarada y el número de operación.
     const comprobanteDialogo = await esperarDialogo(page, 'comprobante');
     const esperado = comprobante('REC', requestId);
     await expect(page.getByTestId('comprobante-pago-estado')).toHaveText('Pago aprobado');
     await expect(page.getByTestId('numero-comprobante')).toHaveText(esperado);
-    await expect(page.getByTestId('comprobante-medio')).toContainText('Tarjeta de débito');
+    await expect(page.getByTestId('comprobante-medio')).toContainText('Tarjeta de crédito Visa •••• 4242');
     await expect(comprobanteDialogo).not.toContainText(TEXTO_DEMO);
     await revisarAccesibilidad(page, 'comprobante');
 
-    // En Firestore: tributo pagado con el medio, pago con el requestId como id y la notificación.
+    // En Firestore: tributo pagado con el medio, pago con la tarjeta enmascarada y la notificación.
     const tributo = await tributoEnDb(adminDb, uid, 'T-1001');
     expect(tributo.pagadoEn).not.toBeNull();
     expect(tributo.comprobante).toBe(esperado);
     expect(tributo.pagoId).toBe(requestId);
-    expect(tributo.medio).toBe('debito');
+    expect(tributo.medio).toBe('credito');
     const pago = (await adminDb.doc(`usuarios/${uid}/pagos/${requestId}`).get()).data();
     expect(pago).toMatchObject({
-      tipo: 'tributo', refId: 'T-1001', importe: SEMILLA['T-1001'].importe, medio: 'debito', proveedor: 'pasarela-simulada',
+      tipo: 'tributo', refId: 'T-1001', importe: SEMILLA['T-1001'].importe, medio: 'credito', proveedor: 'pasarela-simulada',
+      tarjeta: { red: 'Visa', ultimos4: '4242' },
     });
-    expect(Object.keys(pago).sort()).toEqual(['comprobante', 'creadoEn', 'importe', 'medio', 'proveedor', 'refId', 'tipo']);
-    expect((await adminDb.doc(`usuarios/${uid}/notificaciones/pago-${requestId}`).get()).exists).toBe(true);
+    expect(Object.keys(pago).sort()).toEqual(['comprobante', 'creadoEn', 'importe', 'medio', 'proveedor', 'refId', 'tarjeta', 'tipo']);
+    expect(Object.keys(pago.tarjeta).sort()).toEqual(['red', 'ultimos4']);
+    const aviso = (await adminDb.doc(`usuarios/${uid}/notificaciones/pago-${requestId}`).get()).data();
+    expect(aviso.cuerpo).toMatch(/con tarjeta de crédito Visa ••••\s4242/);
 
     // La pantalla se actualiza sola: sale de pendientes, baja el total y aparece en el historial.
     await page.getByTestId('cerrar-comprobante').click();
@@ -202,40 +239,41 @@ test.describe('Tributos', () => {
     await expect(page.getByTestId('total-pendiente')).toHaveText(importe(43250));
     await page.getByTestId('pestanas-tributos-pagados').click();
     await expect(page.getByTestId(`pago-${requestId}`)).toContainText(esperado);
-    await expect(page.getByTestId(`medio-${requestId}`)).toContainText('Tarjeta de débito');
+    await expect(page.getByTestId(`medio-${requestId}`)).toContainText('Tarjeta de crédito Visa •••• 4242');
     await page.getByTestId(`ver-comprobante-${requestId}`).click();
     await esperarDialogo(page, 'comprobante');
     await expect(page.getByTestId('numero-comprobante')).toHaveText(esperado);
-    await expect(page.getByTestId('comprobante-medio')).toContainText('Tarjeta de débito');
+    await expect(page.getByTestId('comprobante-medio')).toContainText('Tarjeta de crédito Visa •••• 4242');
     await page.getByTestId('comprobante-ver-cedulon').click();
     await esperarDialogo(page, 'dialogo-cedulon');
-    await expect(page.getByTestId('dialogo-cedulon')).toContainText('Tarjeta de débito');
+    await expect(page.getByTestId('dialogo-cedulon')).toContainText('Tarjeta de crédito Visa •••• 4242');
     await expect(page.getByTestId('aviso-cedulon')).toHaveText('Pagado desde la app San Francisco Conecta.');
   });
 
   test('errores dentro del diálogo: sin conexión con reintento y cedulón ya pagado', async ({ vecino, adminDb }) => {
     const { page, uid, contexto } = vecino;
+    await sembrarTarjeta(adminDb, uid, TARJETAS_PRUEBA.debito);
     await abrirTributos(page);
 
     // Sin conexión: el error queda junto al botón y el reintento usa el mismo número de operación.
     await page.getByTestId('pagar-T-1002').click();
     await esperarDialogo(page, 'dialogo-pago');
     const requestId = (await page.getByTestId('numero-operacion').getAttribute('data-operacion'))?.match(UUID)?.[0];
-    await page.getByTestId('medio-transferencia').click();
+    await page.getByTestId('medio-tarjeta-1').click();
     await contexto.setOffline(true);
     await page.getByTestId('confirmar-pago').click();
     await expect(page.getByTestId('procesando-pago')).toBeVisible();
     await expect(page.getByTestId('error-pago')).toContainText('conexión');
     await expect(page.getByTestId('confirmar-pago')).toContainText('Reintentar');
-    // El medio elegido se conserva para el reintento.
-    await expect(page.getByTestId('medio-transferencia')).toHaveAttribute('aria-checked', 'true');
+    // La tarjeta elegida se conserva para el reintento.
+    await expect(page.getByTestId('medio-tarjeta-1')).toHaveAttribute('aria-checked', 'true');
     await contexto.setOffline(false);
     await page.getByTestId('confirmar-pago').click();
     await expect(page.getByTestId('numero-comprobante')).toHaveText(comprobante('REC', requestId), { timeout: 30_000 });
-    await expect(page.getByTestId('comprobante-medio')).toContainText('Transferencia bancaria');
+    await expect(page.getByTestId('comprobante-medio')).toContainText('Tarjeta de débito Mastercard •••• 8210');
     const pagadoOffline = await tributoEnDb(adminDb, uid, 'T-1002');
     expect(pagadoOffline.pagoId).toBe(requestId);
-    expect(pagadoOffline.medio).toBe('transferencia');
+    expect(pagadoOffline.medio).toBe('debito');
     await page.getByTestId('cerrar-comprobante').click();
 
     // Otro dispositivo paga T-0999 mientras la confirmación está abierta.

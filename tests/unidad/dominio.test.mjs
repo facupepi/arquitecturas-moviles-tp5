@@ -6,6 +6,7 @@ import {
   ordenarPorCercania, enHorario, estadoTributo, siguienteEstadoReclamo, validarReclamo, validarArchivo,
   recortarNombreArchivo, tipoPorFirma, validarPreferencias, codigoReclamo, comprobante, codigoPagoTributo,
   nuevoIdSolicitud, finSesion, diaCordoba, digitoLuhn, luhnValido, inicioDiaCordoba, inicioMesCordoba,
+  redTarjeta, normalizarVence, tarjetaVencida, revisarTarjeta, validarTarjeta, pagoConTarjeta,
 } from '../../shared/dominio.mjs';
 import { catalogo } from '../../shared/catalogo.mjs';
 import { TIPOS_NOTIFICACION } from '../../shared/constantes.mjs';
@@ -291,4 +292,79 @@ test('inicioDiaCordoba e inicioMesCordoba cortan a la medianoche de Córdoba (UT
   // 31/10 22:00 en Córdoba (1/11 01:00 UTC): sigue siendo octubre.
   assert.equal(inicioMesCordoba(Date.parse('2026-11-01T01:00:00Z')), Date.parse('2026-10-01T03:00:00Z'));
   assert.equal(inicioMesCordoba(Date.parse('2026-11-01T03:00:00Z')), Date.parse('2026-11-01T03:00:00Z'));
+});
+
+// ---------- Tarjetas guardadas ----------
+
+test('redTarjeta: Visa 4, Mastercard 51–55 y 2221–2720, American Express 34/37; otra → "Tarjeta"', () => {
+  assert.equal(redTarjeta('4242 4242 4242 4242'), 'Visa');
+  assert.equal(redTarjeta('5100000000000000'), 'Mastercard');
+  assert.equal(redTarjeta('5555555555554444'), 'Mastercard');
+  assert.equal(redTarjeta('2221000000000009'), 'Mastercard');
+  assert.equal(redTarjeta('2720990000000007'), 'Mastercard');
+  assert.equal(redTarjeta('2220990000000000'), 'Tarjeta');
+  assert.equal(redTarjeta('2721000000000000'), 'Tarjeta');
+  assert.equal(redTarjeta('5600000000000000'), 'Tarjeta');
+  assert.equal(redTarjeta('341111111111111'), 'American Express');
+  assert.equal(redTarjeta('378282246310005'), 'American Express');
+  assert.equal(redTarjeta('6011111111111117'), 'Tarjeta');
+  assert.equal(redTarjeta(''), 'Tarjeta');
+});
+
+test('normalizarVence y tarjetaVencida (vale hasta el último día del mes, en Córdoba)', () => {
+  assert.equal(normalizarVence('0829'), '08/29');
+  assert.equal(normalizarVence('8/29'), '08/29');
+  assert.equal(normalizarVence(' 08 / 29 '), '08/29');
+  assert.equal(normalizarVence('13/29'), null);
+  assert.equal(normalizarVence('00/29'), null);
+  assert.equal(normalizarVence('08/2029'), null);
+  const ahora = cordoba('2026-10-31T23:59');
+  assert.equal(tarjetaVencida('10/26', ahora), false);
+  assert.equal(tarjetaVencida('09/26', ahora), true);
+  assert.equal(tarjetaVencida('10/26', cordoba('2026-11-01T00:00')), true);
+  assert.equal(tarjetaVencida('01/27', ahora), false);
+  assert.equal(tarjetaVencida('cualquiera', ahora), true);
+});
+
+test('revisarTarjeta: devuelve solo tipo, red, últimos 4, titular y vencimiento (nunca el número)', () => {
+  const ahora = cordoba('2026-10-13T12:00');
+  const { tarjeta, errores } = revisarTarjeta({ tipo: 'credito', numero: '4242 4242-4242 4242', titular: '  Ana   Pérez ', vence: '829' }, ahora);
+  assert.deepEqual(errores, {});
+  assert.deepEqual(tarjeta, { tipo: 'credito', red: 'Visa', ultimos4: '4242', titular: 'Ana Pérez', vence: '08/29' });
+  assert.ok(!JSON.stringify(tarjeta).includes('424242'), 'no queda el número completo');
+  // American Express de 15 dígitos y largo máximo de 19.
+  assert.equal(revisarTarjeta({ tipo: 'debito', numero: '378282246310005', titular: 'Bo', vence: '12/30' }, ahora).tarjeta.ultimos4, '0005');
+  assert.ok(revisarTarjeta({ tipo: 'debito', numero: '4000000000000000006', titular: 'Ana', vence: '12/30' }, ahora).tarjeta);
+});
+
+test('revisarTarjeta: un error por campo, todos a la vez', () => {
+  const ahora = cordoba('2026-10-13T12:00');
+  const { tarjeta, errores } = revisarTarjeta({}, ahora);
+  assert.equal(tarjeta, null);
+  assert.deepEqual(Object.keys(errores).sort(), ['numero', 'tipo', 'titular', 'vence']);
+  const error = (datos, campo) => revisarTarjeta({ tipo: 'credito', numero: '4242424242424242', titular: 'Ana', vence: '12/30', ...datos }, ahora).errores[campo];
+  assert.match(error({ tipo: 'billetera' }, 'tipo'), /crédito o de débito/);
+  assert.match(error({ numero: '4242 4242 4242 4241' }, 'numero'), /no corresponde/);       // Luhn
+  assert.match(error({ numero: '424242424242' }, 'numero'), /entre 13 y 19/);              // 12 dígitos
+  assert.match(error({ numero: '42424242424242424242' }, 'numero'), /entre 13 y 19/);      // 20 dígitos
+  assert.match(error({ numero: '4242x42424242424' }, 'numero'), /solo números/);
+  assert.match(error({ titular: 'A' }, 'titular'), /entre 2 y 60/);
+  assert.match(error({ titular: 'A'.repeat(61) }, 'titular'), /entre 2 y 60/);
+  assert.match(error({ titular: 'Ana 4242' }, 'titular'), /números/);
+  assert.match(error({ vence: '09/26' }, 'vence'), /vencida/);
+  assert.match(error({ vence: '1330' }, 'vence'), /MM\/AA/);
+  assert.match(error({ vence: '' }, 'vence'), /Ingresá/);
+  assert.equal(error({ vence: '10/26' }, 'vence'), undefined, 'el mes en curso todavía vale');
+  lanzaEn(() => validarTarjeta({ tipo: 'credito', numero: '1', titular: 'Ana', vence: '12/30' }, ahora), 'numero');
+});
+
+test('pagoConTarjeta: el pago registra el tipo y la tarjeta enmascarada', () => {
+  const ahora = cordoba('2026-10-13T12:00');
+  const guardada = { id: 'tarjeta-1', tipo: 'debito', red: 'Visa', ultimos4: '5556', titular: 'Ana', vence: '08/30' };
+  assert.deepEqual(pagoConTarjeta(guardada, ahora), { medio: 'debito', tarjeta: { red: 'Visa', ultimos4: '5556' } });
+  for (const mala of [null, 'credito', { tipo: 'billetera', red: 'Visa', ultimos4: '1234' }, { tipo: 'credito', red: 'Otra', ultimos4: '1234' },
+    { tipo: 'credito', red: 'Visa', ultimos4: '4242424242424242' }]) {
+    lanzaEn(() => pagoConTarjeta(mala, ahora), 'medio');
+  }
+  lanzaEn(() => pagoConTarjeta({ ...guardada, vence: '09/26' }, ahora), 'medio');
 });

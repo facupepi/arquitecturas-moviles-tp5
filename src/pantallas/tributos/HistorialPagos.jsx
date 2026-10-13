@@ -1,5 +1,5 @@
 // Historial de pagos de tributos (T3, S4): los `pagos` de tipo tributo, del más nuevo al más viejo,
-// con el medio elegido en la pasarela y "Cargar más" (cargarMas('pagos') sube el límite de la escucha; siguen en tiempo real).
+// con el medio elegido en la pasarela (y la tarjeta enmascarada) y "Cargar más" (cargarMas('pagos') sube el límite de la escucha; siguen en tiempo real).
 // En el escritorio van en grilla, con la misma estructura que las tarjetas de Pendientes.
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -37,7 +37,7 @@ export default function HistorialPagos({ pagos, tributosPorId, hayMas, error, ah
                   <FilaDato etiqueta="Importe" valor={dinero(pago.importe)} />
                   <FilaDato etiqueta="Fecha" valor={fechaHora(pago.creadoEn)} />
                   {etiquetaMedio(pago.medio) ? (
-                    <FilaDato etiqueta="Medio de pago" valor={etiquetaMedio(pago.medio)} testID={`medio-${pago.id}`} />
+                    <FilaDato etiqueta="Medio de pago" valor={etiquetaMedio(pago.medio, pago.tarjeta)} testID={`medio-${pago.id}`} />
                   ) : null}
                   <FilaDato etiqueta="Comprobante" valor={pago.comprobante} testID={`comprobante-${pago.id}`} />
                 </View>

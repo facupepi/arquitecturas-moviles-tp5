@@ -10,8 +10,8 @@ import { colores, espacio } from '../../tema/tokens';
 import {
   Boton, Campo, Cargando, ErrorCarga, EtiquetaEstado, Seccion, Selector, Texto, Vacio,
 } from '../../ui';
-import { ETIQUETAS, ZONA_HORARIA } from '../../../shared/constantes.mjs';
-import { codigoVecino, dinero, fecha, tiempoPasado } from '../../../shared/formato.mjs';
+import { ZONA_HORARIA } from '../../../shared/constantes.mjs';
+import { codigoVecino, dinero, fecha, textoMedioPago, tiempoPasado } from '../../../shared/formato.mjs';
 import { Indicadores, Tabla, fechaCorta, plural } from './comun';
 
 const POR_PAGINA = 20;
@@ -25,7 +25,8 @@ const TIPO_PAGO = {
 const nombreMes = new Intl.DateTimeFormat('es-AR', { month: 'long', timeZone: ZONA_HORARIA });
 
 const clave = (x) => `${x.uid}/${x.id}`;
-const medioDe = (pago) => (pago.medio ? ETIQUETAS.mediosPago?.[pago.medio] ?? pago.medio : null);
+// "Tarjeta de crédito Visa •••• 4242" (la tarjeta siempre enmascarada; los pagos anteriores, solo el medio).
+const medioDe = (pago) => (pago.medio ? textoMedioPago(pago.medio, pago.tarjeta) ?? pago.medio : null);
 
 // Qué se pagó: el cedulón (T-1001) o la patente de la sesión si sigue activa.
 function detalle(pago, patentes) {

@@ -1,5 +1,6 @@
-// Pasarela de pago del cedulón (T2, S4). Paso 1: el detalle, el importe y la elección del medio
-// (MediosDePago); "Pagar $X" confirma. Paso 2: "Procesando el pago…" mientras se registra (el
+// Pasarela de pago del cedulón (T2, S4). Paso 1: el detalle, el importe y la elección de una tarjeta
+// guardada (MediosDePago); "Pagar $X" confirma. Sin tarjetas, "Agregar tarjeta" carga una en el mismo
+// diálogo (AltaEnPago) y vuelve al pago. Paso 2: "Procesando el pago…" mientras se registra (el
 // diálogo no se puede cerrar). Al aprobarse, Tributos abre el comprobante (DialogoComprobante).
 // El código de operación (del requestId) se genera al abrir el diálogo y se reutiliza en los
 // reintentos: un reintento después de un corte no cobra dos veces (idempotencia, sección 0).
@@ -11,12 +12,13 @@ import { Aviso, Dialogo, FilaDato, Texto } from '../../ui';
 import ContenidoDialogo from './ContenidoDialogo';
 import MediosDePago from '../pagos/MediosDePago';
 import Procesando from '../pagos/Procesando';
+import AltaEnPago, { dialogoAlta } from '../pagos/AltaEnPago';
 import { dinero, fecha } from '../../../shared/formato.mjs';
 import { comprobante } from '../../../shared/dominio.mjs';
 import { cuandoVence } from './estado';
 
 export default function DialogoPago({
-  visible, tributo, requestId, ahora, ocupado, error, yaPagado, medio, onElegirMedio, errorMedio, onConfirmar, onCerrar,
+  visible, tributo, requestId, ahora, ocupado, error, yaPagado, medio, onConfirmar, onCerrar,
 }) {
   const refMedios = useRef(null);
   if (!tributo) return <Dialogo visible={false} titulo="" onCerrar={onCerrar} />;
@@ -29,9 +31,10 @@ export default function DialogoPago({
   const reintentar = !yaPagado && error && (error.codigo === 'sin-conexion' || error.codigo === 'servidor');
 
   const confirmar = () => {
-    // Sin medio elegido, el error queda junto a las opciones y el foco va a la primera.
+    // Sin tarjeta elegida, el error queda junto a las opciones y el foco va a la primera.
     if (!onConfirmar()) setTimeout(() => refMedios.current?.focus?.(), 0);
   };
+  const alta = medio.agregando && !ocupado ? dialogoAlta(medio) : null;
 
   let acciones;
   if (ocupado) {
@@ -52,17 +55,19 @@ export default function DialogoPago({
   return (
     <Dialogo
       visible={visible}
-      titulo="Pagar cedulón"
+      titulo={alta?.titulo ?? 'Pagar cedulón'}
       onCerrar={onCerrar}
-      cerrable={!ocupado}
-      acciones={acciones}
-      pie={errorMostrado && !ocupado ? (
+      cerrable={!ocupado && !alta?.ocupado}
+      acciones={alta?.acciones ?? acciones}
+      pie={alta ? alta.pie : errorMostrado && !ocupado ? (
         <Aviso tono="peligro" rol="alert" titulo={errorMostrado.titulo} mensaje={errorMostrado.mensaje} testID="error-pago" />
       ) : null}
       testID="dialogo-pago"
     >
       {ocupado ? (
-        <Procesando importe={tributo.importe} medio={medio} />
+        <Procesando importe={tributo.importe} tarjeta={medio.tarjeta} />
+      ) : alta ? (
+        <AltaEnPago medio={medio} />
       ) : (
         <ContenidoDialogo etiqueta="Detalle del pago">
           <View>
@@ -88,7 +93,7 @@ export default function DialogoPago({
             />
           ) : null}
 
-          <MediosDePago ref={refMedios} valor={medio} onCambio={onElegirMedio} error={errorMedio} />
+          <MediosDePago ref={refMedios} medio={medio} />
 
           {/* El mismo formato que Estacionamiento (EST-…): es el número que va a tener el comprobante.
               El requestId completo queda en data-operacion para las pruebas. */}

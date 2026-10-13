@@ -6,11 +6,12 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { colores, espacio, radios } from '../../tema/tokens';
 import { Icono, Texto } from '../../ui';
 import { dinero } from '../../../shared/formato.mjs';
-import { OPCIONES_MEDIO } from './pasarela';
+import { etiquetaTarjeta, iconoMedio } from './pasarela';
 
-export default function Procesando({ importe, medio, testID = 'procesando-pago' }) {
+// `tarjeta`: la tarjeta guardada con la que se paga ({ tipo, red, ultimos4 }).
+export default function Procesando({ importe, tarjeta, testID = 'procesando-pago' }) {
   const ref = useRef(null);
-  const opcion = OPCIONES_MEDIO.find((o) => o.valor === medio);
+  const etiqueta = etiquetaTarjeta(tarjeta);
 
   useEffect(() => {
     try { ref.current?.focus?.({ preventScroll: true }); } catch { /* en nativo no hay foco */ }
@@ -30,11 +31,11 @@ export default function Procesando({ importe, medio, testID = 'procesando-pago' 
       <Texto variante="titulo3" alineacion="center">
         Procesando el pago…
       </Texto>
-      {opcion ? (
+      {etiqueta ? (
         <View style={estilos.medio}>
-          <Icono nombre={opcion.icono} tamano={18} color={colores.accionOscuro} />
-          <Texto variante="chico" peso="700" color={colores.accionOscuro} testID={`${testID}-medio`}>
-            {importe != null ? `${dinero(importe)} con ${opcion.etiqueta.toLowerCase()}` : opcion.etiqueta}
+          <Icono nombre={iconoMedio(tarjeta.tipo)} tamano={18} color={colores.accionOscuro} />
+          <Texto variante="chico" peso="700" color={colores.accionOscuro} testID={`${testID}-medio`} estilo={estilos.textoMedio}>
+            {importe != null ? `${dinero(importe)} con ${etiqueta.charAt(0).toLowerCase()}${etiqueta.slice(1)}` : etiqueta}
           </Texto>
         </View>
       ) : null}
@@ -62,5 +63,7 @@ const estilos = StyleSheet.create({
     paddingVertical: espacio.xs,
     borderRadius: radios.pildora,
     backgroundColor: colores.celesteClaro,
+    maxWidth: '100%',
   },
+  textoMedio: { flexShrink: 1 },
 });

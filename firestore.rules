@@ -41,8 +41,20 @@ service cloud.firestore {
     }
     function frecuencias() { return ['inmediata', 'resumen_diario', 'solo_historial']; }
     function tiposArchivo() { return ['image/jpeg', 'image/png', 'application/pdf']; }
-    // Medio elegido en la pasarela (solo cuál: no hay datos de tarjetas ni de cuentas).
-    function mediosPago() { return ['credito', 'debito', 'billetera', 'transferencia']; }
+    // Medios de la pasarela: tarjetas guardadas de crédito o de débito (también es el tipo de tarjeta).
+    function mediosPago() { return ['credito', 'debito']; }
+    // Red de una tarjeta guardada, deducida del número en el cliente (solo texto).
+    function redesTarjeta() { return ['Visa', 'Mastercard', 'American Express', 'Tarjeta']; }
+    // Lugares fijos para las tarjetas guardadas: el tope de 5 sin leer la colección.
+    function idsTarjeta() { return ['tarjeta-1', 'tarjeta-2', 'tarjeta-3', 'tarjeta-4', 'tarjeta-5']; }
+    function ultimos4Valido(v) { return v is string && v.matches('^[0-9]{4}$'); }
+    // Tarjeta enmascarada de un pago: solo red y últimos 4 dígitos.
+    function tarjetaDelPago(t) {
+      return t is map
+        && t.keys().hasAll(['red', 'ultimos4']) && t.keys().hasOnly(['red', 'ultimos4'])
+        && t.red in redesTarjeta()
+        && ultimos4Valido(t.ultimos4);
+    }
 
     // Evento de la bandeja escrito en el mismo lote: UNA sola llamada getAfter.
     // Quien la llama comprueba antes que id sea string.
@@ -229,6 +241,8 @@ service cloud.firestore {
       }
 
       // ---------- Pagos (T2, E2, E4). Idempotencia: id = requestId, solo create ----------
+      // medio: el tipo de la tarjeta guardada elegida; tarjeta: { red, ultimos4 }. Nunca el número
+      // completo. No se lee la tarjeta guardada (sin get() extra): el pago ya trae lo que se muestra.
       function pagoTributoValido(pagoId, d) {
         let antes = get(rutaPropia('tributos', d.refId));
         let despues = getAfter(rutaPropia('tributos', d.refId));
@@ -255,8 +269,9 @@ service cloud.firestore {
         allow read: if esDueno(uid);
         allow update, delete: if false;
         allow create: if esDueno(uid) && idSolicitud(pagoId)
-          && claves(['tipo', 'refId', 'importe', 'comprobante', 'medio', 'proveedor', 'creadoEn'])
+          && claves(['tipo', 'refId', 'importe', 'comprobante', 'medio', 'tarjeta', 'proveedor', 'creadoEn'])
           && nuevo().medio in mediosPago()
+          && tarjetaDelPago(nuevo().tarjeta)
           && nuevo().proveedor == 'pasarela-simulada'
           && nuevo().creadoEn == request.time
           && entero(nuevo().importe, 1, 10000000)
@@ -397,6 +412,27 @@ service cloud.firestore {
           && nuevo().actualizadoEn == request.time
           && nuevo().ultimoEventoId is string
           && eventoDelReclamo(nuevo().ultimoEventoId, reclamoId);
+      }
+
+      // ---------- Tarjetas guardadas (medios de pago) ----------
+      // Solo lo que se muestra: tipo, red, últimos 4 dígitos, titular y vencimiento MM/AA. Las claves
+      // exactas dejan afuera el número completo, el código de seguridad y cualquier otro campo; el
+      // titular no lleva números. El id es uno de cinco lugares fijos (tope de 5 sin lecturas).
+      // Sin update: para cambiar una tarjeta se quita y se vuelve a cargar.
+      match /tarjetas/{tarjetaId} {
+        allow read, delete: if esDueno(uid);
+        allow update: if false;
+        allow create: if esDueno(uid)
+          && tarjetaId in idsTarjeta()
+          && claves(['tipo', 'red', 'ultimos4', 'titular', 'vence', 'creadoEn'])
+          && nuevo().tipo in mediosPago()
+          && nuevo().red in redesTarjeta()
+          && ultimos4Valido(nuevo().ultimos4)
+          && texto(nuevo().titular, 2, 60)
+          && !nuevo().titular.matches('.*[0-9].*')
+          && nuevo().vence is string
+          && nuevo().vence.matches('^(0[1-9]|1[0-2])/[0-9]{2}$')
+          && nuevo().creadoEn == request.time;
       }
 
       // ---------- Notificaciones personales (N3) ----------

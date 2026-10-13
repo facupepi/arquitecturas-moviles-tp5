@@ -17,6 +17,7 @@
 // - restablecerCatalogo()           reescribe el catálogo del proyecto (horarioEstricto false), para
 //                                   dejarlo como al arrancar después de una prueba que lo cambia.
 // - geolocalizar(context, { lat, lng })   permiso y posición simulada.
+// - sembrarTarjeta(adminDb, uid, tarjeta?)   guarda una tarjeta enmascarada (TARJETAS_PRUEBA) para pagar.
 // - adelantarReloj(page, ms)        page.clock.setSystemTime (sin clock.install, que rompe Firestore).
 //                                   Después de adelantar el reloj no se escribe: las reglas comparan con
 //                                   el request.time real.
@@ -104,6 +105,19 @@ export async function entrarConGoogleFalso(page, sub, nombre = NOMBRE_ADMIN, { e
 /** Crea administradores/{uid} con el Admin SDK (el cliente no puede escribir esa colección). */
 export async function hacerAdmin(adminDb, uid, nombre = NOMBRE_ADMIN) {
   await adminDb.doc(`administradores/${uid}`).set({ nombre, alta: Timestamp.now() });
+}
+
+/**
+ * Guarda una tarjeta (medio de pago) del vecino con el Admin SDK, como la deja guardarTarjeta:
+ * solo tipo, red, últimos 4, titular y vencimiento. Por defecto, tarjeta-1 = Mastercard débito •••• 8210.
+ */
+export const TARJETAS_PRUEBA = {
+  debito: { id: 'tarjeta-1', tipo: 'debito', red: 'Mastercard', ultimos4: '8210', titular: 'Vecino Prueba', vence: '08/30' },
+  credito: { id: 'tarjeta-2', tipo: 'credito', red: 'Visa', ultimos4: '4242', titular: 'Vecino Prueba', vence: '12/30' },
+};
+export async function sembrarTarjeta(adminDb, uid, tarjeta = TARJETAS_PRUEBA.debito) {
+  const { id, ...datos } = tarjeta;
+  await adminDb.doc(`usuarios/${uid}/tarjetas/${id}`).set({ ...datos, creadoEn: Timestamp.now() });
 }
 
 /** Cambia de pantalla por hash sin recargar: irA(page, '#/tributos'). */

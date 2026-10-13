@@ -14,13 +14,16 @@ function tributo(importe, cambios = {}) {
   };
 }
 
-// medio: el elegido en la pasarela; sinMedio: el pago no lo trae. medioTributo: el que se copia al
-// tributo (por defecto, el mismo del pago); sinMedioTributo: el tributo no lo copia.
-function lotePago(db, uid, { pagoId, tributoId, importe, comprobante = 'REC-' + pagoId.replace(/[^a-z0-9]/gi, '').slice(0, 8).toUpperCase(), conTributo = true, conPago = true, notificacion = false, medio = 'credito', medioTributo = medio, sinMedio = false, sinMedioTributo = sinMedio }) {
+// medio: el tipo de la tarjeta guardada elegida en la pasarela; sinMedio: el pago no lo trae.
+// tarjeta: la tarjeta enmascarada ({ red, ultimos4 }); sinTarjeta: el pago no la trae.
+// medioTributo: el que se copia al tributo (por defecto, el mismo del pago); sinMedioTributo: no lo copia.
+const VISA = { red: 'Visa', ultimos4: '4242' };
+function lotePago(db, uid, { pagoId, tributoId, importe, comprobante = 'REC-' + pagoId.replace(/[^a-z0-9]/gi, '').slice(0, 8).toUpperCase(), conTributo = true, conPago = true, notificacion = false, medio = 'credito', medioTributo = medio, sinMedio = false, sinMedioTributo = sinMedio, tarjeta = VISA, sinTarjeta = false }) {
   const lote = writeBatch(db);
   if (conPago) {
     const pago = { tipo: 'tributo', refId: tributoId, importe, comprobante, proveedor: 'pasarela-simulada', creadoEn: serverTimestamp() };
     if (!sinMedio) pago.medio = medio;
+    if (!sinTarjeta) pago.tarjeta = tarjeta;
     lote.set(doc(db, `usuarios/${uid}/pagos/${pagoId}`), pago);
   }
   if (conTributo) {
@@ -64,10 +67,11 @@ describe('tributos y pagos', () => {
     await assertSucceeds(getDoc(doc(db, 'usuarios/u1/pagos/pago-aaaa-0001')));
   });
 
-  it('el pago guarda el medio elegido, en el pago y en el tributo', async () => {
+  it('el pago guarda el medio elegido, en el pago y en el tributo, y la tarjeta enmascarada en el pago', async () => {
     const db = vecino(entorno, 'u1');
     const pago = (await getDoc(doc(db, 'usuarios/u1/pagos/pago-aaaa-0001'))).data();
     assert.equal(pago.medio, 'credito');
+    assert.deepEqual(pago.tarjeta, { red: 'Visa', ultimos4: '4242' });
     assert.equal((await getDoc(doc(db, 'usuarios/u1/tributos/T-1001'))).data().medio, 'credito');
   });
 
@@ -76,8 +80,8 @@ describe('tributos y pagos', () => {
     // El pago no trae medio (pagos nuevos: es obligatorio).
     await assertFails(lotePago(db, 'u1', { pagoId: 'pago-medio-0001', tributoId: 'T-1002', importe: 24750, sinMedio: true }).commit());
     await assertFails(lotePago(db, 'u1', { pagoId: 'pago-medio-0002', tributoId: 'T-1002', importe: 24750, medio: null }).commit());
-    // Medios fuera de la lista (marcas, mayúsculas, datos de tarjeta).
-    for (const [i, medio] of ['efectivo', 'Credito', 'visa', '4111111111111111', 1].entries()) {
+    // Medios fuera de la lista (los anteriores a las tarjetas guardadas, marcas, mayúsculas, datos de tarjeta).
+    for (const [i, medio] of ['billetera', 'transferencia', 'efectivo', 'Credito', 'visa', '4111111111111111', 1].entries()) {
       await assertFails(lotePago(db, 'u1', { pagoId: `pago-medio-01${i}0`, tributoId: 'T-1002', importe: 24750, medio }).commit());
     }
     // El tributo dice otro medio, o no lo copia.
@@ -93,11 +97,41 @@ describe('tributos y pagos', () => {
     await assertFails(lote.commit());
   });
 
-  it('cada medio de la lista pasa', async () => {
+  it('la tarjeta del pago va enmascarada: solo red y últimos 4 dígitos', async () => {
     const db = vecino(entorno, 'u1');
-    for (const [i, medio] of ['debito', 'billetera', 'transferencia'].entries()) {
+    const malas = [
+      { sinTarjeta: true },
+      { tarjeta: null },
+      { tarjeta: '4242' },
+      { tarjeta: { red: 'Visa', ultimos4: '4242424242424242' } },               // número completo
+      { tarjeta: { red: 'Visa', ultimos4: '424' } },
+      { tarjeta: { red: 'Visa', ultimos4: 4242 } },
+      { tarjeta: { red: 'Visa', ultimos4: '4242', cvv: '123' } },               // código de seguridad
+      { tarjeta: { red: 'Visa', ultimos4: '4242', numero: '4242424242424242' } },
+      { tarjeta: { red: 'Visa', ultimos4: '4242', titular: 'Ana' } },          // campo de más
+      { tarjeta: { ultimos4: '4242' } },
+      { tarjeta: { red: 'Diners', ultimos4: '4242' } },
+    ];
+    for (const [i, opciones] of malas.entries()) {
+      await assertFails(lotePago(db, 'u1', { pagoId: `pago-tarj-0${String(i).padStart(3, '0')}`, tributoId: 'T-1002', importe: 24750, ...opciones }).commit());
+    }
+  });
+
+  it('cada medio de la lista pasa con su tarjeta enmascarada; billetera y transferencia ya no', async () => {
+    const db = vecino(entorno, 'u1');
+    const casos = [
+      ['debito', { red: 'Mastercard', ultimos4: '8210' }],
+      ['credito', { red: 'American Express', ultimos4: '0005' }],
+      ['debito', { red: 'Tarjeta', ultimos4: '1117' }],
+    ];
+    for (const [i, [medio, tarjeta]] of casos.entries()) {
       await sembrar(entorno, (adm) => setDoc(doc(adm, `usuarios/u1/tributos/T-M${i}`), tributo(1000)));
-      await assertSucceeds(lotePago(db, 'u1', { pagoId: `pago-lista-000${i}`, tributoId: `T-M${i}`, importe: 1000, medio }).commit());
+      await assertSucceeds(lotePago(db, 'u1', { pagoId: `pago-lista-000${i}`, tributoId: `T-M${i}`, importe: 1000, medio, tarjeta }).commit());
+    }
+    await sembrar(entorno, (adm) => setDoc(doc(adm, 'usuarios/u1/tributos/T-M9'), tributo(1000)));
+    for (const [i, medio] of ['billetera', 'transferencia'].entries()) {
+      await assertFails(lotePago(db, 'u1', { pagoId: `pago-viejo-000${i}`, tributoId: 'T-M9', importe: 1000, medio }).commit());
+      await assertFails(lotePago(db, 'u1', { pagoId: `pago-viejo-001${i}`, tributoId: 'T-M9', importe: 1000, medio, sinTarjeta: true }).commit());
     }
   });
 
@@ -128,7 +162,7 @@ describe('tributos y pagos', () => {
     const db = vecino(entorno, 'u1');
     await assertFails(lotePago(db, 'u1', { pagoId: 'pago-aaaa-0001', tributoId: 'T-1002', importe: 24750 }).commit());
     await assertFails(setDoc(doc(db, 'usuarios/u1/pagos/pago-aaaa-0001'), {
-      tipo: 'tributo', refId: 'T-1001', importe: 18500, comprobante: 'REC-PAGOAAAA', medio: 'credito', proveedor: 'pasarela-simulada', creadoEn: serverTimestamp(),
+      tipo: 'tributo', refId: 'T-1001', importe: 18500, comprobante: 'REC-PAGOAAAA', medio: 'credito', tarjeta: VISA, proveedor: 'pasarela-simulada', creadoEn: serverTimestamp(),
     }));
     await assertFails(deleteDoc(doc(db, 'usuarios/u1/pagos/pago-aaaa-0001')));
   });

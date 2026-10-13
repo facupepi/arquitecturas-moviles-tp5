@@ -1,6 +1,8 @@
 // Mi cuenta (S1, sección 8.2). Solo hay cuentas de Google (no hay acceso anónimo).
 // - Nombre, correo y código de vecino (useSesion escucha onIdTokenChanged).
 // - Lo que tenemos guardado del vecino (cantidades).
+// - Medios de pago: tarjetas de crédito y de débito guardadas (cuenta/Tarjetas), los únicos medios
+//   de la pasarela. Solo tipo, red, últimos 4 dígitos, titular y vencimiento.
 // - Avisos en este dispositivo e instalación de la app.
 // - Privacidad completa (aceptarPrivacidad), "Borrar mis datos" con confirmación y "Cerrar sesión".
 // - Desde 760 px de contenido (medido, no la ventana): dos columnas parejas que ocupan todo el ancho
@@ -31,6 +33,7 @@ import { version } from '../../package.json';
 import Avisos from './cuenta/Avisos';
 import Instalar from './cuenta/Instalar';
 import Privacidad from './cuenta/Privacidad';
+import Tarjetas from './cuenta/Tarjetas';
 import { dejarAvisoSalida } from './cuenta/avisoSalida';
 import { codigoVecino } from '../../shared/formato.mjs';
 
@@ -44,6 +47,7 @@ const seleccionarDatos = (s) => ({
   reclamos: s.reclamos.length,
   sesiones: s.sesiones.length,
   notificaciones: s.notificaciones.filter((n) => n.fuente === 'personal').length,
+  tarjetas: s.tarjetas.length,
   masPagos: s.hayMas?.pagos ?? false,
   masReclamos: s.hayMas?.reclamos ?? false,
   masSesiones: s.hayMas?.estacionamiento ?? false,
@@ -133,6 +137,7 @@ export default function Cuenta() {
       <FilaDato etiqueta="Pagos" valor={cantidad(datos.pagos, datos.masPagos)} testID="dato-pagos" />
       <FilaDato etiqueta="Reclamos" valor={cantidad(datos.reclamos, datos.masReclamos)} testID="dato-reclamos" />
       <FilaDato etiqueta="Estacionamientos" valor={cantidad(datos.sesiones, datos.masSesiones)} testID="dato-estacionamientos" />
+      <FilaDato etiqueta="Tarjetas guardadas" valor={String(datos.tarjetas)} testID="dato-tarjetas" />
       <FilaDato
         etiqueta="Notificaciones personales"
         valor={cantidad(datos.notificaciones, datos.masNotificaciones)}
@@ -161,6 +166,14 @@ export default function Cuenta() {
     <Seccion titulo="Lo que guardamos de vos">
       {datos.errorPerfil ? <ErrorCarga error={datos.errorPerfil} /> : null}
       <Tarjeta>{resumenDatos}</Tarjeta>
+    </Seccion>
+  );
+
+  const mediosPago = (
+    <Seccion titulo="Medios de pago" testID="cuenta-medios-pago">
+      <Tarjeta>
+        <Tarjetas />
+      </Tarjeta>
     </Seccion>
   );
 
@@ -238,6 +251,7 @@ export default function Cuenta() {
             {sesionYDatos}
           </View>
           <View style={estilos.columnaDoble}>
+            {mediosPago}
             {notificaciones}
             {privacidad}
           </View>
@@ -247,6 +261,7 @@ export default function Cuenta() {
           {perfil}
           {avisoAdmin}
           {guardado}
+          {mediosPago}
           {notificaciones}
           {instalar}
           {privacidad}
@@ -278,8 +293,8 @@ export default function Cuenta() {
         ]}
       >
         <Texto variante="cuerpo">
-          Vamos a eliminar tu perfil, tus cedulones y pagos, tus reclamos con sus adjuntos, tus estacionamientos, tus
-          notificaciones y tu usuario. No se puede deshacer.
+          Vamos a eliminar tu perfil, tus cedulones y pagos, tus tarjetas guardadas, tus reclamos con sus adjuntos,
+          tus estacionamientos, tus notificaciones y tu usuario. No se puede deshacer.
         </Texto>
         <Texto variante="chico" color={colores.textoSuave}>
           Podés volver a entrar cuando quieras, empezando de cero.

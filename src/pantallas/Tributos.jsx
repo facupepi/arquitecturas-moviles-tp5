@@ -155,7 +155,7 @@ export default function Tributos({ ruta }) {
       setVisible(true);
     },
     evento: EVENTOS.TRIBUTO_PAGADO,
-    parametrosEvento: (p, _id, _req, medioElegido) => ({ value: p?.importe ?? 0, currency: 'ARS', medio: medioElegido }),
+    parametrosEvento: (p, _id, _req, tarjeta) => ({ value: p?.importe ?? 0, currency: 'ARS', medio: tarjeta?.tipo }),
   });
 
   // ---------- Apertura y cierre de diálogos ----------
@@ -164,10 +164,12 @@ export default function Tributos({ ruta }) {
     setVisible(true);
   }, []);
 
+  const { reiniciar: reiniciarMedio } = medio;
   const cerrar = useCallback(() => {
     setVisible(false);
+    reiniciarMedio();   // descarta lo que se haya escrito en el alta de tarjeta
     if (ruta?.id) navegar('tributos', null, null, { reemplazar: true });
-  }, [ruta?.id, navegar]);
+  }, [ruta?.id, navegar, reiniciarMedio]);
 
   const verCedulon = useCallback((tributo) => {
     abrir({ tipo: 'cedulon', tributoId: tributo.id });
@@ -182,11 +184,11 @@ export default function Tributos({ ruta }) {
     abrir({ tipo: 'pago', tributoId: tributo.id });
   }, [abrir, pago, medio]);
 
-  // Devuelve false si falta elegir el medio (DialogoPago lleva el foco a las opciones).
+  // Devuelve false si falta elegir la tarjeta (DialogoPago lleva el foco a las opciones).
   const confirmarPago = useCallback(() => {
     if (!dialogo || dialogo.tipo !== 'pago') return true;
     if (!medio.validar()) return false;
-    pago.ejecutar(dialogo.tributoId, requestId, medio.valor);
+    pago.ejecutar(dialogo.tributoId, requestId, medio.tarjeta);
     return true;
   }, [dialogo, pago, requestId, medio]);
 
@@ -226,9 +228,11 @@ export default function Tributos({ ruta }) {
 
   const datosDelCedulon = useMemo(
     () => (dialogo?.tipo === 'cedulon' && tributoAbierto
-      ? datosCedulon(tributoAbierto, { municipal: datos.municipal, leyenda, ahora })
+      ? datosCedulon(tributoAbierto, {
+        municipal: datos.municipal, leyenda, ahora, pago: datos.pagos.find((p) => p.id === tributoAbierto.pagoId) ?? null,
+      })
       : null),
-    [dialogo?.tipo, tributoAbierto, datos.municipal, leyenda, ahora],
+    [dialogo?.tipo, tributoAbierto, datos.municipal, datos.pagos, leyenda, ahora],
   );
 
   // ---------- Contenido ----------
@@ -354,9 +358,7 @@ export default function Tributos({ ruta }) {
         ocupado={pago.ocupado}
         error={pago.error}
         yaPagado={yaPagado}
-        medio={medio.valor}
-        onElegirMedio={medio.elegir}
-        errorMedio={medio.error}
+        medio={medio}
         onConfirmar={confirmarPago}
         onCerrar={cerrar}
       />

@@ -31,14 +31,15 @@ export const PRIVACIDAD_COMPLETA = [
     texto:
       'El nombre de tu cuenta de Google, tus preferencias de avisos, '
       + 'tus cedulones y pagos, tus reclamos con sus fotos o PDF, tus estacionamientos y tus notificaciones. '
+      + 'De las tarjetas que guardás para pagar, solo el tipo, la red, los últimos 4 dígitos, el titular y el vencimiento. '
       + 'Si activás los avisos en un dispositivo, guardamos un código de ese navegador para poder enviarte notificaciones.',
   },
   {
     titulo: 'Qué no guardamos',
     texto:
       'Tu ubicación, que usamos solo en el momento. Para avisarte de alarmas cercanas registramos qué alarmas '
-      + 'están cerca durante 30 minutos, nunca tus coordenadas. Tampoco guardamos tu correo en nuestra base '
-      + 'ni datos de tarjetas.',
+      + 'están cerca durante 30 minutos, nunca tus coordenadas. Tampoco guardamos tu correo en nuestra base, '
+      + 'el número completo de tus tarjetas ni su código de seguridad, que nunca te pedimos.',
   },
   {
     titulo: 'Quién puede verlo',

@@ -43,6 +43,7 @@ import WalletCards from 'lucide-react/dist/esm/icons/wallet-cards.js';
 import Smartphone from 'lucide-react/dist/esm/icons/smartphone.js';
 import Landmark from 'lucide-react/dist/esm/icons/landmark.js';
 import LockKeyhole from 'lucide-react/dist/esm/icons/lock-keyhole.js';
+import Trash2 from 'lucide-react/dist/esm/icons/trash-2.js';
 
 // Nombres de la sección 7.2, más chevronIzquierda, chevronAbajo y menos (agregados por WP5)
 // y los de la pasarela de pagos.
@@ -89,6 +90,7 @@ export const ICONOS = {
   billetera: Smartphone,
   banco: Landmark,
   candado: LockKeyhole,
+  quitar: Trash2,
 };
 
 export const NOMBRES_ICONOS = Object.keys(ICONOS);

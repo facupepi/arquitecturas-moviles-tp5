@@ -1,5 +1,6 @@
 // Comprobante del pago de un cedulón (T2 y T3, S4): último paso de la pasarela ("Pago aprobado") y,
-// desde el historial, el comprobante de un pago anterior. Muestra el medio elegido.
+// desde el historial, el comprobante de un pago anterior. Muestra el medio elegido con la tarjeta
+// enmascarada ("Tarjeta de crédito Visa •••• 4242").
 import React from 'react';
 import { Dialogo, Texto } from '../../ui';
 import { colores } from '../../tema/tokens';
@@ -33,7 +34,7 @@ export default function DialogoComprobante({ visible, pago, tributo, recien = fa
             tributo ? { etiqueta: 'Período', valor: tributo.periodo } : null,
             { etiqueta: 'Cedulón', valor: pago.refId },
             { etiqueta: 'Importe', valor: dinero(pago.importe) },
-            { etiqueta: 'Medio de pago', valor: etiquetaMedio(pago.medio), testID: 'comprobante-medio' },
+            { etiqueta: 'Medio de pago', valor: etiquetaMedio(pago.medio, pago.tarjeta), testID: 'comprobante-medio' },
             { etiqueta: 'Fecha y hora', valor: fechaHora(pago.creadoEn) },
           ]}
         />

@@ -17,7 +17,7 @@ import { almacen, listarArchivos } from "../_shared/almacenamiento.ts";
 import { borrarUsuarioAuth } from "../_shared/identidad.ts";
 
 const SUBCOLECCIONES = [
-  "tributos", "pagos", "reclamos", "estacionamiento", "notificaciones", "avisosLeidos", "dispositivos",
+  "tributos", "pagos", "reclamos", "estacionamiento", "notificaciones", "avisosLeidos", "dispositivos", "tarjetas",
 ];
 
 type Item = Record<string, unknown> & { id?: string };

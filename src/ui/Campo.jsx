@@ -3,7 +3,8 @@
 // `ayuda` se muestra debajo cuando no hay error.
 // `ref` llega al TextInput (para llevar el foco al primer campo con error). `teclaEnter` es la
 // etiqueta de la tecla Enter del teclado virtual ('next', 'done', 'go', 'search', 'send') y
-// `onEnviar` lo que hace al tocarla.
+// `onEnviar` lo que hace al tocarla. `autoCompletar` es el autocomplete del navegador ('cc-number',
+// 'cc-name', 'cc-exp'…) para que ofrezca los datos que ya conoce.
 import React, { forwardRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { colores, espacio, medidas, radios, tipografia } from '../tema/tokens';
@@ -26,6 +27,7 @@ const Campo = forwardRef(function Campo({
   testID,
   teclaEnter,
   onEnviar,
+  autoCompletar,
 }, ref) {
   const [enfocado, setEnfocado] = useState(false);
   const idEtiqueta = `${id}-etiqueta`;
@@ -51,7 +53,8 @@ const Campo = forwardRef(function Campo({
         numberOfLines={multilinea ? 4 : undefined}
         inputMode={modoTeclado}
         autoCapitalize={mayusculas ? 'characters' : 'sentences'}
-        autoCorrect={!mayusculas}
+        autoCorrect={!mayusculas && !autoCompletar}
+        autoComplete={autoCompletar}
         maxLength={maxLargo}
         enterKeyHint={teclaEnter ?? (multilinea ? undefined : 'done')}
         onSubmitEditing={multilinea ? undefined : onEnviar}

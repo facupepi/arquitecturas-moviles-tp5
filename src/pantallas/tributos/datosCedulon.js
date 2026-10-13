@@ -11,9 +11,10 @@ export const TEXTO_PAGADO_EN_APP = 'Pagado desde la app San Francisco Conecta.';
 
 /**
  * @param tributo  tributo del almacén con `estado`
- * @param opciones { municipal: info de municipal/info, leyenda, ahora }
+ * @param opciones { municipal: info de municipal/info, leyenda, ahora, pago: el pago del cedulón (para
+ *                 mostrar la tarjeta enmascarada con la que se pagó), si está en el almacén }
  */
-export function datosCedulon(tributo, { municipal = null, leyenda, ahora = Date.now() } = {}) {
+export function datosCedulon(tributo, { municipal = null, leyenda, ahora = Date.now(), pago = null } = {}) {
   const estado = ESTADOS[tributo.estado] ?? ESTADOS.pendiente;
   const pagado = tributo.estado === 'pagado';
   const codigo = codigoPagoTributo(tributo);
@@ -33,7 +34,7 @@ export function datosCedulon(tributo, { municipal = null, leyenda, ahora = Date.
   if (pagado) {
     filas.push(['Pagado el', fechaHora(tributo.pagadoEn)]);
     if (tributo.comprobante) filas.push(['Comprobante', tributo.comprobante]);
-    const medio = etiquetaMedio(tributo.medio);
+    const medio = etiquetaMedio(tributo.medio, pago?.medio === tributo.medio ? pago.tarjeta : null);
     if (medio) filas.push(['Medio de pago', medio]);
   }
 

@@ -2,7 +2,7 @@
 // Todas usan es-AR y la zona horaria de Córdoba. Las fechas llegan como ms (o null).
 // Las fechas se arman con formatToParts para que el resultado sea igual en navegadores, Node y Deno.
 
-import { ZONA_HORARIA } from './constantes.mjs';
+import { ETIQUETAS, ZONA_HORARIA } from './constantes.mjs';
 
 const SIN_DATO = '—';
 
@@ -88,4 +88,32 @@ export function duracion(segundos) {
   const m = Math.floor((total % 3600) / 60);
   const s = total % 60;
   return [h, m, s].map((n) => String(n).padStart(2, '0')).join(':');
+}
+
+// ---------- Tarjetas guardadas y medios de pago ----------
+// "•••• 4242": la tarjeta siempre se muestra enmascarada (solo se guardan los últimos 4 dígitos).
+// Con espacio duro, para que los puntos y los dígitos no queden en renglones distintos.
+export function enmascarada(ultimos4) {
+  return typeof ultimos4 === 'string' && /^[0-9]{4}$/.test(ultimos4) ? `••••\u00a0${ultimos4}` : '';
+}
+
+// Nombre corto de una tarjeta guardada: "Visa crédito •••• 4242" ("Tarjeta de débito •••• 1234" si
+// la red no se reconoció).
+export function textoTarjeta(tarjeta) {
+  if (!tarjeta) return '';
+  const tipo = ETIQUETAS.tiposTarjeta[tarjeta.tipo] ?? '';
+  const red = tarjeta.red && tarjeta.red !== 'Tarjeta' ? tarjeta.red : null;
+  const nombre = red ? `${red} ${tipo}` : `Tarjeta de ${tipo}`;
+  return [nombre.trim(), enmascarada(tarjeta.ultimos4)].filter(Boolean).join(' ');
+}
+
+// Medio de un pago para el comprobante, el historial y el panel: "Tarjeta de crédito Visa •••• 4242".
+// Sin tarjeta (pagos anteriores) queda el medio solo ("Tarjeta de débito", "Billetera virtual");
+// sin medio, null.
+export function textoMedioPago(medio, tarjeta = null) {
+  const etiqueta = ETIQUETAS.mediosPago[medio];
+  if (!etiqueta) return null;
+  if (!tarjeta || !enmascarada(tarjeta.ultimos4)) return etiqueta;
+  const red = tarjeta.red && tarjeta.red !== 'Tarjeta' ? ` ${tarjeta.red}` : '';
+  return `${etiqueta}${red} ${enmascarada(tarjeta.ultimos4)}`;
 }
