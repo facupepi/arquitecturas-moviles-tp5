@@ -125,8 +125,8 @@ function vecinos() {
       uid: 'ejemplo-lucia', nombre: 'Lucía Fernández', base, pagos: [...pagos, s1.pago, s2.pago], reclamos,
       estacionamiento: [s1.sesion, s2.sesion],
       notificaciones: [
-        notificacion(`Tu reclamo ${reclamos[0].codigo} pasó a En proceso`, 'Nota de la Municipalidad: La cuadrilla de bacheo pasa esta semana.', 'reclamos', `#/reclamos/${reclamos[0].codigo}`, 50, false),
-        notificacion(`Tu reclamo ${reclamos[1].codigo} pasó a Resuelto`, 'Nota de la Municipalidad: Se reemplazaron las lámparas.', 'reclamos', `#/reclamos/${reclamos[1].codigo}`, 170, true),
+        notificacion(`Tu reclamo ${reclamos[0].codigo} pasó a En proceso`, 'Nota de la Municipalidad: La cuadrilla de bacheo pasa esta semana.', 'reclamos', `#/reclamos/${reclamos[0].id}`, 50, false),
+        notificacion(`Tu reclamo ${reclamos[1].codigo} pasó a Resuelto`, 'Nota de la Municipalidad: Se reemplazaron las lámparas.', 'reclamos', `#/reclamos/${reclamos[1].id}`, 170, true),
       ],
       preferencias: { zonas: ['centro', 'parque', 'norte'] },
     });
@@ -162,7 +162,7 @@ function vecinos() {
     lista.push({
       uid: 'ejemplo-sofia', nombre: 'Sofía Romero', base, pagos, reclamos, estacionamiento: [],
       notificaciones: [
-        notificacion(`Tu reclamo ${reclamos[0].codigo} pasó a Resuelto`, 'Nota de la Municipalidad: Se reparó el anclaje.', 'reclamos', `#/reclamos/${reclamos[0].codigo}`, 90, true),
+        notificacion(`Tu reclamo ${reclamos[0].codigo} pasó a Resuelto`, 'Nota de la Municipalidad: Se reparó el anclaje.', 'reclamos', `#/reclamos/${reclamos[0].id}`, 90, true),
       ],
       preferencias: { zonas: ['parque', 'norte'], frecuencia: 'resumen_diario' },
     });
