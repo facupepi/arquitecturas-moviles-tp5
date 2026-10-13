@@ -26,7 +26,7 @@ test.describe('Ingreso', () => {
   test('solo ofrece Google: nota académica, privacidad y ningún ingreso como invitado', async ({ page }) => {
     await abrirIngreso(page);
     await expect(page.getByTestId('leyenda-prototipo')).toHaveCount(0);
-    await expect(page.getByTestId('nota-academica')).toHaveText('Proyecto académico UTN FRSF');
+    await expect(page.getByTestId('nota-academica')).toHaveText('Proyecto académico UTN FRSFCO');
     await expect(page.getByTestId('pantalla-ingreso')).not.toContainText(/prototipo|demostración|simulad/i);
     await expect(page.getByTestId('ingresar-google')).toBeVisible();
     await expect(page.getByTestId('ingresar-google')).toContainText('Continuar con Google');

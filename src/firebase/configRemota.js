@@ -9,7 +9,7 @@ import { useSyncExternalStore } from 'react';
 import { app } from './app.js';
 import { USAR_EMULADORES, DESARROLLO } from './config.js';
 
-const LEYENDA_POR_DEFECTO = 'Proyecto académico UTN FRSF';
+const LEYENDA_POR_DEFECTO = 'Proyecto académico UTN FRSFCO';
 
 /** Valores por defecto, con los nombres de los parámetros de Remote Config. */
 export const VALORES_POR_DEFECTO = Object.freeze({

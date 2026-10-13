@@ -39,11 +39,11 @@ test.describe('Sitio publicado, sin sesión', () => {
 
     // La pantalla estática de index.html (9.4) ya trae la nota académica, antes del JavaScript.
     const html = await respuesta.text();
-    expect(html).toContain('Proyecto académico UTN FRSF');
+    expect(html).toContain('Proyecto académico UTN FRSFCO');
     expect(html).not.toMatch(/Prototipo académico/);
 
     await expect(page.getByTestId('pantalla-ingreso')).toBeVisible({ timeout: 45_000 });
-    await expect(page.getByTestId('nota-academica')).toHaveText('Proyecto académico UTN FRSF');
+    await expect(page.getByTestId('nota-academica')).toHaveText('Proyecto académico UTN FRSFCO');
     await expect(page.getByTestId('ingresar-google')).toBeVisible();
     // Sin desborde horizontal.
     const anchos = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);

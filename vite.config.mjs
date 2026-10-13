@@ -12,7 +12,7 @@ const extensiones = ['.web.jsx', '.web.js', '.web.mjs', '.jsx', '.js', '.mjs', '
 const MANIFIESTO = {
   name: 'San Francisco Conecta',
   short_name: 'SF Conecta',
-  description: 'Servicios al vecino de San Francisco. Proyecto académico UTN FRSF.',
+  description: 'Servicios al vecino de San Francisco. Proyecto académico UTN FRSFCO.',
   lang: 'es-AR',
   dir: 'ltr',
   start_url: '/#/inicio',

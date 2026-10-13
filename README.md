@@ -2,7 +2,7 @@
 
 Aplicación móvil web de servicios municipales para la ciudad de San Francisco, Córdoba. Es el trabajo práctico 5 de Arquitecturas Móviles de la UTN Facultad Regional San Francisco.
 
-Es un proyecto académico de la UTN FRSF, sin vínculo oficial con la Municipalidad de San Francisco. Los pagos pasan por una pasarela simulada, sin dinero real, y el panel municipal reemplaza a los sistemas del municipio. La app lo aclara al pie de la pantalla de ingreso y en el pie institucional.
+Es un proyecto académico de la UTN FRSFCO, sin vínculo oficial con la Municipalidad de San Francisco. Los pagos pasan por una pasarela simulada, sin dinero real, y el panel municipal reemplaza a los sistemas del municipio. La app lo aclara al pie de la pantalla de ingreso y en el pie institucional.
 
 La aplicación se publica en https://san-francisco-conecta-tp5.web.app.
 

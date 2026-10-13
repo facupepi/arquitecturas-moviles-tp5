@@ -1,6 +1,6 @@
 # Identidad visual
 
-El logo se obtuvo de la web pública de la Municipalidad de San Francisco el 7 de octubre de 2026 para este trabajo práctico académico (UTN FRSF).
+El logo se obtuvo de la web pública de la Municipalidad de San Francisco el 7 de octubre de 2026 para este trabajo práctico académico (UTN FRSFCO).
 
 - Fuente: https://www.sanfrancisco.gov.ar/theme/imagenes/estructura/Logo_Institucional_blanco.png
 - `municipalidad-blanco-ingreso.png`: el mismo logo reducido a 174 × 102 px (tres veces su tamaño en el Ingreso) y a 256 colores, para la pantalla de Ingreso y la pantalla de arranque de `index.html`.

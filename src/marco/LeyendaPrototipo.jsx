@@ -4,7 +4,7 @@
 // por defecto.
 import { useConfigRemota } from '../firebase/configRemota';
 
-export const LEYENDA_POR_DEFECTO = 'Proyecto académico UTN FRSF';
+export const LEYENDA_POR_DEFECTO = 'Proyecto académico UTN FRSFCO';
 
 /** Texto vigente de la nota (con respaldo). */
 export function useTextoLeyenda() {

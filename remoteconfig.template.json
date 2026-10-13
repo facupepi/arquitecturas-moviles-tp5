@@ -2,7 +2,7 @@
   "conditions": [],
   "parameters": {
     "leyenda_prototipo": {
-      "defaultValue": { "value": "Proyecto académico UTN FRSF" },
+      "defaultValue": { "value": "Proyecto académico UTN FRSFCO" },
       "description": "Nota académica del pie y del ingreso. Vacía o con menos de 20 caracteres, la app usa este mismo texto.",
       "valueType": "STRING"
     },
