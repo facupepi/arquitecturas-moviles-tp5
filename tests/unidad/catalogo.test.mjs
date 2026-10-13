@@ -26,7 +26,7 @@ test('ids únicos y los de la sección 2.4', () => {
   assert.deepEqual(c.zonasEstacionamiento.map((z) => z.id), ['p1', 'p2', 'p3']);
   assert.deepEqual(c.contactos.map((x) => x.id), ['c01', 'c02', 'c03', 'c04', 'c05', 'c06', 'c07', 'c08', 'c09', 'c10']);
   assert.deepEqual(c.avisos.map((a) => a.id), ['av-obras-centro', 'av-corte-sur', 'av-evento-parque', 'av-servicios-todas']);
-  assert.deepEqual(v.tributos.map((t) => t.id), ['T-1001', 'T-1002', 'T-0999', 'T-1000']);
+  assert.deepEqual(v.tributos.map((t) => t.id), ['T-1001', 'T-1002', 'T-0999']);
 });
 
 test('coordenadas dentro de San Francisco', () => {
@@ -107,32 +107,18 @@ test('info y config iniciales', () => {
   assert.equal(c.config.avisoEstacionamientoMin, LIMITES.avisoEstacionamientoMinPorDefecto);
 });
 
-test('datos iniciales del vecino: estados, comprobantes y reclamo semilla', () => {
+test('datos iniciales del vecino: solo sus cedulones, impagos, y la bienvenida', () => {
   const estados = Object.fromEntries(v.tributos.map((t) => [t.id, estadoTributo(t, ahora)]));
-  assert.deepEqual(estados, { 'T-1001': 'por_vencer', 'T-1002': 'pendiente', 'T-0999': 'vencido', 'T-1000': 'pagado' });
+  assert.deepEqual(estados, { 'T-1001': 'por_vencer', 'T-1002': 'pendiente', 'T-0999': 'vencido' });
   for (const t of v.tributos) {
     assert.ok(Number.isInteger(t.importe) && t.importe > 0);
     assert.ok(luhnValido(codigoPagoTributo(t)));
+    assert.equal(t.pagadoEn, null);
+    assert.equal(t.medio, null);
   }
-  const pagado = v.tributos.find((t) => t.id === 'T-1000');
-  assert.equal(pagado.comprobante, 'REC-00001000');
-  assert.equal(pagado.pagoId, 'semilla-T-1000');
-  assert.deepEqual(v.pagos[0], {
-    id: 'semilla-T-1000', tipo: 'tributo', refId: 'T-1000', importe: 18500, comprobante: 'REC-00001000',
-    medio: 'debito', proveedor: 'pasarela-simulada', creadoEn: ahora - 22 * 24 * 3600 * 1000,
-  });
-  assert.ok(MEDIOS_PAGO.includes(v.pagos[0].medio));
-  assert.equal(pagado.medio, v.pagos[0].medio);
-  for (const t of v.tributos.filter((x) => x.id !== 'T-1000')) assert.equal(t.medio, null);
-  assert.match(v.pagos[0].comprobante, /^REC-[A-Z0-9]{8}$/);
-  const r = v.reclamos[0];
-  assert.equal(r.codigo, 'R-000001');
-  assert.match(r.codigo, /^R-[A-Z0-9]{6}$/);
-  assert.ok(CATEGORIAS_RECLAMO.includes(r.categoria));
-  assert.equal(r.estado, 'en_proceso');
-  assert.deepEqual(Object.keys(r.cronologia), ['recibido', 'en_proceso']);
-  assert.ok(r.cronologia.recibido < r.cronologia.en_proceso);
-  assert.ok(texto(r.direccion, 5, 160) && texto(r.descripcion, 10, 1500));
+  assert.deepEqual(v.pagos, []);
+  assert.deepEqual(v.reclamos, []);
+  assert.equal(v.notificaciones.length, 1);
   const bienvenida = v.notificaciones[0];
   assert.equal(bienvenida.id, 'bienvenida');
   assert.ok(TIPOS_NOTIFICACION.includes(bienvenida.tipo));

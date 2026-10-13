@@ -5,6 +5,8 @@
 //   node scripts/vecinos-ejemplo.mjs --emulador            (FIRESTORE_EMULATOR_HOST y FIREBASE_AUTH_EMULATOR_HOST)
 //   node scripts/vecinos-ejemplo.mjs --produccion          (GOOGLE_APPLICATION_CREDENTIALS fuera del repositorio)
 //   node scripts/vecinos-ejemplo.mjs --produccion --borrar (quita los vecinos de ejemplo y sus datos)
+//   node scripts/vecinos-ejemplo.mjs --produccion --cuenta <uid>     (carga los datos de ejemplo en una cuenta real)
+//   node scripts/vecinos-ejemplo.mjs --produccion --reiniciar <uid>  (deja una cuenta como recién registrada)
 //
 // Los uid empiezan con "ejemplo-" y las cuentas no tienen proveedor de ingreso: nadie puede entrar
 // con ellas desde la app. Volver a correrlo reescribe los mismos documentos.
@@ -16,13 +18,15 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { catalogo, datosInicialesVecino } from '../shared/catalogo.mjs';
 import { COLECCIONES as C, PREFERENCIAS_POR_DEFECTO } from '../shared/constantes.mjs';
 import { codigoReclamo, comprobante, costoEstacionamiento } from '../shared/dominio.mjs';
-import { aFirestore } from './sembrar.mjs';
+import { aFirestore, documentosVecino } from './sembrar.mjs';
 
 const MIN = 60 * 1000;
 const HORA = 60 * MIN;
 const DIA = 24 * HORA;
 
-const args = new Set(process.argv.slice(2));
+const argv = process.argv.slice(2);
+const args = new Set(argv);
+const valor = (bandera) => { const i = argv.indexOf(bandera); return i >= 0 ? argv[i + 1] ?? null : null; };
 if (args.has('--emulador') === args.has('--produccion')) {
   console.error('Indicá --emulador o --produccion.');
   process.exit(1);
@@ -100,8 +104,8 @@ function pagarTributo(tributos, tributoId, medio, haceDias) {
 // Cedulón ya pago de los datos iniciales (T-1000): pago propio de cada vecino, con su comprobante.
 function semilla(medio) {
   const base = datosInicialesVecino(ahora);
-  const t = base.tributos.find((x) => x.id === 'T-1000');
-  Object.assign(t, { pagadoEn: null, comprobante: null, pagoId: null, medio: null });
+  base.tributos.push({ id: 'T-1000', concepto: 'Tasa de servicios municipales', periodo: '09/2026', cuenta: 'Cuenta municipal',
+    importe: 18500, vence: ahora - 20 * DIA, pagadoEn: null, comprobante: null, pagoId: null, medio: null });
   base.pagos = [pagarTributo(base.tributos, 'T-1000', medio, 22)];
   return base;
 }
@@ -186,27 +190,40 @@ function vecinos() {
 
 // ---------- Escritura ----------
 const sinId = ({ id, ...resto }) => resto;
+const DATOS = [C.tributos, C.pagos, C.reclamos, C.estacionamiento, C.notificaciones, C.avisosLeidos];
 
-async function borrarVecino(uid) {
+// Borra los datos de una cuenta (y los bloqueos de patente de sus sesiones), sin tocar el perfil ni
+// los dispositivos registrados para las notificaciones.
+async function limpiarDatos(uid) {
   const ref = db.doc(`${C.usuarios}/${uid}`);
   const sesiones = new Set((await ref.collection(C.estacionamiento).get()).docs.map((d) => d.id));
   for (const b of (await db.collection(C.bloqueos).get()).docs) {
     if (sesiones.has(b.get('sesionId'))) await b.ref.delete();
   }
-  await db.recursiveDelete(ref);
+  for (const col of DATOS) await db.recursiveDelete(ref.collection(col));
+}
+
+async function borrarVecino(uid) {
+  await limpiarDatos(uid);
+  await db.recursiveDelete(db.doc(`${C.usuarios}/${uid}`));
   try { await auth.deleteUser(uid); } catch { /* no existía */ }
 }
 
-async function crearVecino(v) {
-  try { await auth.getUser(v.uid); } catch { await auth.createUser({ uid: v.uid, displayName: v.nombre }); }
+// Escribe los datos de ejemplo de v. Con conPerfil, también el perfil (vecinos ficticios); en una
+// cuenta real se conserva su perfil y solo se actualizan nombre y preferencias.
+async function cargarVecino(v, { conPerfil = true } = {}) {
   const ref = db.doc(`${C.usuarios}/${v.uid}`);
-  await db.recursiveDelete(ref);
+  await limpiarDatos(v.uid);
   const lote = db.batch();
   const alta = ahora - 30 * DIA;
-  lote.set(ref, aFirestore({
-    nombre: v.nombre, anonimo: false, creadoEn: alta, actualizadoEn: ahora, altaEn: alta, privacidadAceptadaEn: alta, cercania: null,
-    preferencias: { ...PREFERENCIAS_POR_DEFECTO, tipos: [...PREFERENCIAS_POR_DEFECTO.tipos], ...v.preferencias },
-  }));
+  const preferencias = { ...PREFERENCIAS_POR_DEFECTO, tipos: [...PREFERENCIAS_POR_DEFECTO.tipos], ...v.preferencias };
+  if (conPerfil) {
+    lote.set(ref, aFirestore({
+      nombre: v.nombre, anonimo: false, creadoEn: alta, actualizadoEn: ahora, altaEn: alta, privacidadAceptadaEn: alta, cercania: null, preferencias,
+    }));
+  } else {
+    lote.set(ref, aFirestore({ nombre: v.nombre, preferencias, actualizadoEn: ahora }), { merge: true });
+  }
   const escribir = (col, docs) => docs.forEach((d) => lote.set(ref.collection(col).doc(d.id), aFirestore(sinId(d))));
   escribir(C.tributos, v.base.tributos);
   escribir(C.pagos, v.pagos);
@@ -218,12 +235,29 @@ async function crearVecino(v) {
 }
 
 const lista = vecinos();
-if (args.has('--borrar')) {
+const resumen = (v) => `${v.pagos.length} pagos, ${v.reclamos.length} reclamos, ${v.estacionamiento.length} estacionamientos`;
+if (valor('--cuenta')) {
+  // Los datos de Lucía, en una cuenta real con su propio nombre.
+  const usuario = await auth.getUser(valor('--cuenta'));
+  const v = { ...lista[0], uid: usuario.uid, nombre: usuario.displayName || 'Vecino' };
+  await cargarVecino(v, { conPerfil: false });
+  console.log(`${usuario.email}: ${resumen(v)}`);
+} else if (valor('--reiniciar')) {
+  // Como recién registrada: los mismos documentos que crea vecino/alta, sin tocar el perfil.
+  const usuario = await auth.getUser(valor('--reiniciar'));
+  await limpiarDatos(usuario.uid);
+  const docs = documentosVecino(usuario.uid, { ahora }).slice(1);
+  const lote = db.batch();
+  for (const [ruta, datos] of docs) lote.set(db.doc(ruta), datos);
+  await lote.commit();
+  console.log(`${usuario.email}: reiniciada con ${docs.length} documentos (cedulones, recordatorios y bienvenida).`);
+} else if (args.has('--borrar')) {
   for (const v of lista) await borrarVecino(v.uid);
   console.log(`Borrados ${lista.length} vecinos de ejemplo.`);
 } else {
   for (const v of lista) {
-    await crearVecino(v);
-    console.log(`${v.uid}: ${v.pagos.length} pagos, ${v.reclamos.length} reclamos, ${v.estacionamiento.length} estacionamientos`);
+    try { await auth.getUser(v.uid); } catch { await auth.createUser({ uid: v.uid, displayName: v.nombre }); }
+    await cargarVecino(v);
+    console.log(`${v.uid}: ${resumen(v)}`);
   }
 }

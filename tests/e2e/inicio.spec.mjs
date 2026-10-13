@@ -49,13 +49,13 @@ test.describe('Inicio', () => {
     await expect(page.getByTestId('dato-bicicletas')).toHaveText(`${BICIS} bicis disponibles`);
     await expect(page.getByTestId('dato-tributos')).toContainText(`${IMPAGOS.length} a pagar`);
     await expect(page.getByTestId('dato-tributos')).toContainText('1 vencido');
-    await expect(page.getByTestId('dato-reclamos')).toHaveText('1 en seguimiento');
+    await expect(page.getByTestId('dato-reclamos')).toHaveText('Sin reclamos abiertos');
     await expect(page.getByTestId('dato-estacionamiento')).toHaveText('Sin sesión activa');
     await expect(page.getByTestId('dato-alarmas')).toHaveText('Ninguna activada');
     await expect(page.getByTestId('servicio-tributos')).toHaveAttribute('aria-label', /Mis tributos: .*a pagar, 1 vencido/);
 
     await expect(page.getByTestId('resumen-deuda-valor')).toHaveText(dinero(DEUDA));
-    await expect(page.getByTestId('resumen-reclamos')).toContainText('R-000001');
+    await expect(page.getByTestId('resumen-reclamos')).toContainText('Ninguno');
     await expect(page.getByTestId('resumen-estacionamiento-valor')).toHaveText('Sin sesión');
     await expect(page.getByTestId('resumen-avisos-valor')).not.toHaveText('Ninguno');
     await expect(page.getByTestId('ultimo-aviso')).toBeVisible();

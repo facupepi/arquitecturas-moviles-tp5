@@ -59,14 +59,15 @@ test.describe('Ingreso', () => {
       await expect(page.getByTestId('insignia-no-leidas')).toBeVisible({ timeout: 5_000 });
       expect((await adminDb.doc(`usuarios/${uid}`).get()).get('anonimo')).toBe(false);
 
-      // Datos semilla visibles en Mi cuenta (4 cedulones, 1 pago, 1 reclamo y 3 notificaciones).
+      // Un vecino nuevo arranca solo con sus cedulones: 3 impagos, sin pagos ni reclamos, y 3
+      // notificaciones (bienvenida y dos recordatorios).
       await page.evaluate(() => { window.location.hash = '#/cuenta'; });
       await expect(page.getByTestId('pantalla-cuenta')).toBeVisible();
       await expect(page.getByTestId('cuenta-tipo')).toContainText('Cuenta de Google');
       await expect(page.getByTestId('cuenta-nombre')).toContainText('Vecina Google');
-      await expect(page.getByTestId('dato-tributos')).toContainText('4', { timeout: 5_000 });
-      await expect(page.getByTestId('dato-pagos')).toContainText('1');
-      await expect(page.getByTestId('dato-reclamos')).toContainText('1');
+      await expect(page.getByTestId('dato-tributos')).toContainText('3', { timeout: 5_000 });
+      await expect(page.getByTestId('dato-pagos')).toContainText('0');
+      await expect(page.getByTestId('dato-reclamos')).toContainText('0');
       await expect(page.getByTestId('dato-notificaciones')).toContainText('3', { timeout: 5_000 });
     } finally {
       await adminAuth.deleteUser(uid).catch(() => {});

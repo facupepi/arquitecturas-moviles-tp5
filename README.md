@@ -133,6 +133,15 @@ node scripts/vecinos-ejemplo.mjs --emulador                  # lo mismo contra l
 
 Sus uid empiezan con `ejemplo-` y sus cuentas no tienen proveedor de ingreso, así que nadie puede entrar con ellas desde la app.
 
+Un vecino que se registra arranca solo con sus cedulones, los recordatorios de vencimiento y la bienvenida. Para la demostración, los datos de ejemplo se pueden cargar en una cuenta de Google real, que primero tiene que haber entrado una vez a la app:
+
+```bash
+node scripts/vecinos-ejemplo.mjs --produccion --cuenta <uid>      # le carga pagos, reclamos, estacionamientos y notificaciones
+node scripts/vecinos-ejemplo.mjs --produccion --reiniciar <uid>   # la deja como recién registrada
+```
+
+Las dos opciones conservan el perfil y el celular registrado para las notificaciones.
+
 ## Despliegue
 
 Las credenciales no forman parte del repositorio. La cuenta de servicio de Firebase y los secretos de las funciones se guardan en una carpeta fuera del proyecto, y `.gitignore` excluye `.env.local`, los archivos de credenciales y `supabase/.secretos.env`.

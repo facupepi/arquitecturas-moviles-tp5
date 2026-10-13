@@ -24,8 +24,7 @@ const TEXTO_AVANCE = { en_proceso: 'Pasar a En proceso', resuelto: 'Marcar resue
 
 const clave = (r) => `${r.uid}/${r.id}`;
 
-// Cada vecino de demostración arranca con un reclamo sembrado del mismo código (R-000001): para
-// distinguirlos en clase, la tarjeta muestra a qué vecino pertenece (el mismo código de Mi cuenta).
+// La tarjeta muestra a qué vecino pertenece con el código corto de Mi cuenta, sin nombre ni correo.
 function etiquetaVecino(uid) {
   const codigo = codigoVecino(uid);
   return codigo ? `vecino ${codigo}` : 'vecino sin identificar';

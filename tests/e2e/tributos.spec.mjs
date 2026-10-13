@@ -2,7 +2,7 @@
 // (medio → procesando → aprobado y comprobante), T3 historial y estados, T4 estado "por vencer" y
 // recordatorios de vencimiento.
 // Datos: los que escribe vecino/alta (datosInicialesVecino de shared/catalogo.mjs) para cada vecino
-// nuevo: T-0999 vencido, T-1001 por vencer (2 días), T-1002 pendiente (8 días) y T-1000 pagado.
+// nuevo: T-0999 vencido, T-1001 por vencer (2 días) y T-1002 pendiente (8 días). Sin pagos previos.
 import { Timestamp } from 'firebase-admin/firestore';
 import { test, expect, irA } from './fixtures.mjs';
 import { revisarAccesibilidad } from './accesibilidad.mjs';
@@ -62,11 +62,10 @@ test.describe('Tributos', () => {
     await expect(recordatorios).toContainText('Tenés un cedulón vencido');
     await revisarAccesibilidad(page, 'tributos-pendientes');
 
-    // T3: historial con el pago semilla de T-1000 y su comprobante.
+    // T3: un vecino nuevo todavía no tiene pagos.
     await page.getByTestId('pestanas-tributos-pagados').click();
     await expect(page.getByTestId('pestanas-tributos-pagados')).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByTestId('pago-semilla-T-1000')).toContainText('REC-00001000');
-    await expect(page.getByTestId('pago-semilla-T-1000')).toContainText('09/2026');
+    await expect(page.getByTestId('pagos-vacio')).toBeVisible();
     await revisarAccesibilidad(page, 'tributos-pagados');
 
     // Tocar un recordatorio abre el cedulón correspondiente.

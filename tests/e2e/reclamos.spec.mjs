@@ -223,7 +223,7 @@ test.describe('Reclamos', () => {
 
   test('R4: búsqueda por código, dirección o descripción y "Cargar más"', async ({ vecino, adminDb }) => {
     const { page, uid } = vecino;
-    // 21 reclamos viejos además del de ejemplo: la primera página trae 20.
+    // 21 reclamos viejos: la primera página trae 20.
     const ahora = Date.now();
     const lote = adminDb.batch();
     for (let i = 1; i <= 21; i += 1) {
@@ -244,9 +244,9 @@ test.describe('Reclamos', () => {
     await expect(page.getByTestId('cargar-mas-reclamos')).toBeVisible();
 
     const buscador = page.getByTestId('buscar-reclamos');
-    await buscador.fill('luminaria');                     // descripción del reclamo de ejemplo
+    await buscador.fill('número 07');                     // descripción
     await expect(tarjetas).toHaveCount(1);
-    await expect(page.getByTestId('reclamo-R-000001')).toBeVisible();
+    await expect(page.getByTestId('reclamo-R-HIS007')).toBeVisible();
 
     await buscador.fill('r-his005');                      // código, sin importar mayúsculas
     await expect(tarjetas).toHaveCount(1);
@@ -259,7 +259,7 @@ test.describe('Reclamos', () => {
     await expect(page.getByTestId('reclamo-R-HIS021')).toBeVisible();
     await expect(page.getByTestId('cargar-mas-reclamos')).toHaveCount(0);
     await buscador.fill('');
-    await expect(tarjetas).toHaveCount(22);
+    await expect(tarjetas).toHaveCount(21);
   });
 
   test('R3: el avance del admin se ve en vivo en la línea de tiempo', async ({ vecino, admin }) => {

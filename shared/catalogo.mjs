@@ -171,21 +171,12 @@ export function datosInicialesVecino(ahora = Date.now()) {
     tributo('T-1001', 'Tasa de servicios municipales', '10/2026', 18500, 2),
     tributo('T-1002', 'Contribución sobre inmuebles', '10/2026', 24750, 8),
     tributo('T-0999', 'Tasa de servicios municipales', '08/2026', 18500, -40),
-    tributo('T-1000', 'Tasa de servicios municipales', '09/2026', 18500, -20,
-      { dias: -22, comprobante: 'REC-00001000', pagoId: 'semilla-T-1000', medio: 'debito' }),
   ];
 
-  const pagos = [{
-    id: 'semilla-T-1000', tipo: 'tributo', refId: 'T-1000', importe: 18500, comprobante: 'REC-00001000',
-    medio: 'debito', proveedor: 'pasarela-simulada', creadoEn: ahora - 22 * MS_DIA,
-  }];
-
-  const reclamos = [{
-    id: 'semilla-reclamo-1', codigo: 'R-000001', categoria: 'alumbrado', direccion: DIRECCION_MUNICIPALIDAD,
-    descripcion: 'La luminaria de la esquina no enciende por la noche.', estacionId: null, adjuntos: [],
-    estado: 'en_proceso', cronologia: { recibido: ahora - 2 * MS_DIA, en_proceso: ahora - MS_DIA },
-    notaMunicipal: null, creadoEn: ahora - 2 * MS_DIA, actualizadoEn: ahora - MS_DIA, ultimoEventoId: null,
-  }];
+  // El vecino nuevo arranca solo con la deuda que el municipio tiene registrada a su nombre: sin
+  // pagos, reclamos ni estacionamientos inventados.
+  const pagos = [];
+  const reclamos = [];
 
   const notificaciones = [{
     id: 'bienvenida',
