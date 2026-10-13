@@ -10,9 +10,9 @@ const extensiones = ['.web.jsx', '.web.js', '.web.mjs', '.jsx', '.js', '.mjs', '
 
 // Manifiesto de la PWA (sección 9.3). El ícono es propio, no el logo municipal.
 const MANIFIESTO = {
-  name: 'San Francisco Conecta (prototipo)',
+  name: 'San Francisco Conecta',
   short_name: 'SF Conecta',
-  description: 'Servicios al vecino de San Francisco. Prototipo académico UTN FRSF, sin vínculo oficial con la Municipalidad.',
+  description: 'Servicios al vecino de San Francisco. Proyecto académico UTN FRSF.',
   lang: 'es-AR',
   dir: 'ltr',
   start_url: '/#/inicio',

@@ -72,7 +72,7 @@ export default function DialogoCedulon({ visible, tributo, datos, onCerrar, onPa
           </Texto>
         </View>
 
-        <Aviso tono="aviso" mensaje={datos.aviso} testID="aviso-cedulon" />
+        <Aviso tono="info" mensaje={datos.aviso} testID="aviso-cedulon" />
 
         {errorImpresion ? <Aviso tono="peligro" rol="alert" mensaje={errorImpresion} testID="error-impresion" /> : null}
       </ContenidoDialogo>

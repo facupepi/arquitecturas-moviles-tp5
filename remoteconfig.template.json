@@ -2,8 +2,8 @@
   "conditions": [],
   "parameters": {
     "leyenda_prototipo": {
-      "defaultValue": { "value": "Prototipo académico UTN FRSF, sin vínculo oficial con la Municipalidad de San Francisco" },
-      "description": "Leyenda del marco. Vacía o con menos de 20 caracteres, la app usa este mismo texto: la leyenda no se puede quitar.",
+      "defaultValue": { "value": "Proyecto académico UTN FRSF" },
+      "description": "Nota académica del pie y del ingreso. Vacía o con menos de 20 caracteres, la app usa este mismo texto.",
       "valueType": "STRING"
     },
     "banner_emergencia": {

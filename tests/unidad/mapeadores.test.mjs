@@ -95,6 +95,9 @@ test('tributo pendiente y pagado', () => {
   assert.deepEqual([t.importe, t.vence, t.pagadoEn, t.comprobante], [18500, 1000, null, null]);
   const pagado = tributoDesdeDoc(snap('T-1000', { importe: 18500, vence: ts(1), pagadoEn: ts(2), comprobante: 'REC-00001000', pagoId: 'semilla-T-1000' }));
   assert.equal(pagado.pagadoEn, 2);
+  assert.equal(pagado.medio, null);
+  const conMedio = tributoDesdeDoc(snap('T-1001', { importe: 18500, vence: ts(1), pagadoEn: ts(2), comprobante: 'REC-AAAA0001', pagoId: 'pago-1', medio: 'credito' }));
+  assert.equal(conMedio.medio, 'credito');
 });
 
 test('reclamo: cronología como mapa en ms y pendiente de envío', () => {
@@ -130,4 +133,16 @@ test('notificación, aviso, contacto y evento', () => {
 test('metaDe toma desdeCache y pendientes del snapshot', () => {
   assert.deepEqual(metaDe({ metadata: { fromCache: true, hasPendingWrites: false } }), { desdeCache: true, pendientes: false });
   assert.deepEqual(metaDe(undefined), { desdeCache: false, pendientes: false });
+});
+
+test('pago, sesión y tributo de grupo agregan el uid del dueño', async () => {
+  const { pagoDeGrupoDesdeDoc, sesionDeGrupoDesdeDoc, tributoDeGrupoDesdeDoc } = await import('../../src/datos/mapeadores.js');
+  const p = pagoDeGrupoDesdeDoc(snap('pago-1', { tipo: 'tributo', importe: 18500, creadoEn: ts(7), medio: 'debito' }, { padre: 'vecino-7' }));
+  assert.deepEqual([p.uid, p.importe, p.creadoEn, p.medio], ['vecino-7', 18500, 7, 'debito']);
+  assert.equal(pagoDeGrupoDesdeDoc(snap('pago-2', { tipo: 'extension', importe: 200, creadoEn: ts(8) }, { padre: 'v' })).medio, null);
+  const s = sesionDeGrupoDesdeDoc(snap('ses-1', { patente: 'ABC123', fin: ts(9), minutos: 15, importe: 200 }, { padre: 'vecino-8' }));
+  assert.deepEqual([s.uid, s.fin], ['vecino-8', 9]);
+  const t = tributoDeGrupoDesdeDoc(snap('T-0999', { importe: 18500, vence: ts(1), pagadoEn: null }, { padre: 'vecino-9' }));
+  assert.deepEqual([t.uid, t.vence, t.pagadoEn], ['vecino-9', 1, null]);
+  assert.equal(pagoDeGrupoDesdeDoc(snap('nada', {}, { existe: false })), null);
 });

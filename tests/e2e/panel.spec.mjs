@@ -9,7 +9,8 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { test, expect, irA, hacerAdmin, PROYECTO } from './fixtures.mjs';
 import { PERFILES } from '../../scripts/emuladores.mjs';
 import { revisarAccesibilidad } from './accesibilidad.mjs';
-import { codigoReclamo } from '../../shared/dominio.mjs';
+import { codigoReclamo, comprobante } from '../../shared/dominio.mjs';
+import { codigoVecino } from '../../shared/formato.mjs';
 import { catalogo } from '../../shared/catalogo.mjs';
 
 const MAXIMO_MS = 2000;
@@ -92,6 +93,35 @@ async function crearReclamo(adminDb, uid, id) {
     notaMunicipal: null, creadoEn: ahora, actualizadoEn: ahora, ultimoEventoId: null,
   });
   return codigoReclamo(id);
+}
+
+/** Patente al azar (los bloqueos quedan en el proyecto entre corridas). */
+function patenteAlAzar() {
+  const letras = 'ABCDEFGHJKLMNPRSTUVWXYZ';
+  const l = () => letras[Math.floor(Math.random() * letras.length)];
+  const d = () => String(Math.floor(Math.random() * 10));
+  return `${l()}${l()}${d()}${d()}${d()}${l()}${l()}`;
+}
+
+/** Sesión activa de un vecino como la deja iniciarEstacionamiento: sesión + bloqueo + pago. */
+async function crearSesion(adminDb, uid, { id, patente, minutos = 30 }) {
+  const zona = catalogo().zonasEstacionamiento[0];
+  const ahora = Date.now();
+  const fin = Timestamp.fromMillis(ahora + minutos * 60_000);
+  const importe = Math.round((zona.tarifaHora * minutos) / 60);
+  const lote = adminDb.batch();
+  lote.set(adminDb.doc(`usuarios/${uid}/estacionamiento/${id}`), {
+    patente, zonaId: zona.id, zonaNombre: zona.nombre, zona: zona.zona, minutos, importe,
+    inicio: Timestamp.fromMillis(ahora), fin, extensiones: 0, ultimoPagoId: id,
+    avisoPorVencer: false, avisoFinalizado: false, actualizadoEn: Timestamp.fromMillis(ahora),
+  });
+  lote.set(adminDb.doc(`bloqueosPatente/${patente}`), { sesionId: id, fin });
+  lote.set(adminDb.doc(`usuarios/${uid}/pagos/${id}`), {
+    tipo: 'estacionamiento', refId: id, importe, comprobante: comprobante('EST', id), proveedor: 'pasarela-simulada',
+    creadoEn: Timestamp.fromMillis(ahora),
+  });
+  await lote.commit();
+  return { zona, importe };
 }
 
 test.describe('Panel municipal', () => {
@@ -313,6 +343,88 @@ test.describe('Panel municipal', () => {
     await esperarEventoEnviado(adminDb, aviso.eventoId);
     await expect(page.getByTestId(`aviso-panel-${snap.docs[0].id}`)).toContainText(titulo);
     await expect(page.getByTestId(`envio-aviso-${snap.docs[0].id}`)).toContainText('Avisado');
+  });
+
+  test('pagos: el pago de un vecino aparece en vivo, con su medio, y se filtra por tipo y comprobante', async ({ vecino, admin, adminDb }) => {
+    const { page } = admin;
+    await abrirPanel(page, 'pagos');
+    const hoy = page.getByTestId('recaudado-hoy-valor');
+    await expect(hoy).not.toHaveText('—', { timeout: 30_000 });
+    await expect(page.getByTestId('lista-pagos-panel').or(page.getByTestId('vacio-pagos-panel'))).toBeVisible({ timeout: 30_000 });
+    const antes = await hoy.textContent();
+
+    // El vecino paga un cedulón (lo que escribe la pasarela, con el medio elegido).
+    // El comprobante sale de los primeros 8 caracteres del id: que sean únicos en cada corrida.
+    const id = `${Date.now().toString(36)}-e2e-pago`;
+    const codigo = comprobante('REC', id);
+    await adminDb.doc(`usuarios/${vecino.uid}/pagos/${id}`).set({
+      tipo: 'tributo', refId: 'T-1001', importe: 18500, comprobante: codigo, proveedor: 'pasarela-simulada',
+      medio: 'debito', creadoEn: Timestamp.now(),
+    });
+    const fila = page.getByTestId(`pago-panel-${id}`);
+    await expect(fila).toBeVisible({ timeout: 10_000 });
+    await expect(fila).toContainText(codigo);
+    await expect(fila).toContainText('Tarjeta de débito');
+    await expect(fila).toContainText(codigoVecino(vecino.uid));
+    await expect(fila).not.toContainText(/Vecino E2E|@ejemplo\.test/);
+    await expect.poll(() => hoy.textContent(), { timeout: 10_000 }).not.toBe(antes);
+    await revisarAccesibilidad(page, 'panel-pagos');
+
+    // Filtro por tipo y búsqueda por comprobante, en el cliente.
+    await page.getByTestId('filtro-pagos-estacionamiento').click();
+    await expect(fila).toHaveCount(0);
+    await page.getByTestId('filtro-pagos-tributo').click();
+    await expect(fila).toBeVisible();
+    await page.getByTestId('filtro-pagos-todos').click();
+    await page.getByTestId('buscar-pagos-panel').fill(codigo.toLowerCase());
+    await expect(page.locator('[data-testid^="pago-panel-"]')).toHaveCount(1);
+    await page.getByTestId('buscar-pagos-panel').fill(codigoVecino(vecino.uid));
+    await expect(fila).toBeVisible();
+
+    // Cedulones vencidos: la lista muestra los más atrasados; uno vencido hace más de un año va primero.
+    await adminDb.doc(`usuarios/${vecino.uid}/tributos/T-0900`).set({
+      concepto: 'Tasa de servicios municipales', periodo: '09/2025', cuenta: 'Cuenta municipal', importe: 15000,
+      vence: Timestamp.fromMillis(Date.now() - 400 * 86_400_000), pagadoEn: null, comprobante: null, pagoId: null,
+    });
+    await expect(page.getByTestId(`vencido-panel-${vecino.uid}-T-0900`)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('vencidos-total-detalle')).toContainText(/\d+ cedul(ón|ones) sin pagar/);
+  });
+
+  test('estacionamiento: la sesión activa aparece y "Finalizar sesión" la cierra y libera la patente', async ({ vecino, admin, adminDb }) => {
+    const id = `e2e-ses-${Date.now()}`;
+    const patente = patenteAlAzar();
+    await crearSesion(adminDb, vecino.uid, { id, patente });
+    await irA(vecino.page, '#/estacionamiento');
+    await expect(vecino.page.getByTestId(`temporizador-${id}`)).toBeVisible({ timeout: 20_000 });
+
+    const { page } = admin;
+    await abrirPanel(page, 'estacionamiento');
+    const tarjeta = page.getByTestId(`sesion-panel-${id}`);
+    await expect(tarjeta).toBeVisible({ timeout: 30_000 });
+    await expect(tarjeta).toContainText(patente);
+    await expect(tarjeta).toContainText(codigoVecino(vecino.uid));
+    await expect(page.getByTestId(`restante-sesion-panel-${id}`)).toHaveText(/^(29|30) min$/);
+    await expect(page.getByTestId('sesiones-activas-total-valor')).not.toHaveText('0');
+    await revisarAccesibilidad(page, 'panel-estacionamiento');
+
+    await page.getByTestId('buscar-sesiones-panel').fill(patente);
+    await expect(page.locator('[data-testid^="sesion-panel-"]')).toHaveCount(1);
+
+    await page.getByTestId(`finalizar-sesion-panel-${id}`).click();
+    const d = await dialogo(page, 'confirmar-finalizar-sesion');
+    await expect(d).toContainText(patente);
+    await revisarAccesibilidad(page, 'panel-dialogo-finalizar');
+    await page.getByTestId('confirmar-finalizar-sesion').click();
+    await expect(page.locator('[role="dialog"]')).toHaveCount(0);
+    await expect(tarjeta).toHaveCount(0, { timeout: 10_000 });
+
+    // El celular del vecino deja de mostrarla como activa, sin recargar.
+    await expect(vecino.page.getByTestId(`temporizador-${id}`)).toHaveCount(0, { timeout: 5_000 });
+    const sesion = (await adminDb.doc(`usuarios/${vecino.uid}/estacionamiento/${id}`).get()).data();
+    const bloqueo = (await adminDb.doc(`bloqueosPatente/${patente}`).get()).data();
+    expect(sesion.fin.toMillis()).toBeLessThanOrEqual(Date.now());
+    expect(sesion.minutos).toBe(30);
+    expect(bloqueo).toEqual({ sesionId: id, fin: sesion.fin });
   });
 
   test('demo: recordatorios, resumen, simulador, configuración y restablecer', async ({ vecino, admin, adminDb }) => {

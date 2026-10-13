@@ -1,18 +1,23 @@
-// Inicio de una sesión de estacionamiento (S6, E2): patente, tiempo, importe en vivo y
-// confirmación con pago simulado. La patente se valida en el cliente con normalizarPatente (la
+// Inicio de una sesión de estacionamiento (S6, E2): patente, tiempo, importe en vivo y la pasarela
+// de pago en el diálogo: elegir el medio → "Pagar $X" → "Procesando el pago…" → "Pago aprobado"
+// con el comprobante; "Listo" cierra y lleva el foco a la sesión nueva. La patente se valida en el cliente con normalizarPatente (la
 // misma expresión que las reglas) y el error va debajo del campo; "patente ocupada" también.
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { colores, espacio, radios, tipografia } from '../../tema/tokens';
 import {
-  Aviso, Boton, Campo, Dialogo, FilaDato, Icono, Selector, Texto, useAvisoFlotante,
+  Aviso, Boton, Campo, Dialogo, FilaDato, Icono, Selector, Texto,
 } from '../../ui';
 import { useComando } from '../../datos/useComando';
 import { iniciarEstacionamiento } from '../../datos/repositorio';
 import { EVENTOS } from '../../firebase/analytics';
 import { TRAZAS } from '../../firebase/rendimiento';
 import { comprobante, normalizarPatente, nuevoIdSolicitud } from '../../../shared/dominio.mjs';
-import { dinero, hora } from '../../../shared/formato.mjs';
+import { dinero, fechaHora, hora } from '../../../shared/formato.mjs';
+import MediosDePago from '../pagos/MediosDePago';
+import Procesando from '../pagos/Procesando';
+import ComprobantePago from '../pagos/ComprobantePago';
+import { conProcesamiento, etiquetaMedio, useMedioPago } from '../pagos/pasarela';
 import { MS_MINUTO, OPCIONES_MINUTOS, horarioEstricto, importeSeguro, textoMinutos, zonaEnHorario } from './util';
 
 const OPCIONES = OPCIONES_MINUTOS.map((n) => ({ valor: String(n), etiqueta: textoMinutos(n) }));
@@ -24,16 +29,18 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
   const patente = patenteExterna ?? patenteLocal;
   const setPatente = onPatente ?? setPatenteLocal;
   const refPatente = useRef(null);
-  const aviso = useAvisoFlotante();
+  const refMedios = useRef(null);
+  const medio = useMedioPago();
   const [minutos, setMinutos] = useState('60');
   const [errorPatente, setErrorPatente] = useState(null);
   const [errorBoton, setErrorBoton] = useState(null);
   const [confirmacion, setConfirmacion] = useState(null);   // { requestId, patente, minutos, zona, importe }
+  const [aprobado, setAprobado] = useState(null);           // { sesion, medio, fecha }: último paso de la pasarela
 
-  const inicio = useComando(iniciarEstacionamiento, {
+  // La pasarela muestra "Procesando el pago…" al menos 1,5 s; la traza mide solo el registro.
+  const inicio = useComando(conProcesamiento(iniciarEstacionamiento, TRAZAS.INICIO_ESTACIONAMIENTO), {
     evento: EVENTOS.ESTACIONAMIENTO_INICIADO,
-    parametrosEvento: (_r, datos) => ({ zona: datos?.zonaId, minutos: datos?.minutos }),
-    traza: TRAZAS.INICIO_ESTACIONAMIENTO,
+    parametrosEvento: (_r, datos) => ({ zona: datos?.zonaId, minutos: datos?.minutos, medio: datos?.medio }),
   });
 
   const min = Number(minutos);
@@ -84,31 +91,52 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
       return;
     }
     setPatente(normalizada);
+    medio.reiniciar();
+    setAprobado(null);
     // El requestId se genera al abrir el diálogo y se reutiliza en los reintentos (sección 0).
     setConfirmacion({ requestId: nuevoIdSolicitud(), patente: normalizada, minutos: min, zona, importe });
   };
 
   const confirmar = async () => {
     if (!confirmacion) return;
+    if (!medio.validar()) {
+      setTimeout(() => refMedios.current?.focus?.(), 0);
+      return;
+    }
+    const elegido = medio.valor;
     const sesion = await inicio.ejecutar(
-      { zonaId: confirmacion.zona.id, patente: confirmacion.patente, minutos: confirmacion.minutos },
+      { zonaId: confirmacion.zona.id, patente: confirmacion.patente, minutos: confirmacion.minutos, medio: elegido },
       confirmacion.requestId,
     );
     if (!sesion) return;
-    setConfirmacion(null);
-    // En el celular el aviso va arriba (Marco), así no tapa "Extender 15 min" de la sesión nueva.
-    aviso.mostrar({
-      titulo: 'Estacionamiento iniciado',
-      cuerpo: `Patente ${sesion.patente} hasta las ${hora(sesion.fin)}. Comprobante ${comprobante('EST', sesion.id)}.`,
-    });
-    alIniciar?.(sesion);
+    setAprobado({ sesion, medio: elegido, fecha: Date.now() });
   };
 
   const cerrarConfirmacion = () => {
     if (inicio.ocupado) return;
+    const sesion = aprobado?.sesion;
     setConfirmacion(null);
+    setAprobado(null);
     inicio.limpiar();
+    // Con el pago aprobado, el foco pasa al título de la sesión nueva.
+    if (sesion) alIniciar?.(sesion);
   };
+
+  let tituloDialogo = 'Confirmá tu estacionamiento';
+  let accionesDialogo = [
+    { titulo: 'Cancelar', onPress: cerrarConfirmacion, variante: 'secundario', testID: 'cancelar-estacionamiento' },
+    {
+      titulo: confirmacion?.importe != null ? `Pagar ${dinero(confirmacion.importe)}` : 'Confirmar',
+      onPress: confirmar,
+      testID: 'confirmar-estacionamiento',
+    },
+  ];
+  if (inicio.ocupado) {
+    accionesDialogo = [];
+  } else if (aprobado) {
+    tituloDialogo = 'Comprobante de pago';
+    accionesDialogo = [{ titulo: 'Listo', onPress: cerrarConfirmacion, testID: 'listo-estacionamiento' }];
+  }
 
   const errorDialogo = inicio.error && inicio.error.campo !== 'patente' ? inicio.error : null;
 
@@ -186,24 +214,33 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
 
       <Dialogo
         visible={!!confirmacion}
-        titulo="Confirmá tu estacionamiento"
+        titulo={tituloDialogo}
         onCerrar={cerrarConfirmacion}
         cerrable={!inicio.ocupado}
         testID="dialogo-estacionamiento"
-        pie={errorDialogo ? (
+        pie={errorDialogo && !inicio.ocupado && !aprobado ? (
           <Aviso tono="peligro" rol="alert" titulo="No se pudo iniciar" mensaje={errorDialogo.message} testID="error-estacionamiento" />
         ) : null}
-        acciones={[
-          { titulo: 'Cancelar', onPress: cerrarConfirmacion, variante: 'secundario', deshabilitado: inicio.ocupado, testID: 'cancelar-estacionamiento' },
-          {
-            titulo: confirmacion?.importe != null ? `Pagar ${dinero(confirmacion.importe)}` : 'Confirmar',
-            onPress: confirmar,
-            cargando: inicio.ocupado,
-            testID: 'confirmar-estacionamiento',
-          },
-        ]}
+        acciones={accionesDialogo}
       >
-        {confirmacion ? (
+        {confirmacion && inicio.ocupado ? (
+          <Procesando importe={confirmacion.importe} medio={medio.valor} />
+        ) : confirmacion && aprobado ? (
+          <ComprobantePago
+            enfocar
+            numero={comprobante('EST', aprobado.sesion.id)}
+            bajada="Tu estacionamiento ya está en curso."
+            filas={[
+              { etiqueta: 'Patente', valor: aprobado.sesion.patente },
+              { etiqueta: 'Zona', valor: aprobado.sesion.zonaNombre ?? confirmacion.zona.nombre },
+              { etiqueta: 'Tiempo', valor: textoMinutos(aprobado.sesion.minutos) },
+              { etiqueta: 'Termina a las', valor: `${hora(aprobado.sesion.fin)} h` },
+              { etiqueta: 'Importe', valor: dinero(aprobado.sesion.importe) },
+              { etiqueta: 'Medio de pago', valor: etiquetaMedio(aprobado.medio), testID: 'comprobante-medio' },
+              { etiqueta: 'Fecha y hora', valor: fechaHora(aprobado.fecha) },
+            ]}
+          />
+        ) : confirmacion ? (
           <>
             <View>
               <FilaDato etiqueta="Zona" valor={confirmacion.zona.nombre} />
@@ -212,9 +249,9 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
               <FilaDato etiqueta="Termina aproximadamente" valor={`${hora(Date.now() + confirmacion.minutos * MS_MINUTO)} h`} />
               <FilaDato etiqueta="Importe" valor={dinero(confirmacion.importe)} testID="confirmacion-importe" />
             </View>
-            <Aviso tono="aviso" icono="info" mensaje="Pago simulado, sin cargos reales." />
-            <Texto variante="chico" color={colores.textoSuave}>
-              {`Código de operación: ${comprobante('EST', confirmacion.requestId)}`}
+            <MediosDePago ref={refMedios} valor={medio.valor} onCambio={medio.elegir} error={medio.error} />
+            <Texto variante="chico" color={colores.textoSuave} testID="numero-operacion">
+              {`Número de operación: ${comprobante('EST', confirmacion.requestId)}`}
             </Texto>
           </>
         ) : null}

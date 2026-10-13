@@ -33,16 +33,6 @@ const ETIQUETA_VIGENCIA = Object.fromEntries(VIGENCIAS.map((v) => [v.valor, v.et
 const VACIO = {
   titulo: '', cuerpo: '', detalle: '', tipo: null, zona: 'todas', destino: SIN_DESTINO, enlace: '', vigencia: SIN_VENCIMIENTO,
 };
-const EJEMPLO = {
-  titulo: 'Corte de tránsito por obras en el centro',
-  cuerpo: 'Hoy de 8 a 13 h está cortado el Bv. 9 de Julio frente a la Municipalidad por trabajos de bacheo. Usá calles alternativas.',
-  detalle: 'Las obras forman parte del plan de mantenimiento de calzadas.',
-  tipo: 'obras',
-  zona: 'centro',
-  destino: 'reclamos',
-  enlace: '',
-  vigencia: '12',
-};
 
 const OPCIONES_TIPO = TIPOS_AVISO.map((t) => ({ valor: t, etiqueta: ETIQUETAS.tipos[t] ?? t }));
 const OPCIONES_ZONA = ['todas', ...ZONAS].map((z) => ({ valor: z, etiqueta: ETIQUETAS.zonas[z] ?? z }));
@@ -180,13 +170,6 @@ export default function PestanaAvisos({ eventosPorId }) {
             <Texto variante="chico" color={colores.textoSuave}>
               Lo reciben los vecinos que siguen este tipo de aviso y esta zona. Las emergencias les llegan a todos.
             </Texto>
-            <Boton
-              titulo="Completar con un ejemplo"
-              icono="mensaje"
-              variante="secundario"
-              onPress={() => { setForm(EJEMPLO); setErrores({}); }}
-              testID="aviso-ejemplo"
-            />
             <Campo
               etiqueta="Título"
               valor={form.titulo}

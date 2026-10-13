@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#009ee2" />
     <meta
       name="description"
-      content="San Francisco Conecta: bicicletas, tributos, reclamos, contactos, alarmas, estacionamiento y avisos. Prototipo académico UTN FRSF, sin vínculo oficial con la Municipalidad."
+      content="San Francisco Conecta: bicicletas, tributos, reclamos, contactos, alarmas, estacionamiento y avisos. Proyecto académico UTN FRSF."
     />
     <title>San Francisco Conecta</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -47,8 +47,6 @@
       .a-b { font-weight: 700; color: #1e2939; }
       .a-x { flex: 1; min-width: 0; }
       .a-oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-      .a-leyenda { justify-content: center; gap: 8px; padding: 6px 16px; background: #fff6cd; border-bottom: 1px solid #f1e2a0; color: #7a5e00; }
-      .a-leyenda p { flex-shrink: 1; font-size: 13px; line-height: 18px; font-weight: 600; text-align: center; }
       .a-desp { flex: 1; overflow-y: auto; transform: translateZ(0); } /* como el ScrollView de RNW (misma capa y el mismo suavizado del texto) */
       .a-centro { flex-grow: 1; justify-content: center; align-items: center; padding: 24px; }
       .a-col { width: 100%; max-width: 460px; gap: 16px; }
@@ -93,10 +91,6 @@
     <!-- Pantalla de arranque estática: se pinta sin esperar al JavaScript. -->
     <div id="arranque" aria-busy="true">
       <div class="a-v a-x a-ingreso">
-        <div class="a-f a-leyenda">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7a5e00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-          <p>Prototipo académico UTN FRSF, sin vínculo oficial con la Municipalidad de San Francisco</p>
-        </div>
         <div class="a-v a-desp">
           <div class="a-v a-centro">
             <div class="a-v a-col">
@@ -157,6 +151,7 @@
                   <span>Llamar al 147</span>
                 </a>
               </div>
+              <p class="a-ch a-s a-c">Proyecto académico UTN FRSF</p>
             </div>
           </div>
         </div>
@@ -169,7 +164,6 @@
           <p style="margin-top: 4px; font-size: 40px; line-height: 46px; font-weight: 700">Conecta</p>
           <p style="margin-top: 8px; color: #526174">Tus servicios municipales, a un toque.</p>
         </div>
-        <p style="max-width: 360px; padding: 8px 12px; border-radius: 10px; background: #fff6cd; color: #7a5e00; font-size: 13px; line-height: 18px; font-weight: 600">Prototipo académico UTN FRSF, sin vínculo oficial con la Municipalidad de San Francisco</p>
         <p aria-hidden="true" style="font-size: 14px; line-height: 20px; color: #526174">Cargando…</p>
       </div>
       <p role="status" class="a-oculto">Cargando…</p>

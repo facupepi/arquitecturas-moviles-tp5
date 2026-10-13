@@ -38,8 +38,14 @@ import Paperclip from 'lucide-react/dist/esm/icons/paperclip.js';
 import Printer from 'lucide-react/dist/esm/icons/printer.js';
 import RefreshCw from 'lucide-react/dist/esm/icons/refresh-cw.js';
 import MonitorDown from 'lucide-react/dist/esm/icons/monitor-down.js';
+import CreditCard from 'lucide-react/dist/esm/icons/credit-card.js';
+import WalletCards from 'lucide-react/dist/esm/icons/wallet-cards.js';
+import Smartphone from 'lucide-react/dist/esm/icons/smartphone.js';
+import Landmark from 'lucide-react/dist/esm/icons/landmark.js';
+import LockKeyhole from 'lucide-react/dist/esm/icons/lock-keyhole.js';
 
-// Nombres de la sección 7.2, más chevronIzquierda, chevronAbajo y menos (agregados por WP5).
+// Nombres de la sección 7.2, más chevronIzquierda, chevronAbajo y menos (agregados por WP5)
+// y los de la pasarela de pagos.
 export const ICONOS = {
   inicio: House,
   bicicleta: Bike,
@@ -77,6 +83,12 @@ export const ICONOS = {
   imprimir: Printer,
   actualizar: RefreshCw,
   instalar: MonitorDown,
+  // Medios de la pasarela de pagos (íconos genéricos, sin marcas).
+  tarjetaCredito: CreditCard,
+  tarjetaDebito: WalletCards,
+  billetera: Smartphone,
+  banco: Landmark,
+  candado: LockKeyhole,
 };
 
 export const NOMBRES_ICONOS = Object.keys(ICONOS);

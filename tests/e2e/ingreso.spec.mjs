@@ -23,10 +23,11 @@ async function cuentaNuevaEnPopup(popup, { email, nombre }) {
 }
 
 test.describe('Ingreso', () => {
-  test('solo ofrece Google: leyenda, privacidad y ningún ingreso como invitado', async ({ page }) => {
+  test('solo ofrece Google: nota académica, privacidad y ningún ingreso como invitado', async ({ page }) => {
     await abrirIngreso(page);
-    await expect(page.getByTestId('leyenda-prototipo')).toBeVisible();
-    await expect(page.getByTestId('leyenda-prototipo')).toContainText('Prototipo académico');
+    await expect(page.getByTestId('leyenda-prototipo')).toHaveCount(0);
+    await expect(page.getByTestId('nota-academica')).toHaveText('Proyecto académico UTN FRSF');
+    await expect(page.getByTestId('pantalla-ingreso')).not.toContainText(/prototipo|demostración|simulad/i);
     await expect(page.getByTestId('ingresar-google')).toBeVisible();
     await expect(page.getByTestId('ingresar-google')).toContainText('Continuar con Google');
     await expect(page.getByTestId('ingresar-invitado')).toHaveCount(0);
@@ -48,7 +49,7 @@ test.describe('Ingreso', () => {
     expect(uid).toBeTruthy();
     try {
       await expect(page.getByTestId('pantalla-ingreso')).toHaveCount(0);
-      await expect(page.getByTestId('leyenda-prototipo')).toBeVisible();
+      await expect(page.getByTestId('leyenda-prototipo')).toHaveCount(0);
 
       // Las notificaciones de vencimiento las crea vecino/alta en el momento (T4), sin la tarea diaria.
       await expect.poll(async () => {
@@ -86,10 +87,9 @@ test.describe('Ingreso', () => {
     const caja = await page.getByRole('main').boundingBox();
     expect(caja.width).toBeGreaterThanOrEqual(420);
     expect(caja.width).toBeLessThanOrEqual(500);
-    // Centrada en horizontal (±2 px) y con aire parejo arriba y abajo (debajo de la leyenda).
+    // Centrada en horizontal (±2 px) y con aire parejo arriba y abajo.
     expect(Math.abs(caja.x + caja.width / 2 - 720)).toBeLessThanOrEqual(2);
-    const leyenda = await page.getByTestId('leyenda-prototipo').boundingBox();
-    const arriba = caja.y - (leyenda.y + leyenda.height);
+    const arriba = caja.y;
     const abajo = 900 - (caja.y + caja.height);
     expect(Math.abs(arriba - abajo)).toBeLessThanOrEqual(40);
     // El botón de Google queda dentro de la misma columna.

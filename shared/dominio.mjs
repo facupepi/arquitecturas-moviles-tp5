@@ -83,6 +83,18 @@ export function diaCordoba(ms) {
   return `${p.anio}-${String(p.mes).padStart(2, '0')}-${String(p.diaMes).padStart(2, '0')}`;
 }
 
+// Medianoche de Córdoba del día en que cae ms, en ms UTC (corte de "hoy" para la recaudación del panel).
+export function inicioDiaCordoba(ms) {
+  const p = partesCordoba(ms);
+  return Date.UTC(p.anio, p.mes - 1, p.diaMes) - LIMITES.desfaseCordobaHoras * MS_HORA;
+}
+
+// Primer día del mes de Córdoba en que cae ms, a la medianoche, en ms UTC.
+export function inicioMesCordoba(ms) {
+  const p = partesCordoba(ms);
+  return Date.UTC(p.anio, p.mes - 1, 1) - LIMITES.desfaseCordobaHoras * MS_HORA;
+}
+
 // Misma condición que enHorarioZona de las reglas: día incluido y desde <= hora < hasta.
 export function enHorario(horario, ms) {
   if (!horario || !Array.isArray(horario.dias) || !Number.isFinite(ms)) return false;

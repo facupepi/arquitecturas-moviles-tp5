@@ -194,7 +194,7 @@ const estilos = StyleSheet.create({
   },
   textos: { flex: 1, minWidth: 0, gap: 2 },
   ver: {
-    minHeight: 40,
+    minHeight: medidas.toqueMinimo,
     minWidth: medidas.toqueMinimo,
     paddingHorizontal: espacio.m,
     borderRadius: radios.chico,

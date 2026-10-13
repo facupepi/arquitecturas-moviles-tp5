@@ -120,11 +120,11 @@ describe('sesión anónima: datos del vecino', () => {
     const db = anonimo(entorno, 'anon');
     const lote = writeBatch(db);
     const pago = {
-      tipo: 'tributo', refId: 'T-1001', importe: 18500, comprobante: 'REC-ANON0001',
+      tipo: 'tributo', refId: 'T-1001', importe: 18500, comprobante: 'REC-ANON0001', medio: 'credito',
       proveedor: 'pasarela-simulada', creadoEn: serverTimestamp(),
     };
     lote.set(doc(db, 'usuarios/anon/pagos/pago-anon-0001'), pago);
-    lote.update(doc(db, 'usuarios/anon/tributos/T-1001'), { pagadoEn: serverTimestamp(), comprobante: 'REC-ANON0001', pagoId: 'pago-anon-0001' });
+    lote.update(doc(db, 'usuarios/anon/tributos/T-1001'), { pagadoEn: serverTimestamp(), comprobante: 'REC-ANON0001', pagoId: 'pago-anon-0001', medio: 'credito' });
     await assertFails(lote.commit());
     await assertFails(getDoc(doc(anonimo(entorno, 'anon'), 'bloqueosPatente/AB123CD')));
     await assertSucceeds(getDoc(doc(vecino(entorno, 'anon'), 'bloqueosPatente/AB123CD')));

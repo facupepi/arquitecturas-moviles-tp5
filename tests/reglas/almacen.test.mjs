@@ -77,7 +77,7 @@ before(async () => {
     });
     for (let i = 0; i < 25; i += 1) {
       await setDoc(doc(db, `usuarios/ana/pagos/semilla-pago-${String(i).padStart(2, '0')}`), {
-        tipo: 'tributo', refId: 'T-1000', importe: 100, comprobante: 'REC-00001000', proveedor: 'pasarela-simulada', creadoEn: ts(Date.now() - i * MIN),
+        tipo: 'tributo', refId: 'T-1000', importe: 100, comprobante: 'REC-00001000', medio: 'debito', proveedor: 'pasarela-simulada', creadoEn: ts(Date.now() - i * MIN),
       });
     }
     await setDoc(doc(db, 'usuarios/ana/notificaciones/bienvenida'), {

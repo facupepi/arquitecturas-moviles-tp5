@@ -2,7 +2,7 @@
 // - useSesion(): mientras no está listo, Cargando.
 // - Al montar, completarRedireccion(): termina un ingreso con Google por redirect (PWA de iOS o
 //   popup bloqueado).
-// - Sin usuario: Ingreso (con la leyenda arriba). Con usuario: ProveedorMunicipal > Marco > Enrutador
+// - Sin usuario: Ingreso. Con usuario: ProveedorMunicipal > Marco > Enrutador
 //   y, cuando el almacén queda listo, los servicios diferidos (Analytics, Performance, Remote Config)
 //   con refrescarPush al terminar.
 // - Solo en desarrollo, #/galeria muestra la galería de componentes aunque no haya sesión.
@@ -19,7 +19,6 @@ import { cargarPantalla, precargarPantalla } from './navegacion/pantallas';
 import { EN_DESARROLLO, RUTA_GALERIA } from './navegacion/rutasApp';
 import LimiteError from './navegacion/LimiteError';
 import Marco from './marco/Marco';
-import LeyendaPrototipo, { ContextoLeyenda } from './marco/LeyendaPrototipo';
 import { colores } from './tema/tokens';
 import { ProveedorAvisos } from './ui/AvisoFlotante';
 import Cargando from './ui/Cargando';
@@ -54,28 +53,20 @@ function ServiciosDiferidos() {
   return null;
 }
 
-/**
- * Ingreso sin sesión. La leyenda la dibuja Ingreso debajo de su banda de marca (en el mismo lugar
- * que en el resto de la app, debajo del encabezado); mientras carga o si falla, va arriba de todo.
- */
+/** Ingreso sin sesión. */
 function SinSesion() {
   const Ingreso = cargarPantalla('Ingreso');
-  const conLeyenda = (contenido) => (
-    <View style={estilos.flexible}>
-      <LeyendaPrototipo />
-      <ContextoLeyenda.Provider value>{contenido}</ContextoLeyenda.Provider>
-    </View>
-  );
+  const envolver = (contenido) => <View style={estilos.flexible}>{contenido}</View>;
   return (
     <ProveedorAvisos>
       <View style={estilos.raiz}>
         <View style={estilos.flexible}>
           <LimiteError clave="ingreso">
-            <Suspense fallback={conLeyenda(<Cargando pantallaCompleta />)}>
+            <Suspense fallback={envolver(<Cargando pantallaCompleta />)}>
               {Ingreso ? (
                 <Ingreso />
               ) : (
-                conLeyenda(
+                envolver(
                   <Pantalla titulo="Ingresá a San Francisco Conecta" testID="pantalla-pendiente">
                     <Vacio icono="usuario" titulo="El ingreso todavía no está disponible" />
                   </Pantalla>,
@@ -95,12 +86,9 @@ function GaleriaSinSesion() {
   return (
     <ProveedorAvisos>
       <View style={estilos.raiz}>
-        <LeyendaPrototipo />
-        <ContextoLeyenda.Provider value>
-          <View style={estilos.flexible}>
-            <Suspense fallback={<Cargando pantallaCompleta />}>{Galeria ? <Galeria /> : null}</Suspense>
-          </View>
-        </ContextoLeyenda.Provider>
+        <View style={estilos.flexible}>
+          <Suspense fallback={<Cargando pantallaCompleta />}>{Galeria ? <Galeria /> : null}</Suspense>
+        </View>
       </View>
     </ProveedorAvisos>
   );

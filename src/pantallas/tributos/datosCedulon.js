@@ -4,9 +4,10 @@ import { codigoPagoTributo } from '../../../shared/dominio.mjs';
 import { dinero, fecha, fechaHora } from '../../../shared/formato.mjs';
 import { ESTADOS, cuandoVence } from './estado';
 import { ZONA_SILENCIO_ITF, agruparCodigo, anchoITF, barrasITF } from './barrasITF';
+import { etiquetaMedio } from '../pagos/pasarela';
 
-export const TEXTO_SIN_CARGOS = 'Pago simulado, sin cargos reales.';
-export const MEDIO_DE_PAGO = 'Pasarela simulada';
+export const TEXTO_PAGAR_EN_APP = 'Pagalo desde la app San Francisco Conecta.';
+export const TEXTO_PAGADO_EN_APP = 'Pagado desde la app San Francisco Conecta.';
 
 /**
  * @param tributo  tributo del almacén con `estado`
@@ -32,7 +33,8 @@ export function datosCedulon(tributo, { municipal = null, leyenda, ahora = Date.
   if (pagado) {
     filas.push(['Pagado el', fechaHora(tributo.pagadoEn)]);
     if (tributo.comprobante) filas.push(['Comprobante', tributo.comprobante]);
-    filas.push(['Medio de pago', MEDIO_DE_PAGO]);
+    const medio = etiquetaMedio(tributo.medio);
+    if (medio) filas.push(['Medio de pago', medio]);
   }
 
   const pie = [municipal?.direccion, municipal?.lineaVecino ? `Atención al vecino ${municipal.lineaVecino}` : null]
@@ -52,9 +54,7 @@ export function datosCedulon(tributo, { municipal = null, leyenda, ahora = Date.
     barras,
     unidades: anchoITF(barras),
     silencio: ZONA_SILENCIO_ITF,
-    aviso: pagado
-      ? `${TEXTO_SIN_CARGOS} Este comprobante no tiene validez fiscal.`
-      : `${TEXTO_SIN_CARGOS} Pagalo desde la app: este cedulón no sirve para pagar en bancos ni comercios.`,
+    aviso: pagado ? TEXTO_PAGADO_EN_APP : TEXTO_PAGAR_EN_APP,
     emitido: `Emitido el ${fechaHora(ahora)}`,
     pie,
   };

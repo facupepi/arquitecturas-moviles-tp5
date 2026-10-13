@@ -140,13 +140,15 @@ export function tributoDesdeDoc(snap) {
     pagadoEn: msONull(d.pagadoEn),
     comprobante: textoONull(d.comprobante),
     pagoId: textoONull(d.pagoId),
+    medio: textoONull(d.medio),
   };
 }
 
+// `medio`: el que se eligió en la pasarela; null en pagos anteriores a que existiera.
 export function pagoDesdeDoc(snap) {
   const d = desdeDoc(snap);
   if (!d) return null;
-  return { ...d, importe: numero(d.importe), creadoEn: msONull(d.creadoEn) ?? 0 };
+  return { ...d, importe: numero(d.importe), medio: textoONull(d.medio), creadoEn: msONull(d.creadoEn) ?? 0 };
 }
 
 export function reclamoDesdeDoc(snap, opciones) {
@@ -203,6 +205,21 @@ export function eventoDesdeDoc(snap) {
     procesadoEn: msONull(d.procesadoEn),
     error: textoONull(d.error),
   };
+}
+
+// Grupos de colecciones del panel municipal: el mismo mapeo de cada tipo más el uid del dueño.
+const conDueno = (snap, mapeado) => (mapeado ? { ...mapeado, uid: snap.ref?.parent?.parent?.id ?? null } : null);
+
+export function pagoDeGrupoDesdeDoc(snap) {
+  return conDueno(snap, pagoDesdeDoc(snap));
+}
+
+export function sesionDeGrupoDesdeDoc(snap) {
+  return conDueno(snap, sesionDesdeDoc(snap));
+}
+
+export function tributoDeGrupoDesdeDoc(snap) {
+  return conDueno(snap, tributoDesdeDoc(snap));
 }
 
 // Metadatos comunes de un snapshot (sección 4.3).

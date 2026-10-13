@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { catalogo, datosInicialesVecino } from '../../shared/catalogo.mjs';
 import {
   ZONAS, CATEGORIAS_RECLAMO, TIPOS_AVISO, TIPOS_NOTIFICACION, FRECUENCIAS, TIPOS_ARCHIVO,
-  CATEGORIAS_CONTACTO, ESTADOS_ESTACION, PREFERENCIAS_POR_DEFECTO, ETIQUETAS, LIMITES,
+  CATEGORIAS_CONTACTO, ESTADOS_ESTACION, PREFERENCIAS_POR_DEFECTO, ETIQUETAS, LIMITES, MEDIOS_PAGO,
 } from '../../shared/constantes.mjs';
 import { estadoTributo, validarPreferencias, luhnValido, codigoPagoTributo } from '../../shared/dominio.mjs';
 import { destinoValido } from '../../shared/rutas.mjs';
@@ -92,7 +92,7 @@ test('avisos semilla cumplen la regla de creación de avisos', () => {
     assert.ok(a.enlace === null || /^https:\/\/.{4,300}$/.test(a.enlace));
     assert.equal(a.autor, 'municipalidad');
     assert.equal(typeof a.eventoId, 'string');
-    assert.match(a.detalle, /Aviso de demostración/);
+    assert.match(a.detalle, /147/);
     assert.ok(a.creadoEn <= ahora);
   }
 });
@@ -119,8 +119,11 @@ test('datos iniciales del vecino: estados, comprobantes y reclamo semilla', () =
   assert.equal(pagado.pagoId, 'semilla-T-1000');
   assert.deepEqual(v.pagos[0], {
     id: 'semilla-T-1000', tipo: 'tributo', refId: 'T-1000', importe: 18500, comprobante: 'REC-00001000',
-    proveedor: 'pasarela-simulada', creadoEn: ahora - 22 * 24 * 3600 * 1000,
+    medio: 'debito', proveedor: 'pasarela-simulada', creadoEn: ahora - 22 * 24 * 3600 * 1000,
   });
+  assert.ok(MEDIOS_PAGO.includes(v.pagos[0].medio));
+  assert.equal(pagado.medio, v.pagos[0].medio);
+  for (const t of v.tributos.filter((x) => x.id !== 'T-1000')) assert.equal(t.medio, null);
   assert.match(v.pagos[0].comprobante, /^REC-[A-Z0-9]{8}$/);
   const r = v.reclamos[0];
   assert.equal(r.codigo, 'R-000001');
@@ -157,6 +160,7 @@ test('etiquetas para todos los valores enumerados', () => {
   for (const t of TIPOS_NOTIFICACION) assert.ok(ETIQUETAS.tipos[t], t);
   for (const f of FRECUENCIAS) assert.ok(ETIQUETAS.frecuencias[f], f);
   for (const e of ['pagado', 'vencido', 'por_vencer', 'pendiente']) assert.ok(ETIQUETAS.estadosTributo[e], e);
+  assert.deepEqual(Object.keys(ETIQUETAS.mediosPago).sort(), [...MEDIOS_PAGO].sort());
   assert.deepEqual([...TIPOS_NOTIFICACION], [...TIPOS_AVISO, 'alarmas', 'tributos', 'estacionamiento', 'reclamos']);
   assert.ok(!TIPOS_AVISO.includes('alarmas'), 'el panel no publica avisos de tipo alarmas');
 });
@@ -165,6 +169,7 @@ test('etiquetas para todos los valores enumerados', () => {
 const LISTAS_DE_LAS_REGLAS = {
   zonas: ZONAS, categorias: CATEGORIAS_RECLAMO, tiposAvisoPanel: TIPOS_AVISO,
   tiposNotificacion: TIPOS_NOTIFICACION, frecuencias: FRECUENCIAS, tiposArchivo: TIPOS_ARCHIVO,
+  mediosPago: MEDIOS_PAGO,
 };
 
 function listaDeLasReglas(reglas, nombre) {

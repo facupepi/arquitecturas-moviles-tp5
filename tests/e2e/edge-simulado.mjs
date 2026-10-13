@@ -358,7 +358,7 @@ async function historialAlarma(db, eventoId, ev) {
   await crearSiNoExiste(db.doc(`${C.avisos}/alarma-${eventoId}`), {
     titulo,
     cuerpo,
-    detalle: 'Aviso de demostración generado por la activación de una alarma comunitaria.',
+    detalle: 'Se activó una alarma comunitaria. Ante una emergencia, llamá al 911.',
     tipo: 'alarmas',
     zona: a.zona ?? 'todas',
     destino,

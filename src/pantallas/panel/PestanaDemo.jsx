@@ -17,10 +17,9 @@ import { tiempoPasado } from '../../../shared/formato.mjs';
 import { DosColumnas, EtiquetaEvento, TIPOS_EVENTO, accionPanel, plural } from './comun';
 
 const MINUTOS_SIMULADOR = [1, 2, 5, 10];
-const AVISO_CLASE = LIMITES.avisoEstacionamientoMinMax;   // 14: con 15 minutos, avisa al minuto de empezar
 const OPCIONES_AVISO_EST = Array.from({ length: LIMITES.avisoEstacionamientoMinMax }, (_, i) => {
   const n = i + 1;
-  return { valor: String(n), etiqueta: `${plural(n, 'minuto')} antes del fin${n === AVISO_CLASE ? ' (recomendado para probar)' : ''}` };
+  return { valor: String(n), etiqueta: `${plural(n, 'minuto')} antes del fin` };
 });
 
 // ---------- Textos de los resultados de las tareas ----------
@@ -103,7 +102,7 @@ function Configuracion({ config }) {
   const errorGeneral = guardar.error && !guardar.error.campo ? guardar.error : null;
 
   return (
-    <Tarjeta titulo="Configuración">
+    <Tarjeta titulo="Configuración" estilo={estilos.estirada}>
       <Interruptor
         etiqueta="Simulador automático"
         descripcion="Mueve bicicletas y avanza reclamos solo, cada tantos minutos. Nunca activa alarmas."
@@ -137,19 +136,7 @@ function Configuracion({ config }) {
         error={guardar.errorDe('avisoEstacionamientoMin')}
         testID="aviso-estacionamiento-min"
       />
-      <Texto variante="chico" color={colores.textoSuave}>
-        {`Con ${AVISO_CLASE} minutos, una sesión de 15 minutos avisa “por vencer” alrededor de un minuto después de empezar.`}
-      </Texto>
       {errorGeneral ? <Aviso tono="peligro" rol="alert" mensaje={errorGeneral.message} testID="error-configuracion" /> : null}
-      <Boton
-        titulo="Usar valores para probar"
-        icono="ajustes"
-        variante="texto"
-        onPress={() => guardar.ejecutar({ avisoEstacionamientoMin: AVISO_CLASE, simuladorActivo: false })}
-        deshabilitado={guardar.ocupado}
-        etiquetaAccesible={`Usar valores para probar: aviso ${AVISO_CLASE} minutos antes y simulador apagado`}
-        testID="valores-clase"
-      />
     </Tarjeta>
   );
 }
@@ -223,8 +210,9 @@ export default function PestanaDemo({ eventos, reclamos, cargando, error, onRein
     <View style={estilos.contenedor}>
       <DosColumnas
         proporcion={[1, 1]}
+        estirar
         principal={(
-          <Tarjeta titulo="Acciones inmediatas">
+          <Tarjeta titulo="Acciones inmediatas" estilo={estilos.estirada}>
             <AccionTarea
               titulo="Un paso del simulador"
               descripcion="Mueve algunas bicicletas y avanza reclamos que esperan hace unos minutos."
@@ -310,7 +298,8 @@ export default function PestanaDemo({ eventos, reclamos, cargando, error, onRein
 }
 
 const estilos = StyleSheet.create({
-  contenedor: { gap: espacio.l },
+  contenedor: { gap: espacio.xl },
+  estirada: { flexGrow: 1 },
   accion: { gap: espacio.s },
   separador: { height: 1, backgroundColor: colores.borde },
   lista: {

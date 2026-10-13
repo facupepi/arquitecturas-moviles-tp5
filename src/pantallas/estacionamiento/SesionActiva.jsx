@@ -1,6 +1,7 @@
 // Sesión activa (S6, E3 y E4): temporizador HH:MM:SS (el `ahora` de useAhora(1000) de la pantalla, role="timer"), hora de fin,
 // aviso visual cuando faltan menos de config.avisoEstacionamientoMin minutos (la notificación local
 // la dispara el almacén, no esta pantalla), "Extender 15/30 min" con su importe y "Terminar ahora".
+// La extensión se paga con la pasarela: medio → "Pagar $X" → "Procesando el pago…" → comprobante.
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { colores, espacio, radios, tipografia } from '../../tema/tokens';
@@ -12,7 +13,11 @@ import { extenderEstacionamiento, finalizarEstacionamiento } from '../../datos/r
 import { EVENTOS } from '../../firebase/analytics';
 import { comprobante, nuevoIdSolicitud } from '../../../shared/dominio.mjs';
 import { LIMITES } from '../../../shared/constantes.mjs';
-import { dinero, duracion, hora } from '../../../shared/formato.mjs';
+import { dinero, duracion, fechaHora, hora } from '../../../shared/formato.mjs';
+import MediosDePago from '../pagos/MediosDePago';
+import Procesando from '../pagos/Procesando';
+import ComprobantePago from '../pagos/ComprobantePago';
+import { conProcesamiento, etiquetaMedio, useMedioPago } from '../pagos/pasarela';
 import { EXTENSIONES, MS_MINUTO, importeSeguro, recordatorioPorVencer, textoMinutos } from './util';
 
 function textoRestante(ms) {
@@ -28,12 +33,16 @@ function textoRestante(ms) {
 export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar = false }) {
   const aviso = useAvisoFlotante();
   const refTitulo = useRef(null);
+  const refMedios = useRef(null);
+  const medio = useMedioPago();
   const [extension, setExtension] = useState(null);   // { requestId, minutos, importe }
+  const [aprobada, setAprobada] = useState(null);     // { fin, medio, fecha }: último paso de la pasarela
   const [finalizando, setFinalizando] = useState(false);
 
-  const extender = useComando(extenderEstacionamiento, {
+  // La pasarela muestra "Procesando el pago…" al menos 1,5 s.
+  const extender = useComando(conProcesamiento(extenderEstacionamiento), {
     evento: EVENTOS.ESTACIONAMIENTO_EXTENDIDO,
-    parametrosEvento: (_r, _id, minutos) => ({ minutos }),
+    parametrosEvento: (_r, _id, minutos, _req, medioElegido) => ({ minutos, medio: medioElegido }),
   });
   // Al terminar bien, la sesión pasa al historial y esta tarjeta se desmonta: el aviso lo da alExito.
   const finalizar = useComando(finalizarEstacionamiento, {
@@ -60,25 +69,45 @@ export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar =
 
   const abrirExtension = (minutos) => {
     extender.limpiar();
+    medio.reiniciar();
+    setAprobada(null);
     setExtension({ requestId: nuevoIdSolicitud(), minutos, importe: importeSeguro(tarifa, minutos) });
   };
 
   const confirmarExtension = async () => {
     if (!extension) return;
-    const nueva = await extender.ejecutar(sesion.id, extension.minutos, extension.requestId);
+    if (!medio.validar()) {
+      setTimeout(() => refMedios.current?.focus?.(), 0);
+      return;
+    }
+    const elegido = medio.valor;
+    const nueva = await extender.ejecutar(sesion.id, extension.minutos, extension.requestId, elegido);
     if (!nueva) return;
-    setExtension(null);
-    aviso.mostrar({
-      titulo: `Sumaste ${textoMinutos(extension.minutos)}`,
-      cuerpo: `Ahora termina a las ${hora(nueva.fin)}. Comprobante ${comprobante('EXT', extension.requestId)}.`,
-    });
+    setAprobada({ fin: nueva.fin, medio: elegido, fecha: Date.now() });
   };
 
   const cerrarExtension = () => {
     if (extender.ocupado) return;
     setExtension(null);
+    setAprobada(null);
     extender.limpiar();
   };
+
+  let tituloExtension = 'Extender estacionamiento';
+  let accionesExtension = [
+    { titulo: 'Cancelar', onPress: cerrarExtension, variante: 'secundario', testID: 'cancelar-extension' },
+    {
+      titulo: extension?.importe != null ? `Pagar ${dinero(extension.importe)}` : 'Confirmar',
+      onPress: confirmarExtension,
+      testID: 'confirmar-extension',
+    },
+  ];
+  if (extender.ocupado) {
+    accionesExtension = [];
+  } else if (aprobada) {
+    tituloExtension = 'Comprobante de pago';
+    accionesExtension = [{ titulo: 'Listo', onPress: cerrarExtension, testID: 'listo-extension' }];
+  }
 
   const abrirFinalizar = () => {
     finalizar.limpiar();
@@ -191,24 +220,32 @@ export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar =
 
       <Dialogo
         visible={!!extension}
-        titulo="Extender estacionamiento"
+        titulo={tituloExtension}
         onCerrar={cerrarExtension}
         cerrable={!extender.ocupado}
         testID="dialogo-extension"
-        pie={extender.error ? (
+        pie={extender.error && !extender.ocupado && !aprobada ? (
           <Aviso tono="peligro" rol="alert" titulo="No se pudo extender" mensaje={extender.error.message} testID="error-extension" />
         ) : null}
-        acciones={[
-          { titulo: 'Cancelar', onPress: cerrarExtension, variante: 'secundario', deshabilitado: extender.ocupado, testID: 'cancelar-extension' },
-          {
-            titulo: extension?.importe != null ? `Pagar ${dinero(extension.importe)}` : 'Confirmar',
-            onPress: confirmarExtension,
-            cargando: extender.ocupado,
-            testID: 'confirmar-extension',
-          },
-        ]}
+        acciones={accionesExtension}
       >
-        {extension ? (
+        {extension && extender.ocupado ? (
+          <Procesando importe={extension.importe} medio={medio.valor} />
+        ) : extension && aprobada ? (
+          <ComprobantePago
+            enfocar
+            numero={comprobante('EXT', extension.requestId)}
+            bajada={`Sumaste ${textoMinutos(extension.minutos)}.`}
+            filas={[
+              { etiqueta: 'Patente', valor: sesion.patente },
+              { etiqueta: 'Tiempo extra', valor: textoMinutos(extension.minutos) },
+              { etiqueta: 'Ahora termina a las', valor: `${hora(aprobada.fin)} h` },
+              { etiqueta: 'Importe', valor: dinero(extension.importe) },
+              { etiqueta: 'Medio de pago', valor: etiquetaMedio(aprobada.medio), testID: 'comprobante-medio' },
+              { etiqueta: 'Fecha y hora', valor: fechaHora(aprobada.fecha) },
+            ]}
+          />
+        ) : extension ? (
           <>
             <View>
               <FilaDato etiqueta="Patente" valor={sesion.patente} />
@@ -216,9 +253,9 @@ export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar =
               <FilaDato etiqueta="Nuevo fin" valor={`${hora(sesion.fin + extension.minutos * MS_MINUTO)} h`} />
               <FilaDato etiqueta="Importe" valor={dinero(extension.importe)} />
             </View>
-            <Aviso tono="aviso" icono="info" mensaje="Pago simulado, sin cargos reales." />
-            <Texto variante="chico" color={colores.textoSuave}>
-              {`Código de operación: ${comprobante('EXT', extension.requestId)}`}
+            <MediosDePago ref={refMedios} valor={medio.valor} onCambio={medio.elegir} error={medio.error} />
+            <Texto variante="chico" color={colores.textoSuave} testID="numero-operacion">
+              {`Número de operación: ${comprobante('EXT', extension.requestId)}`}
             </Texto>
           </>
         ) : null}

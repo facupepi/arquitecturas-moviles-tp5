@@ -17,11 +17,11 @@ import {
   reclamoDesdeDoc, sesionDesdeDoc, tributoDesdeDoc, zonaDesdeDoc,
 } from './mapeadores';
 import {
-  codigoReclamo, comprobante, costoEstacionamiento, enHorario, minutosValidos, normalizarPatente,
-  siguienteEstadoReclamo, validarPreferencias, validarReclamo,
+  codigoReclamo, comprobante, costoEstacionamiento, enHorario, minutosValidos,
+  normalizarPatente, siguienteEstadoReclamo, validarPreferencias, validarReclamo,
 } from '../../shared/dominio.mjs';
 import {
-  COLECCIONES as C, LIMITES, PREFERENCIAS_POR_DEFECTO, TIPOS_AVISO, ZONAS,
+  COLECCIONES as C, ETIQUETAS, LIMITES, MEDIOS_PAGO, PREFERENCIAS_POR_DEFECTO, TIPOS_AVISO, ZONAS,
 } from '../../shared/constantes.mjs';
 import { dinero } from '../../shared/formato.mjs';
 
@@ -54,6 +54,11 @@ function validarIdSolicitud(requestId) {
   if (typeof requestId !== 'string' || !/^[A-Za-z0-9_-]{8,80}$/.test(requestId)) {
     throw new ErrorApp('validacion', 'Falta el identificador de la operación. Volvé a abrir el diálogo.', { campo: 'requestId' });
   }
+}
+
+// Medio elegido en la pasarela. Solo se guarda cuál fue: nunca datos de tarjetas ni de cuentas.
+function validarMedio(medio) {
+  if (!MEDIOS_PAGO.includes(medio)) throw errorCampo('medio', 'Elegí un medio de pago.');
 }
 
 function exigirConexion(mensaje) {
@@ -415,9 +420,10 @@ export async function urlAdjunto(uid, ruta) {
 
 // ===================== Tributos =====================
 
-export async function pagarTributo(tributoId, requestId) {
+export async function pagarTributo(tributoId, requestId, medio) {
   const uid = uidActual();
   validarIdSolicitud(requestId);
+  validarMedio(medio);
   if (typeof tributoId !== 'string' || !tributoId) throw new ErrorApp('no-encontrado');
   exigirConexion('Para pagar necesitás conexión. Revisá tu red e intentá de nuevo.');
   return conErrores(() => runTransaction(db, async (tx) => {
@@ -432,18 +438,18 @@ export async function pagarTributo(tributoId, requestId) {
     const importe = tributo.importe;
     const codigoComprobante = comprobante('REC', requestId);
     tx.set(refPago, {
-      tipo: 'tributo', refId: tributoId, importe, comprobante: codigoComprobante,
+      tipo: 'tributo', refId: tributoId, importe, comprobante: codigoComprobante, medio,
       proveedor: PROVEEDOR_PAGO, creadoEn: serverTimestamp(),
     });
-    tx.update(refTributo, { pagadoEn: serverTimestamp(), comprobante: codigoComprobante, pagoId: requestId });
+    tx.update(refTributo, { pagadoEn: serverTimestamp(), comprobante: codigoComprobante, pagoId: requestId, medio });
     tx.set(refDe(uid, C.notificaciones, `pago-${requestId}`), {
       titulo: 'Pago registrado',
-      cuerpo: `${tributo.concepto ?? 'Tributo'} ${tributo.periodo ?? ''}: ${dinero(importe)}. Comprobante ${codigoComprobante}.`.replace(/\s+/g, ' ').slice(0, 500),
+      cuerpo: `${tributo.concepto ?? 'Tributo'} ${tributo.periodo ?? ''}: ${dinero(importe)} con ${ETIQUETAS.mediosPago[medio].toLowerCase()}. Comprobante ${codigoComprobante}.`.replace(/\s+/g, ' ').slice(0, 500),
       tipo: 'tributos', zona: null, destino: `#/tributos/${tributoId}`, enlace: null,
       creadoEn: serverTimestamp(), leida: false, leidaEn: null, origen: 'vecino',
     });
     return {
-      id: requestId, tipo: 'tributo', refId: tributoId, importe, comprobante: codigoComprobante,
+      id: requestId, tipo: 'tributo', refId: tributoId, importe, comprobante: codigoComprobante, medio,
       proveedor: PROVEEDOR_PAGO, creadoEn: Date.now(), pendiente: false,
     };
   }));
@@ -463,9 +469,10 @@ function sesionLocal(id, datos, inicioMs) {
   };
 }
 
-export async function iniciarEstacionamiento({ zonaId, patente, minutos } = {}, requestId) {
+export async function iniciarEstacionamiento({ zonaId, patente, minutos, medio } = {}, requestId) {
   const uid = uidActual();
   validarIdSolicitud(requestId);
+  validarMedio(medio);
   const pat = validar(() => normalizarPatente(patente));
   const min = validar(() => minutosValidos(Number(minutos)));
   if (typeof zonaId !== 'string' || !zonaId) throw errorCampo('zonaId', 'Elegí una zona.');
@@ -498,16 +505,17 @@ export async function iniciarEstacionamiento({ zonaId, patente, minutos } = {}, 
     tx.set(refSesion, datos);
     tx.set(refBloqueo, { sesionId: requestId, fin });
     tx.set(refDe(uid, C.pagos, requestId), {
-      tipo: 'estacionamiento', refId: requestId, importe, comprobante: comprobante('EST', requestId),
+      tipo: 'estacionamiento', refId: requestId, importe, comprobante: comprobante('EST', requestId), medio,
       proveedor: PROVEEDOR_PAGO, creadoEn: serverTimestamp(),
     });
     return sesionLocal(requestId, datos, ahora);
   }), permisoConReloj);
 }
 
-export async function extenderEstacionamiento(sesionId, minutosExtra, requestId) {
+export async function extenderEstacionamiento(sesionId, minutosExtra, requestId, medio) {
   const uid = uidActual();
   validarIdSolicitud(requestId);
+  validarMedio(medio);
   const extra = validar(() => minutosValidos(Number(minutosExtra)));
   if (typeof sesionId !== 'string' || !sesionId) throw new ErrorApp('no-encontrado');
   exigirConexion('Para extender necesitás conexión. Revisá tu red e intentá de nuevo.');
@@ -536,7 +544,7 @@ export async function extenderEstacionamiento(sesionId, minutosExtra, requestId)
     tx.update(refSesion, cambios);
     tx.set(doc(db, C.bloqueos, actual.patente), { sesionId, fin });
     tx.set(refPago, {
-      tipo: 'extension', refId: sesionId, importe: importeExtra, comprobante: comprobante('EXT', requestId),
+      tipo: 'extension', refId: sesionId, importe: importeExtra, comprobante: comprobante('EXT', requestId), medio,
       proveedor: PROVEEDOR_PAGO, creadoEn: serverTimestamp(),
     });
     const ahora = Date.now();
@@ -797,3 +805,6 @@ export async function restablecerDemo() {
   });
   await conErrores(() => lote.commit());
 }
+
+// Ayudantes que comparte src/datos/repositorioPanel.js (cargado solo con el panel municipal).
+export { conErrores, escucharColeccion, exigirConexion, refDe, uidActual };

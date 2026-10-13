@@ -1,38 +1,54 @@
 // Panel municipal (S8, sección 8.11). Solo para administradores: el Enrutador
-// redirige a inicio si esAdmin es falso. Simula los sistemas de la Municipalidad: avanza reclamos,
-// activa alarmas, mueve bicicletas, publica avisos y dispara el simulador y los recordatorios.
-// Todo se escribe en Firestore, así que el celular del vecino cambia solo, sin recargar.
+// redirige a inicio si esAdmin es falso. Controla todo lo que hacen los vecinos: avanza reclamos,
+// sigue los pagos de cedulones y estacionamiento, finaliza sesiones de estacionamiento, activa
+// alarmas, mueve bicicletas, publica avisos y dispara el simulador y los recordatorios.
+// Todo se escribe y se escucha en Firestore, así que el celular del vecino cambia solo, sin recargar.
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useMunicipal } from '../datos/almacen';
-import { useAdmin } from '../datos/useAdmin';
+import { useAdmin, useControlAdmin } from '../datos/useAdmin';
+import { useAhora } from '../datos/useAhora';
 import { espacio } from '../tema/tokens';
 import { Cargando, Pantalla, Pestanas } from '../ui';
 import PestanaReclamos from './panel/PestanaReclamos';
+import PestanaPagos from './panel/PestanaPagos';
+import PestanaEstacionamiento from './panel/PestanaEstacionamiento';
 import PestanaAlarmas from './panel/PestanaAlarmas';
 import PestanaBicicletas from './panel/PestanaBicicletas';
 import PestanaAvisos from './panel/PestanaAvisos';
 import PestanaDemo from './panel/PestanaDemo';
 
-const PESTANAS = ['reclamos', 'alarmas', 'bicicletas', 'avisos', 'demo'];
+const PESTANAS = ['reclamos', 'pagos', 'estacionamiento', 'alarmas', 'bicicletas', 'avisos', 'demo'];
 const ETIQUETAS_PESTANA = {
-  reclamos: 'Reclamos', alarmas: 'Alarmas', bicicletas: 'Bicicletas', avisos: 'Avisos', demo: 'Simulación',
+  reclamos: 'Reclamos', pagos: 'Pagos', estacionamiento: 'Estacionamiento', alarmas: 'Alarmas',
+  bicicletas: 'Bicicletas', avisos: 'Avisos', demo: 'Simulación',
 };
 
 // useAdmin abre sus escuchas al montarse: para "Reintentar" se vuelve a montar este componente.
 function ContenidoPanel({ pestana, onPestana, onReintentar }) {
   const admin = useAdmin();
+  // Pagos y cedulones vencidos se escuchan solo con la pestaña Pagos abierta; las sesiones, siempre
+  // (son pocas y dan el contador de la pestaña Estacionamiento).
+  const control = useControlAdmin({ pagos: pestana === 'pagos', vencidos: pestana === 'pagos' });
   const alarmas = useMunicipal((s) => s.alarmas);
+  const ahora = useAhora(15_000);
 
   const sinResolver = useMemo(() => admin.reclamos.filter((r) => r.estado !== 'resuelto').length, [admin.reclamos]);
   const activas = useMemo(() => alarmas.filter((a) => a.activa).length, [alarmas]);
   const eventosPorId = useMemo(() => new Map(admin.eventos.map((e) => [e.id, e])), [admin.eventos]);
+  // Las sesiones que vencen o se finalizan siguen en la escucha: se filtran con la hora actual. Una
+  // sesión finalizada tiene fin igual a actualizadoEn (la misma hora del servidor) y sale enseguida.
+  const sesionesActivas = useMemo(
+    () => control.sesiones.filter((s) => s.fin > ahora && s.fin > (s.actualizadoEn ?? 0)),
+    [control.sesiones, ahora],
+  );
 
-  const opciones = PESTANAS.map((valor) => ({
-    valor,
-    etiqueta: ETIQUETAS_PESTANA[valor],
-    contador: valor === 'reclamos' && !admin.cargando ? sinResolver : valor === 'alarmas' && activas > 0 ? activas : undefined,
-  }));
+  const contadores = {
+    reclamos: !admin.cargando ? sinResolver : undefined,
+    estacionamiento: sesionesActivas.length > 0 ? sesionesActivas.length : undefined,
+    alarmas: activas > 0 ? activas : undefined,
+  };
+  const opciones = PESTANAS.map((valor) => ({ valor, etiqueta: ETIQUETAS_PESTANA[valor], contador: contadores[valor] }));
 
   const comunes = { eventosPorId, onReintentar };
   return (
@@ -47,6 +63,10 @@ function ContenidoPanel({ pestana, onPestana, onReintentar }) {
       <View role="tabpanel" aria-label={ETIQUETAS_PESTANA[pestana]} style={estilos.panel}>
         {pestana === 'reclamos' ? (
           <PestanaReclamos reclamos={admin.reclamos} cargando={admin.cargando} error={admin.error} {...comunes} />
+        ) : null}
+        {pestana === 'pagos' ? <PestanaPagos control={control} onReintentar={onReintentar} /> : null}
+        {pestana === 'estacionamiento' ? (
+          <PestanaEstacionamiento control={control} activas={sesionesActivas} onReintentar={onReintentar} />
         ) : null}
         {pestana === 'alarmas' ? <PestanaAlarmas {...comunes} /> : null}
         {pestana === 'bicicletas' ? <PestanaBicicletas /> : null}
@@ -78,7 +98,7 @@ export default function PanelMunicipal({ ruta }) {
     <Pantalla
       titulo="Panel municipal"
       antetitulo="ADMINISTRACIÓN MUNICIPAL"
-      bajada="Bicicletas, alarmas, reclamos y avisos de la ciudad."
+      bajada="Reclamos, pagos, estacionamiento y servicios de la ciudad, en tiempo real."
       testID="pantalla-panel"
     >
       {listo ? (

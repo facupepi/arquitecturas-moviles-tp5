@@ -335,7 +335,7 @@ export default function Galeria() {
       >
         <FilaDato etiqueta="Concepto" valor="Tasa de servicios municipales" />
         <FilaDato etiqueta="Importe" valor="$ 18.500" />
-        <Aviso tono="aviso" mensaje="Pago simulado, sin cargos reales." />
+        <Aviso tono="info" mensaje="No te pedimos ni guardamos los datos de tu tarjeta o de tu cuenta." />
         <Texto variante="chico" color={colores.textoSuave}>
           Solicitud 3f2a9c1e-0000-4000-8000-000000000000
         </Texto>

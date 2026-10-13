@@ -2,7 +2,7 @@
 
 Aplicación móvil web de servicios municipales para la ciudad de San Francisco, Córdoba. Es el trabajo práctico 5 de Arquitecturas Móviles de la UTN Facultad Regional San Francisco.
 
-Se trata de un prototipo académico sin vínculo oficial con la Municipalidad de San Francisco. Los pagos, los avisos y el panel municipal son simulados, y la aplicación lo indica en todas sus pantallas.
+Es un proyecto académico de la UTN FRSF, sin vínculo oficial con la Municipalidad de San Francisco. Los pagos pasan por una pasarela simulada, sin dinero real, y el panel municipal reemplaza a los sistemas del municipio. La app lo aclara al pie de la pantalla de ingreso y en el pie institucional.
 
 La aplicación se publica en https://san-francisco-conecta-tp5.web.app.
 
@@ -13,7 +13,7 @@ La aplicación reúne siete servicios en una sola pantalla de inicio.
 | Servicio | Qué permite |
 |---|---|
 | Bicicletas públicas | Ver las estaciones en un mapa con su disponibilidad en vivo, ordenarlas por cercanía y reportar un problema |
-| Tributos | Consultar los cedulones con su estado, abrir la boleta con el código de pago y registrar un pago simulado con comprobante |
+| Tributos | Consultar los cedulones con su estado, abrir la boleta con el código de pago y pagarla eligiendo el medio de pago, con comprobante |
 | Reclamos | Cargar un reclamo con hasta tres fotos o documentos, buscarlo y seguir su línea de tiempo |
 | Atención al vecino | Llamar, escribir o abrir WhatsApp con cada área municipal |
 | Alarmas comunitarias | Ver el estado de cada alarma, seguir zonas y recibir avisos de alarmas cercanas sin guardar la ubicación |
@@ -22,7 +22,7 @@ La aplicación reúne siete servicios en una sola pantalla de inicio.
 
 El vecino entra con su cuenta de Google, la misma en el celular y en la computadora; no hay acceso como invitado. La aplicación se instala en la pantalla de inicio del teléfono y funciona sin conexión con los últimos datos.
 
-Una cuenta de Google registrada como administradora accede además al panel municipal, que reemplaza a los sistemas del municipio para avanzar reclamos, activar alarmas, cambiar la disponibilidad de bicicletas, publicar avisos y controlar la simulación.
+Una cuenta de Google registrada como administradora accede además al panel municipal, que reemplaza a los sistemas del municipio para avanzar reclamos, seguir los pagos y la recaudación, controlar y finalizar los estacionamientos en curso, activar alarmas, cambiar la disponibilidad de bicicletas, publicar avisos y controlar la simulación.
 
 ## Arquitectura
 
@@ -121,6 +121,18 @@ El panel municipal solo se muestra a una cuenta de Google con un documento en la
 
 Para quitar el permiso, se borra el documento desde la misma consola.
 
+## Vecinos de ejemplo
+
+`scripts/vecinos-ejemplo.mjs` carga cuatro vecinos ficticios con actividad, para que el panel municipal muestre movimiento desde el primer momento: cedulones pagos e impagos, pagos con distintos medios, reclamos en cada estado, estacionamientos terminados y uno en curso, y notificaciones.
+
+```bash
+npm run ejemplos:produccion                                  # crea o reescribe los vecinos de ejemplo
+node scripts/vecinos-ejemplo.mjs --produccion --borrar       # los quita con todos sus datos
+node scripts/vecinos-ejemplo.mjs --emulador                  # lo mismo contra los emuladores
+```
+
+Sus uid empiezan con `ejemplo-` y sus cuentas no tienen proveedor de ingreso, así que nadie puede entrar con ellas desde la app.
+
 ## Despliegue
 
 Las credenciales no forman parte del repositorio. La cuenta de servicio de Firebase y los secretos de las funciones se guardan en una carpeta fuera del proyecto, y `.gitignore` excluye `.env.local`, los archivos de credenciales y `supabase/.secretos.env`.
@@ -166,7 +178,7 @@ La demostración usa dos dispositivos.
 
 1. El día anterior, entrar al panel de Supabase para que el proyecto gratuito no quede en pausa por inactividad.
 2. En B, abrir el panel municipal, pestaña Simulación, y tocar "Restablecer valores iniciales".
-3. En la misma pestaña, tocar "Usar valores para probar", que deja el aviso de estacionamiento en 14 minutos y el simulador apagado.
+3. En la misma pestaña, elegir 14 minutos en "Aviso de estacionamiento por vencer" y apagar "Simulador automático".
 4. Si la clase es fuera del horario de cobro, apagar "Cobro de estacionamiento solo en horario".
 5. Grabar un video de respaldo de los pasos siguientes.
 
@@ -174,11 +186,11 @@ La demostración usa dos dispositivos.
 
 | Paso | Dónde | Acción | Qué se ve |
 |---|---|---|---|
-| 1 | A | Abrir la dirección publicada e instalar la aplicación desde Mi cuenta, "Instalar la app" | La pantalla de carga aparece al instante con la leyenda de prototipo académico, y el ícono queda en la pantalla de inicio |
+| 1 | A | Abrir la dirección publicada e instalar la aplicación desde Mi cuenta, "Instalar la app" | La pantalla de carga aparece al instante, y el ícono queda en la pantalla de inicio |
 | 2 | A | Tocar "Continuar con Google" y elegir la cuenta | El inicio muestra los siete servicios sin desplazar, cada uno con un dato actual |
 | 3 | A | Abrir Bicicletas y tocar "Usar mi ubicación" | El mapa marca las estaciones, la lista se ordena por cercanía con la distancia y "Reportar" abre el reclamo con la estación cargada |
 | 4 | B | En el panel, pestaña Bicicletas, sumar bicicletas a la Estación Plaza General Paz | La tarjeta de esa estación cambia en A en menos de dos segundos, sin recargar |
-| 5 | A | Abrir Tributos, ver el cedulón T-1001 y pagarlo | Ya figura la notificación de vencimiento, la boleta muestra el código de pago y el pago simulado entrega un comprobante y pasa a Pagados |
+| 5 | A | Abrir Tributos, ver el cedulón T-1001 y pagarlo | Ya figura la notificación de vencimiento, la boleta muestra el código de pago y el pago, con el medio elegido, entrega un comprobante y pasa a Pagados |
 | 6 | A | En Reclamos, cargar uno con una foto y buscarlo por su código | El reclamo aparece como Recibido con su código y su adjunto |
 | 7 | B | En la pestaña Reclamos, avanzar ese reclamo a En proceso con una nota | La línea de tiempo de A cambia sola, muestra la respuesta de la Municipalidad y llega la notificación push |
 | 8 | A y B | En A, seguir la zona Parque y activar "Avisarme si se activa una alarma cerca". En B, pestaña Alarmas, activar la Alarma Parque Cincuentenario | A muestra el aviso en la aplicación y, con la aplicación cerrada, la notificación push, que al tocarla abre esa alarma en el mapa |

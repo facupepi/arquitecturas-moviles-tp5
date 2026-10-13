@@ -4,7 +4,7 @@
 //   título, la bajada y "Continuar con Google" (popup con respaldo de redirect; completarRedireccion
 //   lo llama App.jsx), con el error justo debajo del botón.
 // - Debajo, compactos: privacidad resumida (Ley 25.326) e instalación de la PWA; al pie, el 147.
-// - La leyenda de prototipo va arriba de todo, como en el resto de la app.
+// - Al pie, una nota discreta: proyecto académico.
 import React, { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { ingresarConGoogle, mensajeDeError } from '../firebase/auth';
@@ -13,7 +13,7 @@ import { useComando } from '../datos/useComando';
 import { useTituloDocumento } from '../navegacion/useTituloDocumento';
 import { colores, cortes, espacio, medidas, radios, sombras } from '../tema/tokens';
 import { Aviso, Boton, Icono, Texto } from '../ui';
-import LeyendaPrototipo, { ContextoLeyenda } from '../marco/LeyendaPrototipo';
+import { useTextoLeyenda } from '../marco/LeyendaPrototipo';
 import { quitarArranque } from '../plataforma/arranque';
 import BotonGoogle from './cuenta/BotonGoogle';
 import Instalar from './cuenta/Instalar';
@@ -80,98 +80,99 @@ export default function Ingreso() {
   });
   const error = google.error;
   const cerroVentana = error?.causa?.code === 'auth/popup-closed-by-user' || error?.causa?.code === 'auth/cancelled-popup-request';
+  const nota = useTextoLeyenda();
   const salida = avisoSalida ? MENSAJES_SALIDA[avisoSalida] : null;
 
   return (
     <View style={estilos.raiz}>
-      <LeyendaPrototipo />
-      <ContextoLeyenda.Provider value>
-        <ScrollView
-          testID="pantalla-ingreso"
-          style={estilos.desplazable}
-          contentContainerStyle={[estilos.centrado, { paddingHorizontal: margen }]}
-        >
-          <View role="main" style={estilos.columna}>
-            <View style={estilos.tarjeta}>
-              <Marca alCargarLogo={quitarArranque} />
-              <View style={estilos.cuerpoTarjeta}>
-                <View style={estilos.textos}>
-                  <Texto variante="antetitulo" color={colores.accion} alineacion="center">
-                    San Francisco, Córdoba
-                  </Texto>
-                  <Texto
-                    role="heading"
-                    aria-level={1}
-                    variante="titulo1"
-                    alineacion="center"
-                    testID="titulo-pantalla"
-                    estilo={width < 380 ? estilos.tituloChico : null}
-                  >
-                    {TITULO}
-                  </Texto>
-                  <Texto variante="cuerpo" color={colores.textoSuave} alineacion="center" estilo={angosto ? estilos.bajadaAngosta : null}>
-                    Trámites, recorridos y avisos en un solo lugar.
-                  </Texto>
-                </View>
-                {salida ? (
-                  <Aviso tono="exito" titulo={salida.titulo} mensaje={salida.mensaje} testID="aviso-salida" />
-                ) : null}
-                <View style={estilos.accion}>
-                  <BotonGoogle
-                    titulo={google.ocupado ? 'Conectando con Google…' : 'Continuar con Google'}
-                    cargando={google.ocupado}
-                    onPress={() => google.ejecutar()}
-                    testID="ingresar-google"
+      <ScrollView
+        testID="pantalla-ingreso"
+        style={estilos.desplazable}
+        contentContainerStyle={[estilos.centrado, { paddingHorizontal: margen }]}
+      >
+        <View role="main" style={estilos.columna}>
+          <View style={estilos.tarjeta}>
+            <Marca alCargarLogo={quitarArranque} />
+            <View style={estilos.cuerpoTarjeta}>
+              <View style={estilos.textos}>
+                <Texto variante="antetitulo" color={colores.accion} alineacion="center">
+                  San Francisco, Córdoba
+                </Texto>
+                <Texto
+                  role="heading"
+                  aria-level={1}
+                  variante="titulo1"
+                  alineacion="center"
+                  testID="titulo-pantalla"
+                  estilo={width < 380 ? estilos.tituloChico : null}
+                >
+                  {TITULO}
+                </Texto>
+                <Texto variante="cuerpo" color={colores.textoSuave} alineacion="center" estilo={angosto ? estilos.bajadaAngosta : null}>
+                  Trámites, recorridos y avisos en un solo lugar.
+                </Texto>
+              </View>
+              {salida ? (
+                <Aviso tono="exito" titulo={salida.titulo} mensaje={salida.mensaje} testID="aviso-salida" />
+              ) : null}
+              <View style={estilos.accion}>
+                <BotonGoogle
+                  titulo={google.ocupado ? 'Conectando con Google…' : 'Continuar con Google'}
+                  cargando={google.ocupado}
+                  onPress={() => google.ejecutar()}
+                  testID="ingresar-google"
+                />
+                {error ? (
+                  <Aviso
+                    tono={cerroVentana ? 'info' : 'peligro'}
+                    rol="alert"
+                    titulo={cerroVentana ? 'No se completó el ingreso' : 'No pudimos hacerte ingresar'}
+                    mensaje={mensajeDeError(error)}
+                    testID="error-ingreso"
                   />
-                  {error ? (
-                    <Aviso
-                      tono={cerroVentana ? 'info' : 'peligro'}
-                      rol="alert"
-                      titulo={cerroVentana ? 'No se completó el ingreso' : 'No pudimos hacerte ingresar'}
-                      mensaje={mensajeDeError(error)}
-                      testID="error-ingreso"
-                    />
-                  ) : null}
-                </View>
-                <Texto variante="chico" color={colores.textoSuave} alineacion="center">
-                  Usás la misma cuenta en el celular y en la computadora.
-                </Texto>
+                ) : null}
               </View>
-            </View>
-
-            <View style={estilos.panel}>
-              <View testID="privacidad-breve" style={estilos.bloque}>
-                <Subtitulo>Tus datos, cuidados</Subtitulo>
-                <View role="list" style={estilos.puntos}>
-                  {PRIVACIDAD_BREVE.map((p) => (
-                    <View key={p.titulo} role="listitem" style={estilos.punto}>
-                      <Icono nombre={p.icono} tamano={18} color={colores.accion} />
-                      <Texto variante="chico" estilo={estilos.flexible}>
-                        {p.titulo}
-                      </Texto>
-                    </View>
-                  ))}
-                </View>
-                <Texto variante="chico" color={colores.textoSuave}>
-                  {`Tus derechos según la ${LEY}. El detalle completo está en Mi cuenta.`}
-                </Texto>
-              </View>
-              <View style={estilos.linea} />
-              <View style={estilos.bloque}>
-                <Subtitulo>Instalá Conecta en tu celular</Subtitulo>
-                <Instalar compacto />
-              </View>
-            </View>
-
-            <View style={estilos.ayuda}>
-              <Texto variante="chico" color={colores.textoSuave}>
-                ¿Necesitás ayuda?
+              <Texto variante="chico" color={colores.textoSuave} alineacion="center">
+                Usás la misma cuenta en el celular y en la computadora.
               </Texto>
-              <Boton titulo="Llamar al 147" icono="telefono" variante="texto" href="tel:147" etiquetaAccesible="Llamar al 147, atención al vecino" />
             </View>
           </View>
-        </ScrollView>
-      </ContextoLeyenda.Provider>
+
+          <View style={estilos.panel}>
+            <View testID="privacidad-breve" style={estilos.bloque}>
+              <Subtitulo>Tus datos, cuidados</Subtitulo>
+              <View role="list" style={estilos.puntos}>
+                {PRIVACIDAD_BREVE.map((p) => (
+                  <View key={p.titulo} role="listitem" style={estilos.punto}>
+                    <Icono nombre={p.icono} tamano={18} color={colores.accion} />
+                    <Texto variante="chico" estilo={estilos.flexible}>
+                      {p.titulo}
+                    </Texto>
+                  </View>
+                ))}
+              </View>
+              <Texto variante="chico" color={colores.textoSuave}>
+                {`Tus derechos según la ${LEY}. El detalle completo está en Mi cuenta.`}
+              </Texto>
+            </View>
+            <View style={estilos.linea} />
+            <View style={estilos.bloque}>
+              <Subtitulo>Instalá Conecta en tu celular</Subtitulo>
+              <Instalar compacto />
+            </View>
+          </View>
+
+          <View style={estilos.ayuda}>
+            <Texto variante="chico" color={colores.textoSuave}>
+              ¿Necesitás ayuda?
+            </Texto>
+            <Boton titulo="Llamar al 147" icono="telefono" variante="texto" href="tel:147" etiquetaAccesible="Llamar al 147, atención al vecino" />
+          </View>
+          <Texto variante="chico" color={colores.textoSuave} alineacion="center" testID="nota-academica">
+            {nota}
+          </Texto>
+        </View>
+      </ScrollView>
     </View>
   );
 }

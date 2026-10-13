@@ -1,6 +1,7 @@
 // Estacionamiento medido (S6, sección 8.9 y 10.3): E1 zonas con tarifa, horario y control de horario;
 // E2 inicio con importe correcto; E3 aviso "por vencer" con el umbral de municipal/config; E4 extensión
-// y "Terminar ahora"; patente ocupada entre vecinos; accesibilidad.
+// y "Terminar ahora"; patente ocupada entre vecinos; accesibilidad. Los pagos pasan por la pasarela:
+// medio → "Procesando el pago…" → "Pago aprobado" con el comprobante.
 //
 // Las tarifas salen de shared/catalogo.mjs (lo mismo que se siembra), nunca de memoria. Cada prueba usa
 // una patente al azar: los bloqueos de patente quedan vigentes en el proyecto entre corridas.
@@ -27,6 +28,7 @@ function patenteAlAzar() {
 }
 
 const soloDigitos = (texto) => String(texto ?? '').replace(/\D/g, '');
+const TEXTO_DEMO = /simulad|sin cargos|sin validez|prototipo/i;
 
 async function abrirEstacionamiento(page, hash = '#/estacionamiento') {
   await irA(page, hash);
@@ -39,15 +41,19 @@ async function esperarDialogo(page, testID) {
   await expect(page.getByTestId(testID)).toBeVisible();
 }
 
-/** Completa el formulario, confirma y devuelve el id de la sesión creada. */
-async function iniciar(page, { zonaId = 'p1', patente, minutos = 15 }) {
+/** Completa el formulario, paga con la pasarela y devuelve el id de la sesión creada. */
+async function iniciar(page, { zonaId = 'p1', patente, minutos = 15, medio = 'credito' }) {
   await page.getByTestId(`zona-${zonaId}`).click();
   await expect(page.getByTestId(`zona-${zonaId}`)).toHaveAttribute('aria-checked', 'true');
   await page.getByTestId('campo-patente').fill(patente);
   await page.getByTestId(`minutos-${minutos}`).click();
   await page.getByTestId('iniciar-estacionamiento').click();
   await esperarDialogo(page, 'confirmar-estacionamiento');
+  await page.getByTestId(`medio-${medio}`).click();
   await page.getByTestId('confirmar-estacionamiento').click();
+  await expect(page.getByTestId('comprobante-pago-estado')).toHaveText('Pago aprobado', { timeout: 20_000 });
+  await page.getByTestId('listo-estacionamiento').click();
+  await expect(page.locator('[role="dialog"]')).toHaveCount(0);
   const temporizador = page.locator('[data-testid^="temporizador-"]').first();
   await expect(temporizador).toBeVisible({ timeout: 20_000 });
   const testId = await temporizador.getAttribute('data-testid');
@@ -115,10 +121,29 @@ test.describe('Estacionamiento medido', () => {
     const dialogo = page.locator('[role="dialog"]');
     await expect(page.getByTestId('confirmacion-patente')).toContainText(patente);
     expect(soloDigitos(await page.getByTestId('confirmacion-importe').textContent())).toBe(String(esperado));
-    await expect(dialogo).toContainText('Pago simulado, sin cargos reales');
-    await expect(dialogo).toContainText(/EST-[A-Z0-9]{8}/);
+    await expect(dialogo).not.toContainText(TEXTO_DEMO);
+    const operacion = (await page.getByTestId('numero-operacion').innerText()).match(/EST-[A-Z0-9]{8}/)?.[0];
+    expect(operacion).toBeTruthy();
+    // Los cuatro medios como radios; sin elegir uno no se paga.
+    await expect(page.getByRole('radiogroup', { name: 'Elegí cómo pagar' }).getByRole('radio')).toHaveCount(4);
+    await expect(dialogo.locator('input, textarea')).toHaveCount(0);
+    await page.getByTestId('confirmar-estacionamiento').click();
+    await expect(page.getByTestId('medio-error')).toHaveText('Elegí un medio de pago para continuar.');
+    await page.getByTestId('medio-billetera').click();
+    await expect(page.getByTestId('medio-billetera')).toHaveAttribute('aria-checked', 'true');
     await revisarAccesibilidad(page, 'estacionamiento-confirmacion', { excluir: EXCLUIR_AXE });
     await page.getByTestId('confirmar-estacionamiento').click();
+
+    // Procesando y después "Pago aprobado" con el comprobante (mismo número de operación y el medio).
+    await expect(page.getByTestId('procesando-pago')).toContainText('Procesando el pago…');
+    await expect(page.getByTestId('procesando-pago-medio')).toContainText('billetera virtual');
+    await expect(page.getByTestId('comprobante-pago-estado')).toHaveText('Pago aprobado', { timeout: 20_000 });
+    await expect(page.getByTestId('numero-comprobante')).toHaveText(operacion);
+    await expect(page.getByTestId('comprobante-medio')).toContainText('Billetera virtual');
+    await expect(dialogo).toContainText(patente);
+    await revisarAccesibilidad(page, 'estacionamiento-comprobante', { excluir: EXCLUIR_AXE });
+    await page.getByTestId('listo-estacionamiento').click();
+    await expect(page.locator('[role="dialog"]')).toHaveCount(0);
 
     const temporizador = page.locator('[data-testid^="temporizador-"]').first();
     await expect(temporizador).toBeVisible({ timeout: 20_000 });
@@ -129,8 +154,8 @@ test.describe('Estacionamiento medido', () => {
     const sesion = (await adminDb.doc(`usuarios/${uid}/estacionamiento/${sesionId}`).get()).data();
     expect(sesion).toMatchObject({ patente, zonaId: 'p2', minutos: 30, importe: esperado, extensiones: 0 });
     const pago = (await adminDb.doc(`usuarios/${uid}/pagos/${sesionId}`).get()).data();
-    expect(pago).toMatchObject({ tipo: 'estacionamiento', refId: sesionId, importe: esperado, proveedor: 'pasarela-simulada' });
-    expect(pago.comprobante).toMatch(/^EST-[A-Z0-9]{8}$/);
+    expect(pago).toMatchObject({ tipo: 'estacionamiento', refId: sesionId, importe: esperado, medio: 'billetera', proveedor: 'pasarela-simulada' });
+    expect(pago.comprobante).toBe(operacion);
     const bloqueo = (await adminDb.doc(`bloqueosPatente/${patente}`).get()).data();
     expect(bloqueo.sesionId).toBe(sesionId);
     expect(bloqueo).not.toHaveProperty('uid');
@@ -168,8 +193,14 @@ test.describe('Estacionamiento medido', () => {
     expect(soloDigitos(await boton.textContent())).toBe(`15${costoEstacionamiento(p1.tarifaHora, 15)}`);
     await boton.click();
     await esperarDialogo(page, 'confirmar-extension');
-    await expect(page.locator('[role="dialog"]')).toContainText('Pago simulado, sin cargos reales');
+    await expect(page.locator('[role="dialog"]')).not.toContainText(TEXTO_DEMO);
+    await page.getByTestId('medio-transferencia').click();
     await page.getByTestId('confirmar-extension').click();
+    await expect(page.getByTestId('procesando-pago')).toContainText('Procesando el pago…');
+    await expect(page.getByTestId('comprobante-pago-estado')).toHaveText('Pago aprobado', { timeout: 20_000 });
+    await expect(page.getByTestId('numero-comprobante')).toHaveText(/^EXT-[A-Z0-9]{8}$/);
+    await expect(page.getByTestId('comprobante-medio')).toContainText('Transferencia bancaria');
+    await page.getByTestId('listo-extension').click();
     await expect(page.locator('[role="dialog"]')).toHaveCount(0);
 
     await expect(page.getByTestId(`minutos-pagados-${sesionId}`)).toContainText('30 min');
@@ -180,7 +211,8 @@ test.describe('Estacionamiento medido', () => {
     expect(sesion.importe).toBe(2 * costoEstacionamiento(p1.tarifaHora, 15));
     expect(sesion.fin.toMillis() - finAntes).toBe(15 * 60_000);
     const pagos = await adminDb.collection(`usuarios/${uid}/pagos`).where('tipo', '==', 'extension').get();
-    expect(pagos.docs.map((d) => d.data().refId)).toContain(sesionId);
+    const extension = pagos.docs.map((d) => d.data()).find((d) => d.refId === sesionId);
+    expect(extension).toMatchObject({ medio: 'transferencia', proveedor: 'pasarela-simulada' });
   });
 
   test('E4: "Terminar ahora" cierra la sesión y otro vecino puede usar la patente', async ({ vecino, nuevoVecino }) => {
@@ -217,6 +249,7 @@ test.describe('Estacionamiento medido', () => {
     await otro.page.getByTestId('minutos-15').click();
     await otro.page.getByTestId('iniciar-estacionamiento').click();
     await esperarDialogo(otro.page, 'confirmar-estacionamiento');
+    await otro.page.getByTestId('medio-debito').click();
     await otro.page.getByTestId('confirmar-estacionamiento').click();
 
     // El error va debajo del campo, con la hora de fin, y el diálogo se cierra.

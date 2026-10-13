@@ -6,7 +6,7 @@ export const PRIVACIDAD_BREVE = [
   {
     icono: 'usuario',
     titulo: 'Guardamos solo tus gestiones',
-    texto: 'Tus reclamos, pagos simulados, estacionamientos y preferencias de avisos. Solo vos podés verlos.',
+    texto: 'Tus reclamos, pagos, estacionamientos y preferencias de avisos. Solo vos podés verlos.',
   },
   {
     icono: 'ubicacion',
@@ -30,7 +30,7 @@ export const PRIVACIDAD_COMPLETA = [
     titulo: 'Qué guardamos',
     texto:
       'El nombre de tu cuenta de Google, tus preferencias de avisos, '
-      + 'tus cedulones y pagos simulados, tus reclamos con sus fotos o PDF, tus estacionamientos y tus notificaciones. '
+      + 'tus cedulones y pagos, tus reclamos con sus fotos o PDF, tus estacionamientos y tus notificaciones. '
       + 'Si activás los avisos en un dispositivo, guardamos un código de ese navegador para poder enviarte notificaciones.',
   },
   {
@@ -38,7 +38,7 @@ export const PRIVACIDAD_COMPLETA = [
     texto:
       'Tu ubicación, que usamos solo en el momento. Para avisarte de alarmas cercanas registramos qué alarmas '
       + 'están cerca durante 30 minutos, nunca tus coordenadas. Tampoco guardamos tu correo en nuestra base '
-      + 'ni datos de tarjetas, porque los pagos son simulados.',
+      + 'ni datos de tarjetas.',
   },
   {
     titulo: 'Quién puede verlo',

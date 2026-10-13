@@ -99,7 +99,7 @@ function cuerpoCedulon(tributo, info = {}) {
   </div>
   ${info.estado?.texto ? `<span class="estado" style="background:${fondo};color:${tinta}">${esc(info.estado.texto)}</span>` : ''}
 </div>
-<p class="leyenda">${esc(info.leyenda ?? 'Prototipo académico. Documento sin validez.')}</p>
+<p class="leyenda">${esc(info.leyenda ?? 'Proyecto académico UTN FRSF')}</p>
 <table><tbody>${filas}</tbody></table>
 ${info.importe ? `<div class="importe"><span>Importe</span><strong>${esc(info.importe)}</strong></div>` : ''}
 ${codigo}

@@ -29,7 +29,7 @@ const CONMUTADOR = '+543564439111';
 const SITIO = 'https://www.sanfrancisco.gov.ar';
 const PORTAL_TRIBUTARIO = 'https://drt.sanfrancisco.gov.ar';
 const DIRECCION_MUNICIPALIDAD = 'Bv. 9 de Julio 1187';
-const AVISO_DEMO = 'Aviso de demostración: lo publica el prototipo San Francisco Conecta y no es un comunicado oficial de la Municipalidad.';
+const AVISO_DEMO = 'Para más información, comunicate con la línea 147 de atención al vecino.';
 
 export function catalogo(ahora = Date.now()) {
   const info = {
@@ -165,18 +165,19 @@ export function datosInicialesVecino(ahora = Date.now()) {
     pagadoEn: pago ? ahora + pago.dias * MS_DIA : null,
     comprobante: pago ? pago.comprobante : null,
     pagoId: pago ? pago.pagoId : null,
+    medio: pago ? pago.medio : null,
   });
   const tributos = [
     tributo('T-1001', 'Tasa de servicios municipales', '10/2026', 18500, 2),
     tributo('T-1002', 'Contribución sobre inmuebles', '10/2026', 24750, 8),
     tributo('T-0999', 'Tasa de servicios municipales', '08/2026', 18500, -40),
     tributo('T-1000', 'Tasa de servicios municipales', '09/2026', 18500, -20,
-      { dias: -22, comprobante: 'REC-00001000', pagoId: 'semilla-T-1000' }),
+      { dias: -22, comprobante: 'REC-00001000', pagoId: 'semilla-T-1000', medio: 'debito' }),
   ];
 
   const pagos = [{
     id: 'semilla-T-1000', tipo: 'tributo', refId: 'T-1000', importe: 18500, comprobante: 'REC-00001000',
-    proveedor: 'pasarela-simulada', creadoEn: ahora - 22 * MS_DIA,
+    medio: 'debito', proveedor: 'pasarela-simulada', creadoEn: ahora - 22 * MS_DIA,
   }];
 
   const reclamos = [{

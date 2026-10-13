@@ -25,6 +25,9 @@ export const EXTENSION_ARCHIVO = congelar({ 'image/jpeg': 'jpg', 'image/png': 'p
 export const ESTADOS_ESTACION = congelar(['operativa', 'fuera_de_servicio']);
 export const CATEGORIAS_CONTACTO = congelar(['municipal', 'emergencias', 'salud']);
 export const PREFIJOS_COMPROBANTE = congelar(['REC', 'EST', 'EXT']);
+// Medios que ofrece la pasarela de pagos (T2, E2, E4). Se guarda solo cuál se eligió: la app no
+// pide ni guarda datos de tarjetas ni de cuentas. Deben coincidir con mediosPago() de firestore.rules.
+export const MEDIOS_PAGO = congelar(['credito', 'debito', 'billetera', 'transferencia']);
 
 export const LIMITES = congelar({
   adjuntos: 3, bytesAdjunto: 2 * 1024 * 1024, ladoImagen: 1600, largoNombreAdjunto: 100,
@@ -61,6 +64,10 @@ export const ETIQUETAS = congelar({
   estadosTributo: { pagado: 'Pagado', vencido: 'Vencido', por_vencer: 'Por vencer', pendiente: 'Pendiente' },
   estadosEstacion: { operativa: 'Operativa', fuera_de_servicio: 'Fuera de servicio' },
   categoriasContacto: { municipal: 'Municipal', emergencias: 'Emergencias', salud: 'Salud' },
+  mediosPago: {
+    credito: 'Tarjeta de crédito', debito: 'Tarjeta de débito', billetera: 'Billetera virtual',
+    transferencia: 'Transferencia bancaria',
+  },
 });
 
 export const ZONA_HORARIA = 'America/Argentina/Cordoba';

@@ -69,6 +69,9 @@ describe('usuarios/{uid}', () => {
     await assertSucceeds(updateDoc(doc(db, 'usuarios/con-alta'), {
       privacidadAceptadaEn: serverTimestamp(), actualizadoEn: serverTimestamp(),
     }));
+    // Sin pausa, el emulador puede atender este pedido en el mismo milisegundo que el anterior: el
+    // actualizadoEn que quedó guardado coincide con request.time y la regla lo acepta.
+    await new Promise((listo) => setTimeout(listo, 20));
     await assertFails(updateDoc(doc(db, 'usuarios/con-alta'), { nombre: 'Sin fecha' }));
   });
 

@@ -41,6 +41,8 @@ service cloud.firestore {
     }
     function frecuencias() { return ['inmediata', 'resumen_diario', 'solo_historial']; }
     function tiposArchivo() { return ['image/jpeg', 'image/png', 'application/pdf']; }
+    // Medio elegido en la pasarela (solo cuál: no hay datos de tarjetas ni de cuentas).
+    function mediosPago() { return ['credito', 'debito', 'billetera', 'transferencia']; }
 
     // Evento de la bandeja escrito en el mismo lote: UNA sola llamada getAfter.
     // Quien la llama comprueba antes que id sea string.
@@ -207,20 +209,23 @@ service cloud.firestore {
       }
 
       // ---------- Tributos (T1-T3) ----------
-      function pagoDelTributo(tributoId, pagoId, importe, comprobante) {
+      // El medio se compara con el del pago que ya se lee (la lista la valida el pago): sin lecturas extra.
+      function pagoDelTributo(tributoId, pagoId, importe, comprobante, medio) {
         let p = getAfter(rutaPropia('pagos', pagoId));
         return p != null && p.data.tipo == 'tributo' && p.data.refId == tributoId
-          && p.data.importe == importe && p.data.comprobante == comprobante;
+          && p.data.importe == importe && p.data.comprobante == comprobante
+          && p.data.get('medio', null) == medio;
       }
       match /tributos/{tributoId} {
         allow read: if esDueno(uid);
         allow create, delete: if false;
         allow update: if esDueno(uid)
           && viejo().pagadoEn == null
-          && soloCambian(['pagadoEn', 'comprobante', 'pagoId'])
+          && soloCambian(['pagadoEn', 'comprobante', 'pagoId', 'medio'])
           && nuevo().pagadoEn == request.time
           && idSolicitud(nuevo().pagoId)
-          && pagoDelTributo(tributoId, nuevo().pagoId, viejo().importe, nuevo().comprobante);
+          && pagoDelTributo(tributoId, nuevo().pagoId, viejo().importe, nuevo().comprobante,
+                            nuevo().get('medio', null));
       }
 
       // ---------- Pagos (T2, E2, E4). Idempotencia: id = requestId, solo create ----------
@@ -250,7 +255,8 @@ service cloud.firestore {
         allow read: if esDueno(uid);
         allow update, delete: if false;
         allow create: if esDueno(uid) && idSolicitud(pagoId)
-          && claves(['tipo', 'refId', 'importe', 'comprobante', 'proveedor', 'creadoEn'])
+          && claves(['tipo', 'refId', 'importe', 'comprobante', 'medio', 'proveedor', 'creadoEn'])
+          && nuevo().medio in mediosPago()
           && nuevo().proveedor == 'pasarela-simulada'
           && nuevo().creadoEn == request.time
           && entero(nuevo().importe, 1, 10000000)
@@ -430,9 +436,44 @@ service cloud.firestore {
       }
     }
 
-    // Lectura administrativa por grupo de colecciones (panel municipal).
+    // ===================== Panel municipal: control de lo que hacen los vecinos =====================
+    // Lectura administrativa por grupo de colecciones (reclamos, pagos, cedulones y sesiones).
     match /{ruta=**}/reclamos/{reclamoId} {
       allow read: if esAdmin();
+    }
+    match /{ruta=**}/pagos/{pagoId} {
+      allow read: if esAdmin();
+    }
+    match /{ruta=**}/tributos/{tributoId} {
+      allow read: if esAdmin();
+    }
+    match /{ruta=**}/estacionamiento/{sesionId} {
+      allow read: if esAdmin();
+    }
+
+    // "Finalizar sesión" desde el panel: lo mismo que "Terminar ahora" del vecino, en un lote con el
+    // bloqueo de la patente. Solo cambian fin y actualizadoEn (a la hora del servidor) y solo si la
+    // sesión seguía activa. Lecturas: exists de esAdmin y getAfter del bloqueo.
+    function bloqueoLiberadoEnLote(sesionId, patente) {
+      let b = getAfter(/databases/$(database)/documents/bloqueosPatente/$(patente));
+      return b != null && b.data.sesionId == sesionId && b.data.fin == request.time;
+    }
+    match /usuarios/{uid}/estacionamiento/{sesionId} {
+      allow update: if esAdmin()
+        && viejo().fin > request.time
+        && soloCambian(['fin', 'actualizadoEn'])
+        && nuevo().fin == request.time
+        && nuevo().actualizadoEn == request.time
+        && bloqueoLiberadoEnLote(sesionId, viejo().patente);
+    }
+    // El bloqueo no tiene uid: el administrador solo puede adelantar a "ahora" el fin de un bloqueo
+    // vigente, sin cambiar su sesión. No crea bloqueos ni los extiende.
+    match /bloqueosPatente/{patente} {
+      allow update: if esAdmin()
+        && claves(['sesionId', 'fin'])
+        && nuevo().sesionId == viejo().sesionId
+        && viejo().fin > request.time
+        && nuevo().fin == request.time;
     }
   }
 }

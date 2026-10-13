@@ -1,5 +1,5 @@
 // Marco de la app con sesión (WP5, 7.4). Reemplaza heredado:src/MunicipalApp.jsx (disposición).
-// - Encabezado arriba y, debajo, la leyenda de prototipo (siempre visible).
+// - Encabezado arriba.
 // - Ancho ≥ 900: MenuLateral fijo a la izquierda. Menos de 900: BarraInferior y menú en un Modal.
 // - Monta ProveedorAvisos, BannerEmergencia, IndicadorConexion y ActualizacionDisponible.
 // - Muestra `alerta` del almacén como aviso flotante con "Ver" (navega a su destino) y la descarta.
@@ -16,7 +16,6 @@ import BannerEmergencia from './BannerEmergencia';
 import BarraInferior, { ALTO_BARRA } from './BarraInferior';
 import EncabezadoInstitucional from './EncabezadoInstitucional';
 import IndicadorConexion from './IndicadorConexion';
-import LeyendaPrototipo, { ContextoLeyenda } from './LeyendaPrototipo';
 import { MenuLateralFijo, MenuMovil } from './MenuLateral';
 import PieInstitucional from './PieInstitucional';
 
@@ -47,17 +46,14 @@ function MarcoInterno({ escritorio, children }) {
     <View style={estilos.raiz}>
       <AlertaEnVivo />
       <EncabezadoInstitucional />
-      <LeyendaPrototipo />
       <IndicadorConexion />
       <BannerEmergencia />
       <ActualizacionDisponible />
       <View style={estilos.cuerpo}>
         {escritorio ? <MenuLateralFijo /> : null}
-        <ContextoLeyenda.Provider value>
-          <ContextoMarco.Provider value={valorMarco}>
-            <View style={estilos.contenido}>{children}</View>
-          </ContextoMarco.Provider>
-        </ContextoLeyenda.Provider>
+        <ContextoMarco.Provider value={valorMarco}>
+          <View style={estilos.contenido}>{children}</View>
+        </ContextoMarco.Provider>
       </View>
       {escritorio ? null : <BarraInferior onMenu={() => setMenuAbierto(true)} menuAbierto={menuAbierto} />}
       {escritorio ? null : <MenuMovil visible={menuAbierto} onCerrar={() => setMenuAbierto(false)} />}

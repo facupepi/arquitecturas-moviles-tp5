@@ -30,3 +30,6 @@ playwright/.cache/
 
 # Restos de la versión heredada
 server/data/
+
+# Reporte que genera npm run test:e2e
+docs/pruebas/e2e-junit.xml

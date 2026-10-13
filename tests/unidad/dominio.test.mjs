@@ -5,7 +5,7 @@ import {
   ErrorDominio, requerido, miembro, minutosValidos, normalizarPatente, costoEstacionamiento, distanciaKm,
   ordenarPorCercania, enHorario, estadoTributo, siguienteEstadoReclamo, validarReclamo, validarArchivo,
   recortarNombreArchivo, tipoPorFirma, validarPreferencias, codigoReclamo, comprobante, codigoPagoTributo,
-  nuevoIdSolicitud, finSesion, diaCordoba, digitoLuhn, luhnValido,
+  nuevoIdSolicitud, finSesion, diaCordoba, digitoLuhn, luhnValido, inicioDiaCordoba, inicioMesCordoba,
 } from '../../shared/dominio.mjs';
 import { catalogo } from '../../shared/catalogo.mjs';
 import { TIPOS_NOTIFICACION } from '../../shared/constantes.mjs';
@@ -280,4 +280,15 @@ test('nuevoIdSolicitud: UUID v4 único, también sin randomUUID', () => {
   } finally {
     Object.defineProperty(globalThis, 'crypto', original);
   }
+});
+
+test('inicioDiaCordoba e inicioMesCordoba cortan a la medianoche de Córdoba (UTC-3)', () => {
+  // 9/10/2026 01:30 en Córdoba (04:30 UTC): el día empezó a las 03:00 UTC.
+  assert.equal(inicioDiaCordoba(Date.parse('2026-10-09T04:30:00Z')), Date.parse('2026-10-09T03:00:00Z'));
+  // 8/10/2026 23:00 en Córdoba (9/10 02:00 UTC): todavía es el día 8.
+  assert.equal(inicioDiaCordoba(Date.parse('2026-10-09T02:00:00Z')), Date.parse('2026-10-08T03:00:00Z'));
+  assert.equal(inicioMesCordoba(Date.parse('2026-10-09T04:30:00Z')), Date.parse('2026-10-01T03:00:00Z'));
+  // 31/10 22:00 en Córdoba (1/11 01:00 UTC): sigue siendo octubre.
+  assert.equal(inicioMesCordoba(Date.parse('2026-11-01T01:00:00Z')), Date.parse('2026-10-01T03:00:00Z'));
+  assert.equal(inicioMesCordoba(Date.parse('2026-11-01T03:00:00Z')), Date.parse('2026-11-01T03:00:00Z'));
 });

@@ -22,6 +22,7 @@
     "test:todo": "npm test && npm run test:reglas && npm run build && npm run test:e2e",
     "sembrar:emulador": "node scripts/sembrar.mjs --emulador",
     "sembrar:produccion": "node scripts/sembrar.mjs --produccion",
+    "ejemplos:produccion": "node scripts/vecinos-ejemplo.mjs --produccion",
     "capturas": "node scripts/capturas.mjs",
     "deploy:reglas": "firebase deploy --only firestore",
     "deploy:remoteconfig": "firebase deploy --only remoteconfig",

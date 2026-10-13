@@ -19,7 +19,7 @@ function comprobante(prefijo, id) {
 // Arma el lote de inicio: sesión + bloqueo + pago, con la opción de romper cada parte.
 function loteInicio(db, uid, {
   sesionId, patente, zonaId = 'p1', minutos = 60, importe, fin, zonaNombre, zona = 'centro',
-  sinBloqueo = false, sinPago = false, bloqueoExtra = {}, finBloqueo,
+  sinBloqueo = false, sinPago = false, bloqueoExtra = {}, finBloqueo, medio = 'debito', sinMedio = false,
 }) {
   const z = zonas[zonaId] || zonas.p1;   // las zonas de la prueba de dayOfWeek copian p1
   const finTs = fin ?? ts(Date.now() + minutos * MIN);
@@ -34,16 +34,18 @@ function loteInicio(db, uid, {
     lote.set(doc(db, `bloqueosPatente/${patente}`), { sesionId, fin: finBloqueo ?? finTs, ...bloqueoExtra });
   }
   if (!sinPago) {
-    lote.set(doc(db, `usuarios/${uid}/pagos/${sesionId}`), {
+    const pago = {
       tipo: 'estacionamiento', refId: sesionId, importe: importe ?? (z.tarifaHora * minutos) / 60,
       comprobante: comprobante('EST', sesionId), proveedor: 'pasarela-simulada', creadoEn: serverTimestamp(),
-    });
+    };
+    if (!sinMedio) pago.medio = medio;
+    lote.set(doc(db, `usuarios/${uid}/pagos/${sesionId}`), pago);
   }
   return { lote, fin: finTs };
 }
 
 // Lote de extensión sobre una sesión conocida (minutos, importe y fin actuales).
-function loteExtension(db, uid, { sesionId, patente, actual, extra = 15, pagoId, importeExtra, sinBloqueo = false, sinPago = false, tarifa = 800 }) {
+function loteExtension(db, uid, { sesionId, patente, actual, extra = 15, pagoId, importeExtra, sinBloqueo = false, sinPago = false, tarifa = 800, medio = 'billetera' }) {
   const minutos = actual.minutos + extra;
   const fin = ts(actual.fin.toMillis() + extra * MIN);
   const importeDelta = importeExtra ?? (tarifa * extra) / 60;
@@ -54,10 +56,12 @@ function loteExtension(db, uid, { sesionId, patente, actual, extra = 15, pagoId,
   });
   if (!sinBloqueo) lote.set(doc(db, `bloqueosPatente/${patente}`), { sesionId, fin });
   if (!sinPago) {
-    lote.set(doc(db, `usuarios/${uid}/pagos/${pagoId}`), {
+    const pago = {
       tipo: 'extension', refId: sesionId, importe: importeDelta, comprobante: comprobante('EXT', pagoId),
       proveedor: 'pasarela-simulada', creadoEn: serverTimestamp(),
-    });
+    };
+    pago.medio = medio;
+    lote.set(doc(db, `usuarios/${uid}/pagos/${pagoId}`), pago);
   }
   return { lote, nuevo: { minutos, fin, importe: actual.importe + importeDelta, extensiones: actual.extensiones + 1 } };
 }
@@ -108,6 +112,16 @@ describe('inicio de sesión', () => {
     await assertSucceeds(lote.commit());
     const { lote: otro } = loteInicio(db, 'u2', { sesionId: 'sesion-ok-000002', patente: 'AB123CD', minutos: 15 });
     await assertSucceeds(otro.commit());
+  });
+
+  it('el pago del inicio exige un medio de la lista', async () => {
+    const db = vecino(entorno, 'u2');
+    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-medio-0001', patente: 'MED001', minutos: 15, sinMedio: true }).lote.commit());
+    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-medio-0002', patente: 'MED002', minutos: 15, medio: 'efectivo' }).lote.commit());
+    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-medio-0003', patente: 'MED003', minutos: 15, medio: null }).lote.commit());
+    await assertSucceeds(loteInicio(db, 'u2', { sesionId: 'sesion-medio-0004', patente: 'MED004', minutos: 15, medio: 'transferencia' }).lote.commit());
+    const pago = (await getDoc(doc(db, 'usuarios/u2/pagos/sesion-medio-0004'))).data();
+    assert.equal(pago.medio, 'transferencia');
   });
 
   it('importe distinto, minutos fuera de bloque o más de 240 se rechazan', async () => {

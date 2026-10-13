@@ -1,4 +1,4 @@
-// Tributos (S4, sección 8.7): T1 consulta y cedulón imprimible, T2 pago simulado con confirmación,
+// Tributos (S4, sección 8.7): T1 consulta y cedulón imprimible, T2 pago con la pasarela (elección de medio),
 // T3 historial y estado, T4 estado "por vencer" y recordatorios de vencimiento.
 // Enlace profundo: #/tributos/T-1001 abre ese cedulón (lo usan los recordatorios y el push).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -27,6 +27,7 @@ import DialogoCedulon from './tributos/DialogoCedulon';
 import DialogoPago from './tributos/DialogoPago';
 import DialogoComprobante from './tributos/DialogoComprobante';
 import HistorialPagos from './tributos/HistorialPagos';
+import { conProcesamiento, useMedioPago } from './pagos/pasarela';
 import Recordatorios, { tributoDeDestino } from './tributos/Recordatorios';
 
 // Desde este ancho de contenido, el resumen y los recordatorios van lado a lado.
@@ -143,7 +144,9 @@ export default function Tributos({ ruta }) {
 
   const tributoAbierto = dialogo ? tributosPorId.get(dialogo.tributoId) ?? null : null;
 
-  const pago = useComando(repositorio.pagarTributo, {
+  const medio = useMedioPago();
+  // La pasarela muestra "Procesando el pago…" al menos 1,5 s; la traza mide solo el registro.
+  const pago = useComando(conProcesamiento(repositorio.pagarTributo, TRAZAS.PAGO_TRIBUTO), {
     // El comprobante se abre antes de que el comando deje de estar ocupado: así la confirmación
     // nunca llega a mostrar "ya está pagado" por el snapshot de nuestro propio pago.
     alExito: (resultado) => {
@@ -152,8 +155,7 @@ export default function Tributos({ ruta }) {
       setVisible(true);
     },
     evento: EVENTOS.TRIBUTO_PAGADO,
-    traza: TRAZAS.PAGO_TRIBUTO,
-    parametrosEvento: (p) => ({ value: p?.importe ?? 0, currency: 'ARS' }),
+    parametrosEvento: (p, _id, _req, medioElegido) => ({ value: p?.importe ?? 0, currency: 'ARS', medio: medioElegido }),
   });
 
   // ---------- Apertura y cierre de diálogos ----------
@@ -174,15 +176,19 @@ export default function Tributos({ ruta }) {
 
   const pagar = useCallback((tributo) => {
     pago.limpiar();
+    medio.reiniciar();
     // El requestId se genera al abrir la confirmación y se reutiliza en los reintentos (sección 0).
     setRequestId(nuevoIdSolicitud());
     abrir({ tipo: 'pago', tributoId: tributo.id });
-  }, [abrir, pago]);
+  }, [abrir, pago, medio]);
 
-  const confirmarPago = useCallback(async () => {
-    if (!dialogo || dialogo.tipo !== 'pago') return;
-    await pago.ejecutar(dialogo.tributoId, requestId);
-  }, [dialogo, pago, requestId]);
+  // Devuelve false si falta elegir el medio (DialogoPago lleva el foco a las opciones).
+  const confirmarPago = useCallback(() => {
+    if (!dialogo || dialogo.tipo !== 'pago') return true;
+    if (!medio.validar()) return false;
+    pago.ejecutar(dialogo.tributoId, requestId, medio.valor);
+    return true;
+  }, [dialogo, pago, requestId, medio]);
 
   const imprimir = useCallback((tributo, info) => {
     const promesa = imprimirCedulon(tributo, info);
@@ -315,7 +321,7 @@ export default function Tributos({ ruta }) {
   return (
     <Pantalla
       titulo="Tributos"
-      bajada="Consultá tus cedulones, imprimilos y pagalos en forma simulada."
+      bajada="Consultá tus cedulones, imprimilos y pagalos desde el celular."
       testID="pantalla-tributos"
     >
       {enlaceNoEncontrado ? (
@@ -348,6 +354,9 @@ export default function Tributos({ ruta }) {
         ocupado={pago.ocupado}
         error={pago.error}
         yaPagado={yaPagado}
+        medio={medio.valor}
+        onElegirMedio={medio.elegir}
+        errorMedio={medio.error}
         onConfirmar={confirmarPago}
         onCerrar={cerrar}
       />

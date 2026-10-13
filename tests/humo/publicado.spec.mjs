@@ -2,7 +2,7 @@
 // cuentas de Google y una prueba automática no puede (ni debe) entrar con una cuenta real, así que
 // no crea usuarios ni escribe nada en producción.
 //
-// - La URL responde 200 por HTTPS con la pantalla estática y la leyenda, y carga sin errores graves.
+// - La URL responde 200 por HTTPS con la pantalla estática y la nota académica, y carga sin errores graves.
 // - Política de seguridad: CSP y encabezados de Hosting (solo contra Hosting, no en vite preview).
 // - Ingreso: columna centrada con "Continuar con Google", privacidad breve y sin ingreso como invitado.
 // - El manifiesto es válido (campos de 9.3 e íconos que responden).
@@ -26,7 +26,7 @@ async function prepararPagina(page) {
 const esLocal = (url) => ['127.0.0.1', 'localhost'].includes(new URL(url).hostname);
 
 test.describe('Sitio publicado, sin sesión', () => {
-  test('responde 200 por HTTPS con la pantalla estática, la leyenda y la pantalla de Ingreso', async ({ page, baseURL }) => {
+  test('responde 200 por HTTPS con la pantalla estática, la nota académica y la pantalla de Ingreso', async ({ page, baseURL }) => {
     await prepararPagina(page);
     const errores = vigilarConsola(page, origenes(baseURL));
     const respuesta = await page.goto('/');
@@ -37,13 +37,13 @@ test.describe('Sitio publicado, sin sesión', () => {
     if (!['127.0.0.1', 'localhost'].includes(hostname)) expect(protocol).toBe('https:');
     expect(respuesta.headers()['content-type'] ?? '').toContain('text/html');
 
-    // La pantalla estática de index.html (9.4) ya trae la leyenda, antes del JavaScript.
+    // La pantalla estática de index.html (9.4) ya trae la nota académica, antes del JavaScript.
     const html = await respuesta.text();
-    expect(html).toContain('Prototipo académico UTN FRSF, sin vínculo oficial con la Municipalidad');
+    expect(html).toContain('Proyecto académico UTN FRSF');
+    expect(html).not.toMatch(/Prototipo académico/);
 
     await expect(page.getByTestId('pantalla-ingreso')).toBeVisible({ timeout: 45_000 });
-    await expect(page.getByTestId('leyenda-prototipo')).toBeVisible();
-    await expect(page.getByTestId('leyenda-prototipo')).toContainText('Prototipo académico');
+    await expect(page.getByTestId('nota-academica')).toHaveText('Proyecto académico UTN FRSF');
     await expect(page.getByTestId('ingresar-google')).toBeVisible();
     // Sin desborde horizontal.
     const anchos = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
@@ -100,7 +100,7 @@ test.describe('Sitio publicado, sin sesión', () => {
     expect(r.status(), urlManifiesto).toBe(200);
     expect(r.headers()['content-type'] ?? '').toMatch(/application\/(manifest\+)?json/);
     const m = await r.json();
-    expect(m.name).toBe('San Francisco Conecta (prototipo)');
+    expect(m.name).toBe('San Francisco Conecta');
     expect(m.short_name).toBe('SF Conecta');
     expect(m.lang).toBe('es-AR');
     expect(m.start_url).toBe('/#/inicio');
