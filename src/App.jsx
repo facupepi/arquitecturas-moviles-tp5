@@ -12,9 +12,10 @@ import { completarRedireccion, useSesion } from './firebase/auth';
 import { iniciarServiciosDiferidos } from './firebase/diferidos';
 import { ProveedorMunicipal, useMunicipal } from './datos/almacen';
 import { refrescarPush } from './datos/sesion';
+import { quitarArranque, recordarSesion, sesionAnotada } from './plataforma/arranque';
 import { ProveedorNavegacion, useRuta } from './navegacion/ProveedorNavegacion';
 import Enrutador from './navegacion/Enrutador';
-import { cargarPantalla } from './navegacion/pantallas';
+import { cargarPantalla, precargarPantalla } from './navegacion/pantallas';
 import { EN_DESARROLLO, RUTA_GALERIA } from './navegacion/rutasApp';
 import LimiteError from './navegacion/LimiteError';
 import Marco from './marco/Marco';
@@ -27,6 +28,10 @@ import Vacio from './ui/Vacio';
 
 let redireccionRevisada = false;
 let diferidosIniciados = false;
+
+// Sin sesión anotada, lo más probable es que haya que mostrar el Ingreso: su chunk se baja mientras
+// Auth lee la sesión guardada, en lugar de esperar a que termine.
+if (!sesionAnotada()) precargarPantalla('Ingreso');
 
 function programarEnReposo(tarea) {
   const enReposo = globalThis.requestIdleCallback;
@@ -115,7 +120,17 @@ function Contenido() {
       });
   }, []);
 
-  if (EN_DESARROLLO && ruta.nombre === RUTA_GALERIA && !usuario) return <GaleriaSinSesion />;
+  const galeria = EN_DESARROLLO && ruta.nombre === RUTA_GALERIA && !usuario;
+
+  // Pantalla de arranque de index.html: sin sesión la quita Ingreso cuando ya está dibujado debajo
+  // (es una copia suya); con sesión o en la galería, apenas se sabe qué mostrar.
+  useEffect(() => {
+    if (!listo) return;
+    recordarSesion(Boolean(usuario));
+    if (usuario || galeria) quitarArranque();
+  }, [listo, usuario, galeria]);
+
+  if (galeria) return <GaleriaSinSesion />;
   if (!listo) return <Cargando pantallaCompleta mensaje="Cargando…" />;
   if (!usuario) return <SinSesion />;
   return (

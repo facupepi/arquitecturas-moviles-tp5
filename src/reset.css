@@ -5,7 +5,7 @@
   font-family: 'Quicksand';
   font-style: normal;
   font-weight: 300 700;
-  font-display: swap;
+  font-display: block; /* igual que index.html: la pantalla de arranque se pinta ya con Quicksand */
   src: url('/fonts/quicksand-latin.woff2') format('woff2');
 }
 

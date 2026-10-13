@@ -20,3 +20,9 @@ export function cargarPantalla(archivo, version = 0) {
   memoria.set(clave, componente);
   return componente;
 }
+
+/** Empieza a descargar el chunk de una pantalla sin dibujarla (el import() se comparte con lazy). */
+export function precargarPantalla(archivo) {
+  const cargador = MODULOS[`../pantallas/${archivo}.jsx`];
+  cargador?.().catch(() => {}); // si falla, el lazy vuelve a intentarlo y LimiteError lo muestra
+}

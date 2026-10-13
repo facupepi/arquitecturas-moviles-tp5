@@ -1,0 +1,557 @@
+{
+  "series": [
+    {
+      "fecha": "2026-10-13T00:36:58.499Z",
+      "etiqueta": "",
+      "url": "https://san-francisco-conecta-tp5.web.app",
+      "perfil": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "deviceScaleFactor": 3,
+        "isMobile": true,
+        "hasTouch": true,
+        "userAgent": "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.7390.37 Mobile Safari/537.36",
+        "locale": "es-AR",
+        "timezoneId": "America/Argentina/Cordoba",
+        "red": {
+          "latencia": 150,
+          "bajadaMbps": 1.6,
+          "subidaMbps": 0.75
+        },
+        "cpu": 4,
+        "navegador": "Chromium 141.0.7390.37",
+        "simularRecaptcha": false
+      },
+      "criterio": "LCP en frío < 3000 ms e Ingreso utilizable en visita repetida < 3000 ms (peor caso)",
+      "cumple": {
+        "frioLcpMenor3s": true,
+        "repetidaIngresoMenor3s": true
+      },
+      "resumen": {
+        "frio": {
+          "ttfb": {
+            "n": 7,
+            "minimo": 205,
+            "mediana": 218,
+            "p90": 227,
+            "peor": 227
+          },
+          "fcp": {
+            "n": 7,
+            "minimo": 688,
+            "mediana": 700,
+            "p90": 720,
+            "peor": 720
+          },
+          "lcp": {
+            "n": 7,
+            "minimo": 1172,
+            "mediana": 1196,
+            "p90": 1240,
+            "peor": 1240
+          },
+          "ingresoUtilizable": {
+            "n": 7,
+            "minimo": 2762,
+            "mediana": 2784,
+            "p90": 2856,
+            "peor": 2856
+          },
+          "interactivo": {
+            "n": 7,
+            "minimo": 2762,
+            "mediana": 2784,
+            "p90": 2856,
+            "peor": 2856
+          },
+          "tbtHastaIngreso": {
+            "n": 7,
+            "minimo": 189,
+            "mediana": 194,
+            "p90": 233,
+            "peor": 233
+          },
+          "finUltimaTareaLarga": {
+            "n": 7,
+            "minimo": 2365,
+            "mediana": 2384,
+            "p90": 2439,
+            "peor": 2439
+          },
+          "domContentLoaded": {
+            "n": 7,
+            "minimo": 2364,
+            "mediana": 2384,
+            "p90": 2438,
+            "peor": 2438
+          },
+          "load": {
+            "n": 7,
+            "minimo": 6141,
+            "mediana": 6212,
+            "p90": 6252,
+            "peor": 6252
+          },
+          "redHastaIngreso.totalKB": {
+            "n": 7,
+            "minimo": 802.5,
+            "mediana": 802.7,
+            "p90": 802.8,
+            "peor": 802.8
+          }
+        },
+        "repetida": {
+          "ttfb": {
+            "n": 7,
+            "minimo": 2,
+            "mediana": 2,
+            "p90": 2,
+            "peor": 2
+          },
+          "fcp": {
+            "n": 7,
+            "minimo": 344,
+            "mediana": 456,
+            "p90": 508,
+            "peor": 508
+          },
+          "lcp": {
+            "n": 7,
+            "minimo": 344,
+            "mediana": 456,
+            "p90": 508,
+            "peor": 508
+          },
+          "ingresoUtilizable": {
+            "n": 7,
+            "minimo": 1314,
+            "mediana": 1416,
+            "p90": 1480,
+            "peor": 1480
+          },
+          "interactivo": {
+            "n": 7,
+            "minimo": 1314,
+            "mediana": 1416,
+            "p90": 1480,
+            "peor": 1480
+          },
+          "tbtHastaIngreso": {
+            "n": 7,
+            "minimo": 496,
+            "mediana": 504,
+            "p90": 514,
+            "peor": 514
+          },
+          "finUltimaTareaLarga": {
+            "n": 7,
+            "minimo": 1277,
+            "mediana": 1315,
+            "p90": 1378,
+            "peor": 1378
+          },
+          "red.totalKB": {
+            "n": 7,
+            "minimo": 30.7,
+            "mediana": 30.9,
+            "p90": 31.1,
+            "peor": 31.1
+          }
+        }
+      },
+      "corridas": {
+        "frio": [
+          {
+            "corrida": 1,
+            "ttfb": 227,
+            "fcp": 692,
+            "lcp": 1240,
+            "lcpElemento": "p \"Tus derechos según la Ley 25.326 de Prot\"",
+            "ingresoUtilizable": 2856,
+            "tbtHastaIngreso": 233,
+            "finUltimaTareaLarga": 2439,
+            "tareasLargas": 9,
+            "interactivo": 2856,
+            "domContentLoaded": 2438,
+            "load": 6212,
+            "redHastaIngreso": {
+              "solicitudes": 22,
+              "desdeServiceWorker": 0,
+              "totalKB": 802.8,
+              "origenAppKB": 352.9,
+              "porTipoKB": {
+                "Document": 33.6,
+                "Font": 62.1,
+                "Script": 664.4,
+                "Stylesheet": 35.2,
+                "Image": 7.5
+              }
+            }
+          },
+          {
+            "corrida": 2,
+            "ttfb": 214,
+            "fcp": 712,
+            "lcp": 1196,
+            "lcpElemento": "p \"Tus derechos según la Ley 25.326 de Prot\"",
+            "ingresoUtilizable": 2784,
+            "tbtHastaIngreso": 189,
+            "finUltimaTareaLarga": 2377,
+            "tareasLargas": 9,
+            "interactivo": 2784,
+            "domContentLoaded": 2375,
+            "load": 6141,
+            "redHastaIngreso": {
+              "solicitudes": 22,
+              "desdeServiceWorker": 0,
+              "totalKB": 802.7,
+              "origenAppKB": 352.9,
+              "porTipoKB": {
+                "Document": 33.6,
+                "Font": 62.1,
+                "Script": 663.5,
+                "Stylesheet": 36.1,
+                "Image": 7.5
+              }
+            }
+          },
+          {
+            "corrida": 3,
+            "ttfb": 205,
+            "fcp": 720,
+            "lcp": 1176,
+            "lcpElemento": "p \"Tus derechos según la Ley 25.326 de Prot\"",
+            "ingresoUtilizable": 2775,
+            "tbtHastaIngreso": 194,
+            "finUltimaTareaLarga": 2367,
+            "tareasLargas": 8,
+            "interactivo": 2775,
+            "domContentLoaded": 2367,
+            "load": 6221,
+            "redHastaIngreso": {
+              "solicitudes": 22,
+              "desdeServiceWorker": 0,
+              "totalKB": 802.7,
+              "origenAppKB": 352.9,
+              "porTipoKB": {
+                "Document": 33.5,
+                "Font": 62.1,
+                "Script": 664.4,
+                "Stylesheet": 35.2,
+                "Image": 7.5
+              }
+            }
+          },
+          {
+            "corrida": 4,
+            "ttfb": 211,
+            "fcp": 696,
+            "lcp": 1172,
+            "lcpElemento": "p \"Tus derechos según la Ley 25.326 de Prot\"",
+            "ingresoUtilizable": 2797,
+            "tbtHastaIngreso": 231,
+            "finUltimaTareaLarga": 2407,
+            "tareasLargas": 8,
+            "interactivo": 2797,
+            "domContentLoaded": 2406,
+            "load": 6180,
+            "redHastaIngreso": {
+              "solicitudes": 22,
+              "desdeServiceWorker": 0,
+              "totalKB": 802.7,
+              "origenAppKB": 352.9,
+              "porTipoKB": {
+                "Document": 33.5,
+                "Font": 62.1,
+                "Script": 664.4,
+                "Stylesheet": 35.2,
+                "Image": 7.5
+              }
+            }
+          },
+          {
+            "corrida": 5,
+            "ttfb": 219,
+            "fcp": 688,
+            "lcp": 1196,
+            "lcpElemento": "p \"Tus derechos según la Ley 25.326 de Prot\"",
+            "ingresoUtilizable": 2809,
+            "tbtHastaIngreso": 199,
+            "finUltimaTareaLarga": 2413,
+            "tareasLargas": 8,
+            "interactivo": 2809,
+            "domContentLoaded": 2412,
+            "load": 6252,
+            "redHastaIngreso": {
+              "solicitudes": 22,
+              "desdeServiceWorker": 0,
+              "totalKB": 802.6,
+              "origenAppKB": 352.9,
+              "porTipoKB": {
+                "Document": 33.4,
+                "Font": 62.1,
+                "Script": 664.4,
+                "Stylesheet": 35.2,
+                "Image": 7.5
+              }
+            }
+          },
+          {
+            "corrida": 6,
+            "ttfb": 218,
+            "fcp": 716,
+            "lcp": 1192,
+            "lcpElemento": "p \"Tus derechos según la Ley 25.326 de Prot\"",
+            "ingresoUtilizable": 2762,
+            "tbtHastaIngreso": 191,
+            "finUltimaTareaLarga": 2365,
+            "tareasLargas": 9,
+            "interactivo": 2762,
+            "domContentLoaded": 2364,
+            "load": 6239,
+            "redHastaIngreso": {
+              "solicitudes": 22,
+              "desdeServiceWorker": 0,
+              "totalKB": 802.5,
+              "origenAppKB": 352.9,
+              "porTipoKB": {
+                "Document": 33.4,
+                "Font": 62.1,
+                "Script": 663.6,
+                "Stylesheet": 35.9,
+                "Image": 7.5
+              }
+            }
+          },
+          {
+            "corrida": 7,
+            "ttfb": 224,
+            "fcp": 700,
+            "lcp": 1236,
+            "lcpElemento": "p \"Tus derechos según la Ley 25.326 de Prot\"",
+            "ingresoUtilizable": 2773,
+            "tbtHastaIngreso": 190,
+            "finUltimaTareaLarga": 2384,
+            "tareasLargas": 8,
+            "interactivo": 2773,
+            "domContentLoaded": 2384,
+            "load": 6166,
+            "redHastaIngreso": {
+              "solicitudes": 22,
+              "desdeServiceWorker": 0,
+              "totalKB": 802.6,
+              "origenAppKB": 352.8,
+              "porTipoKB": {
+                "Document": 33.6,
+                "Font": 62.9,
+                "Script": 663.5,
+                "Stylesheet": 35.2,
+                "Image": 7.5
+              }
+            }
+          }
+        ],
+        "repetida": [
+          {
+            "corrida": 1,
+            "controladaPorSW": true,
+            "ttfb": 2,
+            "fcp": 344,
+            "lcp": 344,
+            "lcpElemento": "p \"Tus derechos según la Ley 25.326 de Prot\"",
+            "ingresoUtilizable": 1314,
+            "tbtHastaIngreso": 510,
+            "finUltimaTareaLarga": 1277,
+            "tareasLargas": 7,
+            "interactivo": 1314,
+            "red": {
+              "solicitudes": 24,
+              "desdeServiceWorker": 14,
+              "totalKB": 31,
+              "origenAppKB": 0,
+              "porTipoKB": {
+                "Document": 27.9,
+                "Font": 0,
+                "Script": 0,
+                "Stylesheet": 0,
+                "Image": 0,
+                "XHR": 2.2,
+                "Fetch": 0.8
+              }
+            }
+          },
+          {
+            "corrida": 2,
+            "controladaPorSW": true,
+            "ttfb": 2,
+            "fcp": 372,
+            "lcp": 372,
+            "lcpElemento": "p \"Tus derechos según la Ley 25.326 de Prot\"",
+            "ingresoUtilizable": 1353,
+            "tbtHastaIngreso": 504,
+            "finUltimaTareaLarga": 1316,
+            "tareasLargas": 7,
+            "interactivo": 1353,
+            "red": {
+              "solicitudes": 24,
+              "desdeServiceWorker": 14,
+              "totalKB": 30.7,
+              "origenAppKB": 0,
+              "porTipoKB": {
+                "Document": 27.7,
+                "Font": 0,
+                "Script": 0,
+                "Stylesheet": 0,
+                "Image": 0,
+                "XHR": 2.2,
+                "Fetch": 0.8
+              }
+            }
+          },
+          {
+            "corrida": 3,
+            "controladaPorSW": true,
+            "ttfb": 2,
+            "fcp": 456,
+            "lcp": 456,
+            "lcpElemento": "p \"Tus derechos según la Ley 25.326 de Prot\"",
+            "ingresoUtilizable": 1416,
+            "tbtHastaIngreso": 510,
+            "finUltimaTareaLarga": 1315,
+            "tareasLargas": 7,
+            "interactivo": 1416,
+            "red": {
+              "solicitudes": 24,
+              "desdeServiceWorker": 14,
+              "totalKB": 30.9,
+              "origenAppKB": 0,
+              "porTipoKB": {
+                "Document": 28,
+                "Font": 0,
+                "Script": 0,
+                "Stylesheet": 0,
+                "Image": 0,
+                "XHR": 2.2,
+                "Fetch": 0.8
+              }
+            }
+          },
+          {
+            "corrida": 4,
+            "controladaPorSW": true,
+            "ttfb": 2,
+            "fcp": 476,
+            "lcp": 476,
+            "lcpElemento": "p \"Tus derechos según la Ley 25.326 de Prot\"",
+            "ingresoUtilizable": 1480,
+            "tbtHastaIngreso": 504,
+            "finUltimaTareaLarga": 1327,
+            "tareasLargas": 7,
+            "interactivo": 1480,
+            "red": {
+              "solicitudes": 24,
+              "desdeServiceWorker": 14,
+              "totalKB": 31.1,
+              "origenAppKB": 0,
+              "porTipoKB": {
+                "Document": 28.1,
+                "Font": 0,
+                "Script": 0,
+                "Stylesheet": 0,
+                "Image": 0,
+                "XHR": 2.2,
+                "Fetch": 0.8
+              }
+            }
+          },
+          {
+            "corrida": 5,
+            "controladaPorSW": true,
+            "ttfb": 2,
+            "fcp": 472,
+            "lcp": 472,
+            "lcpElemento": "p \"Tus derechos según la Ley 25.326 de Prot\"",
+            "ingresoUtilizable": 1351,
+            "tbtHastaIngreso": 496,
+            "finUltimaTareaLarga": 1312,
+            "tareasLargas": 7,
+            "interactivo": 1351,
+            "red": {
+              "solicitudes": 24,
+              "desdeServiceWorker": 14,
+              "totalKB": 30.9,
+              "origenAppKB": 0,
+              "porTipoKB": {
+                "Document": 27.9,
+                "Font": 0,
+                "Script": 0,
+                "Stylesheet": 0,
+                "Image": 0,
+                "XHR": 2.2,
+                "Fetch": 0.8
+              }
+            }
+          },
+          {
+            "corrida": 6,
+            "controladaPorSW": true,
+            "ttfb": 2,
+            "fcp": 508,
+            "lcp": 508,
+            "lcpElemento": "p \"Tus derechos según la Ley 25.326 de Prot\"",
+            "ingresoUtilizable": 1479,
+            "tbtHastaIngreso": 514,
+            "finUltimaTareaLarga": 1378,
+            "tareasLargas": 8,
+            "interactivo": 1479,
+            "red": {
+              "solicitudes": 24,
+              "desdeServiceWorker": 14,
+              "totalKB": 30.8,
+              "origenAppKB": 0,
+              "porTipoKB": {
+                "Document": 27.8,
+                "Font": 0,
+                "Script": 0,
+                "Stylesheet": 0,
+                "Image": 0,
+                "XHR": 2.2,
+                "Fetch": 0.8
+              }
+            }
+          },
+          {
+            "corrida": 7,
+            "controladaPorSW": true,
+            "ttfb": 2,
+            "fcp": 440,
+            "lcp": 440,
+            "lcpElemento": "p \"Tus derechos según la Ley 25.326 de Prot\"",
+            "ingresoUtilizable": 1424,
+            "tbtHastaIngreso": 499,
+            "finUltimaTareaLarga": 1279,
+            "tareasLargas": 8,
+            "interactivo": 1424,
+            "red": {
+              "solicitudes": 24,
+              "desdeServiceWorker": 14,
+              "totalKB": 31.1,
+              "origenAppKB": 0,
+              "porTipoKB": {
+                "Document": 28.1,
+                "Font": 0,
+                "Script": 0,
+                "Stylesheet": 0,
+                "Image": 0,
+                "XHR": 2.2,
+                "Fetch": 0.8
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

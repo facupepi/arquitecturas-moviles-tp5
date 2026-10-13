@@ -5,6 +5,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { espacio, medidas } from '../tema/tokens';
 import ErrorCarga from '../ui/ErrorCarga';
+import { quitarArranque } from '../plataforma/arranque';
 
 export default class LimiteError extends React.Component {
   constructor(props) {
@@ -18,6 +19,7 @@ export default class LimiteError extends React.Component {
   }
 
   componentDidCatch(error) {
+    quitarArranque(); // si falla el Ingreso, el aviso no puede quedar tapado por la pantalla estática
     if (typeof console !== 'undefined') console.error('Error en la pantalla:', error);
   }
 

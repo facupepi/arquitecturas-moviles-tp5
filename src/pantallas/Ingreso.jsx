@@ -5,7 +5,7 @@
 //   lo llama App.jsx), con el error justo debajo del botón.
 // - Debajo, compactos: privacidad resumida (Ley 25.326) e instalación de la PWA; al pie, el 147.
 // - La leyenda de prototipo va arriba de todo, como en el resto de la app.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { ingresarConGoogle, mensajeDeError } from '../firebase/auth';
 import { EVENTOS } from '../firebase/analytics';
@@ -14,20 +14,33 @@ import { useTituloDocumento } from '../navegacion/useTituloDocumento';
 import { colores, cortes, espacio, medidas, radios, sombras } from '../tema/tokens';
 import { Aviso, Boton, Icono, Texto } from '../ui';
 import LeyendaPrototipo, { ContextoLeyenda } from '../marco/LeyendaPrototipo';
+import { quitarArranque } from '../plataforma/arranque';
 import BotonGoogle from './cuenta/BotonGoogle';
 import Instalar from './cuenta/Instalar';
 import { MENSAJES_SALIDA, tomarAvisoSalida } from './cuenta/avisoSalida';
 import { LEY, PRIVACIDAD_BREVE } from './cuenta/textos';
 
-const LOGO = { uri: '/brand/municipalidad-blanco.png' };
+// Copia del logo a 174 × 102 (3 × 58 × 34) y 256 colores, 4 KB en lugar de 60: la pantalla de arranque
+// de index.html lo pide antes que el JavaScript y así casi no le quita ancho de banda.
+const LOGO = { uri: '/brand/municipalidad-blanco-ingreso.png' };
 const PROPORCION_LOGO = 372 / 217;
 const ANCHO_COLUMNA = 460;
 const TITULO = 'Tu ciudad, a un toque.';
+// index.html trae una copia estática de esta pantalla (#arranque) que tapa a React mientras carga.
+// Se quita cuando el logo ya se ve (si no, parpadearía) o, como mucho, a este tiempo del montaje.
+const ESPERA_MAXIMA_LOGO_MS = 600;
 
-function Marca() {
+function Marca({ alCargarLogo }) {
   return (
     <View style={estilos.marca}>
-      <Image source={LOGO} aria-hidden resizeMode="contain" style={{ height: 34, width: Math.round(34 * PROPORCION_LOGO) }} />
+      <Image
+        source={LOGO}
+        aria-hidden
+        resizeMode="contain"
+        onLoad={alCargarLogo}
+        onError={alCargarLogo}
+        style={{ height: 34, width: Math.round(34 * PROPORCION_LOGO) }}
+      />
       <View style={estilos.separadorMarca} />
       <View>
         <Texto variante="titulo3" color={colores.blanco} estilo={estilos.nombreMarca}>
@@ -56,6 +69,11 @@ export default function Ingreso() {
   const margen = angosto ? medidas.margenLateral : espacio.xl;
   const [avisoSalida] = useState(() => tomarAvisoSalida());
 
+  useEffect(() => {
+    const espera = setTimeout(quitarArranque, ESPERA_MAXIMA_LOGO_MS);
+    return () => clearTimeout(espera);
+  }, []);
+
   const google = useComando(ingresarConGoogle, {
     evento: EVENTOS.LOGIN,
     parametrosEvento: () => ({ method: 'google' }),
@@ -75,7 +93,7 @@ export default function Ingreso() {
         >
           <View role="main" style={estilos.columna}>
             <View style={estilos.tarjeta}>
-              <Marca />
+              <Marca alCargarLogo={quitarArranque} />
               <View style={estilos.cuerpoTarjeta}>
                 <View style={estilos.textos}>
                   <Texto variante="antetitulo" color={colores.accion} alineacion="center">

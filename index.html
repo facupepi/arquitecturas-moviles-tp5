@@ -12,44 +12,168 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="preload" href="/fonts/quicksand-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- Marca html[data-sesion] si en esta visita ya hubo sesión (lo anota src/plataforma/arranque.web.js):
+         así la pantalla de arranque no muestra el Ingreso a quien ya ingresó. Script externo por la CSP. -->
+    <script src="/arranque.js"></script>
     <style>
+      /* "block": el texto de la pantalla de arranque se pinta directamente con Quicksand (precargada),
+         con las mismas medidas que después dibuja React, sin un primer pintado con otra fuente. */
       @font-face {
         font-family: 'Quicksand';
         font-style: normal;
         font-weight: 300 700;
-        font-display: swap;
+        font-display: block;
         src: url('/fonts/quicksand-latin.woff2') format('woff2');
       }
       html, body, #root { height: 100%; }
       body { margin: 0; background: #f4f7fa; -webkit-text-size-adjust: 100%; }
+      /* Pantalla de arranque: copia estática del Ingreso (src/pantallas/Ingreso.jsx) con sus mismas
+         medidas, así el elemento más grande (el párrafo de la Ley 25.326) ya está pintado y React no lo
+         reemplaza por uno mayor (LCP). Tapa #root hasta que React dibuja el Ingreso debajo y la quita
+         (src/plataforma/arranque.web.js). Sin encabezados ni regiones: mientras convive con el árbol de
+         React no duplica los roles que usan las pruebas y los lectores de pantalla. */
+      /* Sin system-ui en la lista: mientras Quicksand está en su período "block" el texto se ubica con la
+         fuente de respaldo, y resolver system-ui le costaba unos 50 ms al primer pintado (CPU ×4). */
+      #arranque { position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column; background: #f4f7fa; color: #1e2939; font: 500 16px/24px Quicksand, Arial, sans-serif; }
+      #arranque * { box-sizing: border-box; }
+      /* pre-wrap como el <Text> de React Native Web: conserva el espacio al final de cada renglón, que cuenta en el ancho del texto. */
+      :where(#arranque) p { margin: 0; white-space: pre-wrap; overflow-wrap: break-word; }
+      #arranque svg { display: block; flex-shrink: 0; }
+      .a-v, .a-f { position: relative; z-index: 0; display: flex; flex-direction: column; flex-shrink: 0; min-width: 0; min-height: 0; }
+      .a-f { flex-direction: row; align-items: center; }
+      .a-ch { font-size: 14px; line-height: 20px; }
+      .a-s { color: #526174; }
+      .a-c { text-align: center; }
+      .a-b { font-weight: 700; color: #1e2939; }
+      .a-x { flex: 1; min-width: 0; }
+      .a-oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+      .a-leyenda { justify-content: center; gap: 8px; padding: 6px 16px; background: #fff6cd; border-bottom: 1px solid #f1e2a0; color: #7a5e00; }
+      .a-leyenda p { flex-shrink: 1; font-size: 13px; line-height: 18px; font-weight: 600; text-align: center; }
+      .a-desp { flex: 1; overflow-y: auto; transform: translateZ(0); } /* como el ScrollView de RNW (misma capa y el mismo suavizado del texto) */
+      .a-centro { flex-grow: 1; justify-content: center; align-items: center; padding: 24px; }
+      .a-col { width: 100%; max-width: 460px; gap: 16px; }
+      .a-tarjeta, .a-panel { background: #fff; border: 1px solid #dce4eb; border-radius: 18px; }
+      .a-tarjeta { overflow: hidden; box-shadow: 0 2px 10px rgba(30, 41, 57, 0.06); }
+      .a-marca { height: 64px; justify-content: center; gap: 12px; background: #0077ae; color: #fff; }
+      .a-sep { width: 1px; height: 30px; background: rgba(255, 255, 255, 0.45); }
+      .a-cuerpo { padding: 24px; gap: 16px; }
+      .a-textos { gap: 8px; align-items: center; }
+      .a-ante { font-size: 13px; line-height: 18px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #0077ae; }
+      .a-titulo { font-size: 28px; line-height: 34px; font-weight: 700; }
+      .a-boton { min-height: 52px; justify-content: center; gap: 12px; padding: 10px 18px; border: 1px solid #b7c8d6; border-radius: 12px; background: #fff; font-weight: 700; cursor: progress; }
+      .a-panel { padding: 16px; gap: 16px; }
+      .a-bloque { gap: 8px; }
+      .a-puntos { gap: 8px; }
+      .a-puntos > div { gap: 12px; }
+      .a-linea { height: 1px; background: #dce4eb; }
+      .a-fila { flex-direction: row; align-items: flex-start; gap: 8px; }
+      .a-ios { display: none; }
+      .a-paso { gap: 8px; }
+      .a-num { width: 26px; height: 26px; border-radius: 13px; background: #e0f2fc; align-items: center; justify-content: center; color: #005c88; }
+      .a-ayuda { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; column-gap: 4px; }
+      .a-enlace { align-self: flex-start; min-height: 48px; min-width: 48px; justify-content: center; gap: 8px; padding: 10px 12px; border: 1px solid transparent; border-radius: 12px; color: #0077ae; font-weight: 700; text-decoration: underline; }
+      .a-sesion { display: none; flex: 1; align-items: center; justify-content: center; gap: 20px; padding: 32px 16px; text-align: center; }
+      html[data-sesion] .a-ingreso { display: none; }
+      html[data-sesion] .a-sesion { display: flex; }
+      @supports (-webkit-touch-callout: none) {
+        .a-manual { display: none; }
+        .a-ios { display: flex; }
+      }
+      @media (max-width: 599.98px) {
+        .a-centro { padding: 24px 16px; }
+        .a-bajada { max-width: 240px; }
+      }
+      @media (max-width: 379.98px) {
+        .a-titulo { font-size: 24px; line-height: 30px; }
+      }
     </style>
   </head>
   <body>
-    <div id="root">
-      <!-- Pantalla de inicio estática: se pinta sin esperar al JavaScript y React Native Web la reemplaza al montar. -->
-      <div
-        id="arranque"
-        style="min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 32px 16px; box-sizing: border-box; font-family: Quicksand, system-ui, Arial, sans-serif; color: #1e2939; text-align: center;"
-      >
-        <img src="/icons/icono.svg" width="72" height="72" alt="" style="display: block; border-radius: 18px;" />
-        <div>
-          <p style="margin: 0; font-size: 13px; line-height: 18px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #526174;">San Francisco</p>
-          <h1 style="margin: 4px 0 0; font-size: 40px; line-height: 46px; font-weight: 700; color: #1e2939;">Conecta</h1>
-          <p style="margin: 8px 0 0; font-size: 16px; line-height: 24px; font-weight: 500; color: #526174;">Tus servicios municipales, a un toque.</p>
+    <div id="root"></div>
+    <!-- Pantalla de arranque estática: se pinta sin esperar al JavaScript. -->
+    <div id="arranque" aria-busy="true">
+      <div class="a-v a-x a-ingreso">
+        <div class="a-f a-leyenda">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7a5e00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          <p>Prototipo académico UTN FRSF, sin vínculo oficial con la Municipalidad de San Francisco</p>
         </div>
-        <p
-          style="margin: 0; max-width: 360px; padding: 8px 12px; border-radius: 10px; background: #fff6cd; color: #7a5e00; font-size: 13px; line-height: 18px; font-weight: 600;"
-        >
-          Prototipo académico UTN FRSF, sin vínculo oficial con la Municipalidad de San Francisco
-        </p>
-        <p role="status" style="margin: 0; font-size: 14px; line-height: 20px; font-weight: 500; color: #526174;">Cargando…</p>
+        <div class="a-v a-desp">
+          <div class="a-v a-centro">
+            <div class="a-v a-col">
+              <div class="a-v a-tarjeta">
+                <div class="a-f a-marca">
+                  <img src="/brand/municipalidad-blanco-ingreso.png" width="58" height="34" alt="" style="object-fit: contain" />
+                  <div class="a-v a-sep"></div>
+                  <div class="a-v">
+                    <p style="font-size: 18px; line-height: 20px; font-weight: 700">Conecta</p>
+                    <p style="font-size: 12px; line-height: 15px; font-weight: 600">San Francisco</p>
+                  </div>
+                </div>
+                <div class="a-v a-cuerpo">
+                  <div class="a-v a-textos">
+                    <p class="a-ante a-c">San Francisco, Córdoba</p>
+                    <p class="a-titulo a-c">Tu ciudad, a un toque.</p>
+                    <p class="a-s a-c a-bajada">Trámites, recorridos y avisos en un solo lugar.</p>
+                  </div>
+                  <div class="a-f a-boton">
+                    <svg width="22" height="22" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6C44.4 38.01 46.98 31.83 46.98 24.55Z"/><path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.28-3.13.75-4.59l-7.97-6.19A23.8 23.8 0 0 0 0 24c0 3.87.93 7.53 2.56 10.78l7.97-6.19Z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.91-5.8l-7.73-6c-2.15 1.45-4.92 2.3-8.18 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.97 6.19C6.51 42.62 14.62 48 24 48Z"/></svg>
+                    <p class="a-c">Continuar con Google</p>
+                  </div>
+                  <noscript>
+                    <p class="a-c">San Francisco Conecta necesita JavaScript para funcionar. Para hacer un trámite o un reclamo, llamá al 147 (atención al vecino).</p>
+                  </noscript>
+                  <p class="a-ch a-s a-c">Usás la misma cuenta en el celular y en la computadora.</p>
+                </div>
+              </div>
+              <div class="a-v a-panel">
+                <div class="a-v a-bloque">
+                  <p class="a-b">Tus datos, cuidados</p>
+                  <div class="a-v a-puntos">
+                    <div class="a-f"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0077ae" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg><p class="a-ch a-x">Guardamos solo tus gestiones</p></div>
+                    <div class="a-f"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0077ae" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg><p class="a-ch a-x">Tu ubicación nunca se guarda</p></div>
+                    <div class="a-f"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0077ae" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><p class="a-ch a-x">Estadísticas anónimas</p></div>
+                    <div class="a-f"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0077ae" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><p class="a-ch a-x">Podés borrar todo cuando quieras</p></div>
+                  </div>
+                  <p class="a-ch a-s">Tus derechos según la Ley 25.326 de Protección de Datos Personales. El detalle completo está en Mi cuenta.</p>
+                </div>
+                <div class="a-v a-linea"></div>
+                <div class="a-v a-bloque">
+                  <p class="a-b">Instalá Conecta en tu celular</p>
+                  <div class="a-v a-fila a-manual">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#526174" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 13V7"/><path d="m15 10-3 3-3-3"/><rect width="20" height="14" x="2" y="3" rx="2"/><path d="M12 17v4"/><path d="M8 21h8"/></svg>
+                    <p class="a-ch a-s a-x">Abrí el menú del navegador y elegí <b class="a-b">Instalar app</b> o <b class="a-b">Agregar a la pantalla principal</b>.</p>
+                  </div>
+                  <div class="a-v a-bloque a-ios">
+                    <p class="a-ch a-s">En iPhone se instala desde Safari:</p>
+                    <div class="a-f a-paso"><div class="a-v a-num"><p class="a-ch a-b" style="color: #005c88">1</p></div><p class="a-ch a-x">Tocá <b class="a-b">Compartir</b> (el cuadrado con la flecha hacia arriba).</p></div>
+                    <div class="a-f a-paso"><div class="a-v a-num"><p class="a-ch a-b" style="color: #005c88">2</p></div><p class="a-ch a-x">Elegí <b class="a-b">Agregar a inicio</b> y confirmá con Agregar.</p></div>
+                  </div>
+                </div>
+              </div>
+              <div class="a-v a-ayuda">
+                <p class="a-ch a-s">¿Necesitás ayuda?</p>
+                <a class="a-f a-enlace" href="tel:147" aria-label="Llamar al 147, atención al vecino">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0077ae" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                  <span>Llamar al 147</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+      <!-- Con sesión anotada: la pantalla neutra de siempre, porque React va a abrir la app y no el Ingreso. -->
+      <div class="a-v a-sesion">
+        <svg width="72" height="72" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#009ee2"/><path d="M346 148.8A140 140 0 1 0 346 363.2" fill="none" stroke="#fff" stroke-width="64" stroke-linecap="round"/></svg>
+        <div>
+          <p style="font-size: 13px; line-height: 18px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #526174">San Francisco</p>
+          <p style="margin-top: 4px; font-size: 40px; line-height: 46px; font-weight: 700">Conecta</p>
+          <p style="margin-top: 8px; color: #526174">Tus servicios municipales, a un toque.</p>
+        </div>
+        <p style="max-width: 360px; padding: 8px 12px; border-radius: 10px; background: #fff6cd; color: #7a5e00; font-size: 13px; line-height: 18px; font-weight: 600">Prototipo académico UTN FRSF, sin vínculo oficial con la Municipalidad de San Francisco</p>
+        <p aria-hidden="true" style="font-size: 14px; line-height: 20px; color: #526174">Cargando…</p>
+      </div>
+      <p role="status" class="a-oculto">Cargando…</p>
     </div>
-    <noscript>
-      <p style="margin: 16px; font-family: system-ui, Arial, sans-serif; font-size: 16px; line-height: 24px; color: #1e2939;">
-        San Francisco Conecta necesita JavaScript para funcionar. Para hacer un trámite o un reclamo, llamá al 147 (atención al vecino).
-      </p>
-    </noscript>
     <script type="module" src="/src/index.web.js"></script>
   </body>
 </html>
