@@ -258,7 +258,8 @@ const resumen = (v) => `${(v.tarjetas ?? []).length} tarjetas, ${v.pagos.length}
 if (valor('--cuenta')) {
   // Los datos de Lucía, en una cuenta real con su propio nombre.
   const usuario = await auth.getUser(valor('--cuenta'));
-  const v = { ...lista[0], uid: usuario.uid, nombre: usuario.displayName || 'Vecino' };
+  const nombre = usuario.displayName || 'Vecino';
+  const v = { ...lista[0], uid: usuario.uid, nombre, tarjetas: (lista[0].tarjetas ?? []).map((t) => ({ ...t, titular: nombre })) };
   await cargarVecino(v, { conPerfil: false });
   console.log(`${usuario.email}: ${resumen(v)}`);
 } else if (valor('--reiniciar')) {
