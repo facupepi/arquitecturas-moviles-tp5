@@ -376,18 +376,24 @@ function FilaResumen({ icono, servicio, etiqueta, valor, detalle, tono = 'normal
         <Icono nombre={icono} tamano={18} color={servicio.tinta} />
       </View>
       <View style={estilos.filaTextos}>
-        <View style={estilos.filaCabecera}>
-          <Texto variante="chico" peso="700" color={colores.textoSuave} estilo={estilos.filaEtiqueta}>
-            {etiqueta}
-          </Texto>
-          <Texto variante="cuerpo" peso="700" color={tono === 'normal' ? colores.texto : COLOR_TONO[tono]} testID={`${testID}-valor`}>
-            {valor}
-          </Texto>
-        </View>
+        <Texto variante="chico" peso="700" color={colores.textoSuave}>
+          {etiqueta}
+        </Texto>
         <Texto variante="chico" color={colores.textoSuave}>
           {detalle}
         </Texto>
       </View>
+      {/* El valor va en su propia columna, centrado en la fila como el ícono y la flecha. */}
+      <Texto
+        variante="cuerpo"
+        peso="700"
+        color={tono === 'normal' ? colores.texto : COLOR_TONO[tono]}
+        alineacion="right"
+        testID={`${testID}-valor`}
+        estilo={estilos.filaValor}
+      >
+        {valor}
+      </Texto>
       <Icono nombre="chevron" tamano={18} color={colores.textoSuave} />
     </Pressable>
   );
@@ -698,10 +704,7 @@ const estilos = StyleSheet.create({
     flexShrink: 0,
   },
   filaTextos: { flex: 1, minWidth: 0, gap: 2 },
-  filaCabecera: { flexDirection: 'row', alignItems: 'baseline', columnGap: espacio.s, flexWrap: 'wrap' },
-  // Crece hasta empujar el valor a la derecha; si no entran los dos, el valor baja a otra línea
-  // (antes la etiqueta se achicaba y cortaba "Estacionamiento" a la mitad a 360 px).
-  filaEtiqueta: { flexGrow: 1, flexShrink: 0 },
+  filaValor: { flexShrink: 0, maxWidth: '40%' },
   avisoEtiquetas: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.s },
   dosColumnas: { flexDirection: 'row', alignItems: 'stretch', gap: espacio.xl },
   unaColumna: { gap: espacio.l },
