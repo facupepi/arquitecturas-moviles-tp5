@@ -24,6 +24,7 @@ import {
   COLECCIONES as C, LIMITES, PREFERENCIAS_POR_DEFECTO, TIPOS_AVISO, ZONAS,
 } from '../../shared/constantes.mjs';
 import { dinero, textoMedioPago } from '../../shared/formato.mjs';
+import { ETAPAS_TRIBUTO, idRecordatorioTributo } from '../../shared/recordatorios.mjs';
 
 const MIN = 60_000;
 const ESPERA_COMMIT_MS = 2500;
@@ -449,6 +450,13 @@ export async function pagarTributo(tributoId, requestId, tarjeta) {
     if (!snapTributo.exists()) throw new ErrorApp('no-encontrado');
     const tributo = snapTributo.data();
     if (tributo.pagadoEn != null) throw new ErrorApp('ya-pagado');
+    // Sus recordatorios ("vence en N días", "vencido") dejan de tener sentido: se marcan leídos en la
+    // misma transacción (update permitido: solo leida y leidaEn). Los ids son deterministas.
+    const venceMs = tributo.vence?.toMillis?.();
+    const refsRecordatorios = Number.isFinite(venceMs)
+      ? ETAPAS_TRIBUTO.map((etapa) => refDe(uid, C.notificaciones, idRecordatorioTributo(tributoId, venceMs, etapa)))
+      : [];
+    const recordatorios = await Promise.all(refsRecordatorios.map((ref) => tx.get(ref)));
     const importe = tributo.importe;
     const codigoComprobante = comprobante('REC', requestId);
     tx.set(refPago, {
@@ -456,6 +464,9 @@ export async function pagarTributo(tributoId, requestId, tarjeta) {
       proveedor: PROVEEDOR_PAGO, creadoEn: serverTimestamp(),
     });
     tx.update(refTributo, { pagadoEn: serverTimestamp(), comprobante: codigoComprobante, pagoId: requestId, medio });
+    for (const r of recordatorios) {
+      if (r.exists() && r.get('leida') !== true) tx.update(r.ref, { leida: true, leidaEn: serverTimestamp() });
+    }
     tx.set(refDe(uid, C.notificaciones, `pago-${requestId}`), {
       titulo: 'Pago registrado',
       cuerpo: `${tributo.concepto ?? 'Tributo'} ${tributo.periodo ?? ''}: ${dinero(importe)} con ${conMinuscula(textoMedioPago(medio, enmascarada))}. Comprobante ${codigoComprobante}.`.replace(/\s+/g, ' ').slice(0, 500),

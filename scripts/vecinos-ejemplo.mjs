@@ -10,7 +10,9 @@
 //   node scripts/vecinos-ejemplo.mjs --produccion --reiniciar <uid>  (deja una cuenta como recién registrada)
 //
 // Los uid empiezan con "ejemplo-" y las cuentas no tienen proveedor de ingreso: nadie puede entrar
-// con ellas desde la app. Volver a correrlo reescribe los mismos documentos.
+// con ellas desde la app. Volver a correrlo reescribe los mismos documentos. El resto del uid es
+// opaco y fijo: el panel muestra el código de vecino (últimos 4 caracteres) y con "ejemplo-lucia"
+// mostraba "…UCIA", parte del nombre. Los uid anteriores se borran al cargar y con --borrar.
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { initializeApp, applicationDefault } from 'firebase-admin/app';
@@ -21,6 +23,9 @@ import { COLECCIONES as C, PREFERENCIAS_POR_DEFECTO } from '../shared/constantes
 import { codigoReclamo, comprobante, costoEstacionamiento } from '../shared/dominio.mjs';
 import { validarTarjeta } from '../shared/tarjetas.mjs';
 import { aFirestore, documentosVecino } from './sembrar.mjs';
+
+// Uid de una versión anterior (terminaban en el nombre del vecino): se borran para limpiar producción.
+const UID_ANTERIORES = ['ejemplo-lucia', 'ejemplo-martin', 'ejemplo-sofia', 'ejemplo-javier'];
 
 const MIN = 60 * 1000;
 const HORA = 60 * MIN;
@@ -140,7 +145,7 @@ function vecinos() {
     const s1 = sesion({ zonaId: 'p1', patente: 'AE482KD', minutos: 60, inicio: ahora - 2 * DIA - 4 * HORA, tarjeta: debito });
     const s2 = sesion({ zonaId: 'p3', patente: 'AE482KD', minutos: 90, inicio: ahora - 5 * DIA - 6 * HORA, tarjeta: visa, finalizadaAntes: 20 * MIN });
     lista.push({
-      uid: 'ejemplo-lucia', nombre: 'Lucía Fernández', base, tarjetas: [visa, debito], pagos: [...pagos, s1.pago, s2.pago], reclamos,
+      uid: 'ejemplo-7k2q9x', nombre: 'Lucía Fernández', base, tarjetas: [visa, debito], pagos: [...pagos, s1.pago, s2.pago], reclamos,
       estacionamiento: [s1.sesion, s2.sesion],
       notificaciones: [
         notificacion(`Tu reclamo ${reclamos[0].codigo} pasó a En proceso`, 'Nota de la Municipalidad: La cuadrilla de bacheo pasa esta semana.', 'reclamos', `#/reclamos/${reclamos[0].id}`, 50, false),
@@ -163,7 +168,7 @@ function vecinos() {
     const activa = sesion({ zonaId: 'p2', patente: 'AC345BD', minutos: 120, inicio: ahora - 75 * MIN, tarjeta: debito });
     const vieja = sesion({ zonaId: 'p1', patente: 'AC345BD', minutos: 30, inicio: ahora - 3 * DIA - 2 * HORA, tarjeta: master });
     lista.push({
-      uid: 'ejemplo-martin', nombre: 'Martín Gómez', base, tarjetas: [master, debito], pagos: [...pagos, activa.pago, vieja.pago], reclamos,
+      uid: 'ejemplo-m4t8vb', nombre: 'Martín Gómez', base, tarjetas: [master, debito], pagos: [...pagos, activa.pago, vieja.pago], reclamos,
       estacionamiento: [activa.sesion, vieja.sesion], bloqueo: { patente: 'AC345BD', sesionId: activa.sesion.id, fin: activa.sesion.fin },
       notificaciones: [],
       preferencias: { zonas: ['centro'] },
@@ -181,7 +186,7 @@ function vecinos() {
         estado: 'en_proceso', haceDias: 1.5, nota: 'Espacios verdes programó la poda.' }),
     ];
     lista.push({
-      uid: 'ejemplo-sofia', nombre: 'Sofía Romero', base, tarjetas: [amex], pagos, reclamos, estacionamiento: [],
+      uid: 'ejemplo-r3h6wz', nombre: 'Sofía Romero', base, tarjetas: [amex], pagos, reclamos, estacionamiento: [],
       notificaciones: [
         notificacion(`Tu reclamo ${reclamos[0].codigo} pasó a Resuelto`, 'Nota de la Municipalidad: Se reparó el anclaje.', 'reclamos', `#/reclamos/${reclamos[0].id}`, 90, true),
       ],
@@ -199,7 +204,7 @@ function vecinos() {
     ];
     const s = sesion({ zonaId: 'p3', patente: 'AB123CD', minutos: 45, inicio: ahora - 1 * DIA - 3 * HORA, tarjeta: credito });
     lista.push({
-      uid: 'ejemplo-javier', nombre: 'Javier Ortiz', base, tarjetas: [debito, credito], pagos: [...base.pagos, s.pago], reclamos, estacionamiento: [s.sesion],
+      uid: 'ejemplo-p9c5dn', nombre: 'Javier Ortiz', base, tarjetas: [debito, credito], pagos: [...base.pagos, s.pago], reclamos, estacionamiento: [s.sesion],
       notificaciones: [], preferencias: { zonas: ['sur'] },
     });
   }
@@ -273,9 +278,10 @@ if (valor('--cuenta')) {
   await lote.commit();
   console.log(`${usuario.email}: reiniciada con ${docs.length} documentos (cedulones, recordatorios y bienvenida).`);
 } else if (args.has('--borrar')) {
-  for (const v of lista) await borrarVecino(v.uid);
-  console.log(`Borrados ${lista.length} vecinos de ejemplo.`);
+  for (const uid of [...lista.map((v) => v.uid), ...UID_ANTERIORES]) await borrarVecino(uid);
+  console.log(`Borrados ${lista.length} vecinos de ejemplo (y los ${UID_ANTERIORES.length} uid anteriores, si quedaban).`);
 } else {
+  for (const uid of UID_ANTERIORES) await borrarVecino(uid);
   for (const v of lista) {
     try { await auth.getUser(v.uid); } catch { await auth.createUser({ uid: v.uid, displayName: v.nombre }); }
     await cargarVecino(v);

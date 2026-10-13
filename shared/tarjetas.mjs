@@ -34,7 +34,7 @@ export function normalizarVence(texto) {
  * para mostrarlos debajo de cada campo.
  *   → { tarjeta: { tipo, red, ultimos4, titular, vence } | null, errores: { tipo?, numero?, titular?, vence? } }
  */
-export function revisarTarjeta({ tipo, numero, titular, vence } = {}, ahoraMs = Date.now()) {
+export function revisarTarjeta({ tipo, numero, titular, vence, codigo } = {}, ahoraMs = Date.now()) {
   const errores = {};
   if (!MEDIOS_PAGO.includes(tipo)) errores.tipo = 'Elegí si es de crédito o de débito.';
 
@@ -50,6 +50,15 @@ export function revisarTarjeta({ tipo, numero, titular, vence } = {}, ahoraMs = 
   else if (nombre.length < LIMITES.largoTitularMin || nombre.length > LIMITES.largoTitularMax) {
     errores.titular = `Usá entre ${LIMITES.largoTitularMin} y ${LIMITES.largoTitularMax} caracteres.`;
   } else if (/[0-9]/.test(nombre)) errores.titular = 'El titular no lleva números.';
+
+  // Código de seguridad: se valida (3 dígitos, 4 en American Express) y se descarta; nunca se
+  // devuelve ni se guarda. Solo se exige cuando llega el campo (el formulario siempre lo envía).
+  if (codigo !== undefined) {
+    const cvv = String(codigo ?? '').trim();
+    const largo = redTarjeta(digitos) === 'American Express' ? 4 : 3;
+    if (!cvv) errores.codigo = 'Ingresá el código de seguridad.';
+    else if (!new RegExp(`^[0-9]{${largo}}$`).test(cvv)) errores.codigo = `Son ${largo} números, al dorso de la tarjeta.`;
+  }
 
   const venceNormalizado = normalizarVence(vence);
   if (!String(vence ?? '').trim()) errores.vence = 'Ingresá el vencimiento.';

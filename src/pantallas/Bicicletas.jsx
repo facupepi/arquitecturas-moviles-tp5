@@ -16,7 +16,8 @@ import {
 import { ordenarPorCercania } from '../../shared/dominio.mjs';
 import TarjetaEstacion from './bicicletas/TarjetaEstacion';
 import { llevarALaVista } from './bicicletas/llevarALaVista';
-import { ANCHO_LADO_A_LADO, Grilla, MapaYLista, useAncho } from './bicicletas/Disposicion';
+import { Grilla, MapaYLista, altoMapaLateral, esLadoALado, useAncho } from './bicicletas/Disposicion';
+import { useTarjetaALaVista } from './bicicletas/useTarjetaALaVista';
 import {
   distanciaTexto, estadoEstacion, normalizarBusqueda, ordenarPorDisponibilidad, plural,
 } from './bicicletas/utiles';
@@ -60,12 +61,12 @@ export default function Bicicletas({ ruta }) {
   const ahora = useAhora(30_000);
   const refMapa = useRef(null);
   const [ancho, alMedir] = useAncho();
-  const { height: altoVentana } = useWindowDimensions();
-  const ladoALado = ancho >= ANCHO_LADO_A_LADO;
+  const { width: anchoVentana, height: altoVentana } = useWindowDimensions();
+  const ladoALado = esLadoALado(ancho, anchoVentana);
   const refLadoALado = useRef(ladoALado);
   refLadoALado.current = ladoALado;
-  // En escritorio el mapa acompaña a la lista y ocupa casi todo el alto visible.
-  const altoMapa = ladoALado ? Math.round(Math.min(620, Math.max(380, altoVentana - 330))) : 300;
+  // En escritorio el mapa acompaña a la lista, fijo a la vista, y ocupa casi todo el alto visible.
+  const altoMapa = ladoALado ? altoMapaLateral(altoVentana) : 300;
 
   const [seleccionado, setSeleccionado] = useState(ruta?.id ?? null);
   const [posicion, setPosicion] = useState(null);
@@ -73,7 +74,8 @@ export default function Bicicletas({ ruta }) {
   const [errorUbicacion, setErrorUbicacion] = useState(null);
   const [busqueda, setBusqueda] = useState('');
 
-  const refsTarjetas = useRef({});
+  const tarjetas = useTarjetaALaVista();
+  const refsTarjetas = tarjetas.refs;
   const pendienteDeVista = useRef(ruta?.id ?? null);
 
   // Enlace profundo #/bicicletas/b3: la estación queda elegida en el mapa y la pantalla baja hasta
@@ -145,8 +147,18 @@ export default function Bicicletas({ ruta }) {
     }
   }, [estaciones]);
 
+  // Un punto elegido en el mapa: su tarjeta entra a la vista (si la búsqueda la ocultaba, se limpia).
+  const elegirEnMapa = (id) => {
+    setSeleccionado(id);
+    if (!visibles.some((e) => e.id === id)) setBusqueda('');
+    tarjetas.pedir(id);
+  };
+
+  // "Ver en mapa" centra el punto en el mapa aunque ya estuviera elegido (cada pedido es nuevo).
+  const [enfoque, setEnfoque] = useState(0);
   const verEnMapa = useCallback((id) => {
     setSeleccionado(id);
+    setEnfoque((n) => n + 1);
     // Lado a lado el mapa ya está a la vista: no hace falta desplazar la pantalla.
     if (!refLadoALado.current) llevarALaVista(refMapa);
   }, []);
@@ -209,7 +221,8 @@ export default function Bicicletas({ ruta }) {
           <Mapa
             puntos={puntos}
             seleccionado={seleccionado}
-            onSeleccionar={setSeleccionado}
+            enfoque={enfoque}
+            onSeleccionar={elegirEnMapa}
             ubicacion={posicion}
             alto={altoMapa}
             etiqueta="Mapa de las estaciones de bicicletas de San Francisco"
@@ -242,7 +255,7 @@ export default function Bicicletas({ ruta }) {
             {visibles.map((e) => (
               <TarjetaEstacion
                 key={e.id}
-                refContenedor={(nodo) => { refsTarjetas.current[e.id] = nodo; }}
+                refContenedor={tarjetas.registrar(e.id)}
                 estacion={e}
                 distanciaKm={e.distanciaKm}
                 seleccionada={e.id === seleccionado}

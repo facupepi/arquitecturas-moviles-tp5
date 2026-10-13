@@ -1,4 +1,4 @@
-// Tokens de diseño (WP5, sección 7.1). Colores tomados del CSS heredado y de public/brand/README.md.
+// Tokens de diseño (WP5, sección 7.1). Colores tomados del CSS heredado y de docs/marca.md.
 // Todo componente toma de acá colores, tipografía, espacios y medidas: no hay valores sueltos.
 
 export const colores = {

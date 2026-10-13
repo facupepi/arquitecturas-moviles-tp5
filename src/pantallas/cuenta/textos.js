@@ -6,7 +6,7 @@ export const PRIVACIDAD_BREVE = [
   {
     icono: 'usuario',
     titulo: 'Guardamos solo tus gestiones',
-    texto: 'Tus reclamos, pagos, estacionamientos y preferencias de avisos. Solo vos podés verlos.',
+    texto: 'Tus reclamos, pagos, estacionamientos y preferencias de avisos. Otros vecinos no los ven; el municipio, solo lo necesario para atenderlos.',
   },
   {
     icono: 'ubicacion',
@@ -39,12 +39,14 @@ export const PRIVACIDAD_COMPLETA = [
     texto:
       'Tu ubicación, que usamos solo en el momento. Para avisarte de alarmas cercanas registramos qué alarmas '
       + 'están cerca durante 30 minutos, nunca tus coordenadas. Tampoco guardamos tu correo en nuestra base, '
-      + 'el número completo de tus tarjetas ni su código de seguridad, que nunca te pedimos.',
+      + 'el número completo de tus tarjetas ni su código de seguridad, que solo usamos para validarla.',
   },
   {
     titulo: 'Quién puede verlo',
     texto:
-      'Solo vos. El personal municipal ve los reclamos para poder responderlos. '
+      'Ningún otro vecino. El personal municipal ve los reclamos para poder responderlos, y para controlar los cobros '
+      + 've tus pagos (importe, comprobante, red y últimos 4 dígitos de la tarjeta), tus cedulones vencidos y tus '
+      + 'estacionamientos (patente, zona y horario). En esas listas te identifica con un código corto, sin tu nombre ni tu correo. '
       + 'La patente de un estacionamiento activo queda bloqueada sin tu identidad, para que nadie más la use al mismo tiempo.',
   },
   {

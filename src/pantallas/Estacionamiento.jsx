@@ -2,10 +2,10 @@
 // horario; E2 inicio con patente y minutos; E3 temporizador con aviso antes de vencer; E4 extensión
 // y finalización anticipada; historial con "Cargar más". Enlace profundo: #/estacionamiento/p1.
 import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { colores, coloresMapa, espacio, radios } from '../tema/tokens';
 import {
-  Aviso, Cargando, ErrorCarga, FilaDato, Mapa, Pantalla, Seccion, Tarjeta, Texto, Vacio, useAnchoDisponible,
+  Aviso, Cargando, ErrorCarga, Mapa, Pantalla, Seccion, Tarjeta, Texto, Vacio, useAnchoDisponible,
 } from '../ui';
 import { useMunicipal, cargarMas } from '../datos/almacen';
 import { useAhora } from '../datos/useAhora';
@@ -14,11 +14,14 @@ import FormularioInicio from './estacionamiento/FormularioInicio';
 import Historial from './estacionamiento/Historial';
 import SelectorZona from './estacionamiento/SelectorZona';
 import SesionActiva from './estacionamiento/SesionActiva';
+import { MapaYLista, altoMapaLateral, esLadoALado } from './bicicletas/Disposicion';
+import { useTarjetaALaVista } from './bicicletas/useTarjetaALaVista';
 import {
   horarioEstricto, puntosDeZonas, separarSesiones, umbralAviso, zonaEnHorario,
 } from './estacionamiento/util';
 
-// Desde este ancho de contenido: mapa y zonas a la izquierda; sesión, inicio e historial a la derecha.
+// Desde este ancho de contenido (sin el menú lateral; en escritorio, desde el de Disposicion): el
+// mapa a la izquierda, fijo a la vista; zonas, sesión, inicio e historial a la derecha.
 const ANCHO_DOS_COLUMNAS = 840;
 
 const TITULO = 'Estacionamiento medido';
@@ -80,10 +83,12 @@ export default function Estacionamiento({ ruta }) {
   const { listo, zonas, config, sesiones, hayMas, errorZonas, errorSesiones } = useMunicipal(seleccionar);
   const { navegar } = useRuta();
   const [anchoDisponible, alMedir] = useAnchoDisponible();
+  const { width: anchoVentana, height: altoVentana } = useWindowDimensions();
+  const zonasALaVista = useTarjetaALaVista();
   const ahora = useAhora(1000);
   // Lo que no necesita el segundo exacto (horario de las zonas, mapa) cambia cada 15 s.
   const ahoraLento = Math.floor(ahora / 15000) * 15000;
-  const ancho = anchoDisponible >= ANCHO_DOS_COLUMNAS;
+  const ancho = esLadoALado(anchoDisponible, anchoVentana, ANCHO_DOS_COLUMNAS);
 
   const idRuta = ruta?.id ?? null;
   const [zonaId, setZonaId] = useState(idRuta);
@@ -104,6 +109,11 @@ export default function Estacionamiento({ ruta }) {
     setZonaId(id);
     // Deja la zona en la dirección (se puede compartir), sin sumar entradas al historial.
     if (id !== idRuta) navegar('estacionamiento', id, null, { reemplazar: true });
+  };
+  // Una zona elegida en el mapa entra a la vista en la lista de zonas.
+  const elegirEnMapa = (id) => {
+    elegirZona(id);
+    zonasALaVista.pedir(id);
   };
 
   const zona = zonas.find((z) => z.id === zonaId) ?? null;
@@ -158,15 +168,23 @@ export default function Estacionamiento({ ruta }) {
       <Mapa
         puntos={puntos}
         seleccionado={zonaId}
-        onSeleccionar={elegirZona}
-        alto={ancho ? 360 : 240}
+        onSeleccionar={elegirEnMapa}
+        alto={ancho ? altoMapaLateral(altoVentana) : 240}
         etiqueta="Mapa de las zonas de estacionamiento medido de San Francisco"
         testID="mapa-estacionamiento"
       />
       <LeyendaMapa />
     </>
   );
-  const selector = <SelectorZona zonas={zonas} valor={zonaId} onCambio={elegirZona} ahora={ahoraLento} />;
+  const selector = (
+    <SelectorZona
+      zonas={zonas}
+      valor={zonaId}
+      onCambio={elegirZona}
+      ahora={ahoraLento}
+      refOpcion={zonasALaVista.registrar}
+    />
+  );
   const formulario = (
     <>
       <AvisoHorario zona={zona} estricto={estricto} cobra={cobra} />
@@ -181,28 +199,16 @@ export default function Estacionamiento({ ruta }) {
     </>
   );
 
-  let cuerpoFormulario;
-  if (sinZonas) {
-    cuerpoFormulario = sinZonas;
-  } else if (ancho) {
-    // El mapa y las zonas quedan en la columna izquierda; acá, la zona elegida y los datos.
-    cuerpoFormulario = (
+  // Ancho: el mapa va en la columna izquierda (fijo); acá, las zonas y los datos.
+  const cuerpoFormulario = sinZonas ?? (
+    <>
+      {ancho ? null : mapa}
       <Tarjeta>
-        {zona ? <FilaDato etiqueta="Zona" valor={zona.nombre} testID="zona-elegida" /> : null}
+        {selector}
         {formulario}
       </Tarjeta>
-    );
-  } else {
-    cuerpoFormulario = (
-      <>
-        {mapa}
-        <Tarjeta>
-          {selector}
-          {formulario}
-        </Tarjeta>
-      </>
-    );
-  }
+    </>
+  );
 
   const seccionFormulario = (
     <Seccion titulo={activas.length ? 'Iniciar otro estacionamiento' : 'Iniciar un estacionamiento'} testID="iniciar">
@@ -224,24 +230,20 @@ export default function Estacionamiento({ ruta }) {
 
   return (
     <Pantalla titulo={TITULO} bajada={BAJADA} testID="pantalla-estacionamiento">
-      <View onLayout={alMedir} style={ancho ? estilos.columnas : estilos.apilado}>
-        {ancho ? (
-          <>
-            <View style={estilos.columnaPrincipal}>
-              <Seccion titulo="Zonas" testID="zonas">
-                {sinZonas ?? (
-                  <>
-                    {mapa}
-                    <Tarjeta>{selector}</Tarjeta>
-                  </>
-                )}
-              </Seccion>
-            </View>
-            <View style={estilos.columnaLateral}>
-              {ordenadas}
-              {seccionHistorial}
-            </View>
-          </>
+      <View onLayout={alMedir} style={estilos.apilado}>
+        {ancho && !sinZonas ? (
+          <MapaYLista
+            ladoALado
+            proporcion={[3, 2]}
+            testID="columna-mapa-estacionamiento"
+            mapa={mapa}
+            lista={(
+              <>
+                {ordenadas}
+                {seccionHistorial}
+              </>
+            )}
+          />
         ) : (
           <>
             {ordenadas}
@@ -255,9 +257,6 @@ export default function Estacionamiento({ ruta }) {
 
 const estilos = StyleSheet.create({
   apilado: { gap: espacio.l },
-  columnas: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.xl },
-  columnaPrincipal: { flex: 3, minWidth: 0, gap: espacio.l },
-  columnaLateral: { flex: 2, minWidth: 0, gap: espacio.l },
   leyenda: { flexDirection: 'row', flexWrap: 'wrap', columnGap: espacio.l, rowGap: espacio.xs, marginTop: -espacio.s },
   leyendaItem: { flexDirection: 'row', alignItems: 'center', gap: espacio.xs },
   leyendaLinea: { width: 18, height: 6, borderRadius: radios.pildora },

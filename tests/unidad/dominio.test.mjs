@@ -369,3 +369,14 @@ test('pagoConTarjeta: el pago registra el tipo y la tarjeta enmascarada', () => 
   }
   lanzaEn(() => pagoConTarjeta({ ...guardada, vence: '09/26' }, ahora), 'medio');
 });
+
+test('revisarTarjeta: el código de seguridad se valida y nunca se devuelve', () => {
+  const ahora = Date.UTC(2026, 9, 13, 15);
+  const base = { tipo: 'credito', numero: '4242424242424242', titular: 'Ana Paz', vence: '12/30' };
+  assert.equal(revisarTarjeta({ ...base, codigo: '' }, ahora).errores.codigo, 'Ingresá el código de seguridad.');
+  assert.equal(revisarTarjeta({ ...base, codigo: '12' }, ahora).errores.codigo, 'Son 3 números, al dorso de la tarjeta.');
+  assert.equal(revisarTarjeta({ ...base, numero: '378282246310005', codigo: '123' }, ahora).errores.codigo, 'Son 4 números, al dorso de la tarjeta.');
+  const { tarjeta } = revisarTarjeta({ ...base, codigo: '123' }, ahora);
+  assert.ok(tarjeta);
+  assert.equal(JSON.stringify(tarjeta).includes('123'), false);
+});

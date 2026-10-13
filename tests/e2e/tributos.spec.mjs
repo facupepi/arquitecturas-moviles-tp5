@@ -139,7 +139,6 @@ test.describe('Tributos', () => {
     await expect(page.getByTestId('importe-pago')).toHaveText(importe(SEMILLA['T-1001'].importe));
     await expect(page.getByTestId('sin-tarjetas-pago')).toContainText('Todavía no tenés tarjetas guardadas');
     await expect(dialogo.locator('input, textarea')).toHaveCount(0);
-    await expect(page.getByTestId('nota-seguridad-pago')).toHaveText('Guardamos solo los últimos 4 dígitos. Nunca te pedimos el código de seguridad.');
     const requestId = (await page.getByTestId('numero-operacion').getAttribute('data-operacion'))?.match(UUID)?.[0];
     expect(requestId).toBeTruthy();
 
@@ -149,12 +148,11 @@ test.describe('Tributos', () => {
     expect((await tributoEnDb(adminDb, uid, 'T-1001')).pagadoEn).toBeNull();
     await revisarAccesibilidad(page, 'pago-sin-tarjetas');
 
-    // "Agregar tarjeta" carga la tarjeta en el mismo diálogo, sin código de seguridad.
+    // "Agregar tarjeta" carga la tarjeta en el mismo diálogo, con código de seguridad que no se guarda.
     await page.getByTestId('agregar-tarjeta-pago').click();
     await expect(dialogo.getByRole('heading', { name: 'Agregar tarjeta' })).toBeVisible();
     await expect(page.getByTestId('tarjeta-tipo-credito')).toBeFocused();
-    await expect(dialogo.locator('input')).toHaveCount(3);
-    await expect(dialogo).not.toContainText(/CVV|CVC/);
+    await expect(dialogo.locator('input')).toHaveCount(4);
     await expect(page.getByTestId('confirmar-pago')).toHaveCount(0);
     // Vacío: un error debajo de cada campo y el foco en el primero.
     await page.getByTestId('guardar-tarjeta').click();
@@ -162,6 +160,7 @@ test.describe('Tributos', () => {
     await expect(dialogo).toContainText('Ingresá el número de la tarjeta.');
     await expect(dialogo).toContainText('Ingresá el nombre como figura en la tarjeta.');
     await expect(dialogo).toContainText('Ingresá el vencimiento.');
+    await expect(dialogo).toContainText('Ingresá el código de seguridad.');
     await expect(page.getByTestId('tarjeta-numero')).toHaveAttribute('aria-invalid', 'true');
     await revisarAccesibilidad(page, 'pago-alta-tarjeta');
     await page.getByTestId('tarjeta-tipo-debito').click();
@@ -170,6 +169,7 @@ test.describe('Tributos', () => {
     await page.getByTestId('tarjeta-titular').fill('Vecina Prueba');
     await page.getByTestId('tarjeta-vence').fill('0830');
     await expect(page.getByTestId('tarjeta-vence')).toHaveValue('08/30');
+    await page.getByTestId('tarjeta-codigo').fill('456');
     await page.getByTestId('guardar-tarjeta').click();
 
     // De vuelta en el pago, con la tarjeta nueva elegida.

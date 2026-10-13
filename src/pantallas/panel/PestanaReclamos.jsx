@@ -13,7 +13,7 @@ import {
 } from '../../ui';
 import { nuevoIdSolicitud, siguienteEstadoReclamo } from '../../../shared/dominio.mjs';
 import { ETIQUETAS } from '../../../shared/constantes.mjs';
-import { codigoVecino, tiempoPasado } from '../../../shared/formato.mjs';
+import { codigoVecino, sinSuspensivos, tiempoPasado } from '../../../shared/formato.mjs';
 import { EstadoEnvio, Grilla, TONO_ESTADO_RECLAMO, accionPanel, estilosPanel, fechaCorta, plural } from './comun';
 
 const LARGO_NOTA = 300;
@@ -32,9 +32,11 @@ function etiquetaVecino(uid) {
 
 function coincide(reclamo, texto) {
   if (!texto) return true;
-  const t = texto.toLocaleLowerCase('es-AR');
+  // El código de vecino se busca igual con "…", con tres puntos o sin ellos.
+  const t = sinSuspensivos(texto).toLocaleLowerCase('es-AR');
+  if (!t) return true;
   return [reclamo.codigo, reclamo.direccion, reclamo.descripcion, ETIQUETAS.categorias[reclamo.categoria], etiquetaVecino(reclamo.uid)]
-    .some((v) => typeof v === 'string' && v.toLocaleLowerCase('es-AR').includes(t));
+    .some((v) => typeof v === 'string' && sinSuspensivos(v).toLocaleLowerCase('es-AR').includes(t));
 }
 
 function LineaTiempo({ cronologia }) {

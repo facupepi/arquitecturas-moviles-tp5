@@ -21,8 +21,13 @@ function cuandoVence(dias) {
   return `vence en ${dias} días`;
 }
 
-// → [{ id, titulo, cuerpo, tipo: 'tributos', destino, tributoId, etapa }]
 // id: tributo-<tributoId>-<AAAA-MM-DD del vencimiento en Córdoba>-<por_vencer|vencido>
+export const ETAPAS_TRIBUTO = Object.freeze(['por_vencer', 'vencido']);
+export function idRecordatorioTributo(tributoId, venceMs, etapa) {
+  return `tributo-${tributoId}-${diaCordoba(venceMs)}-${etapa}`;
+}
+
+// → [{ id, titulo, cuerpo, tipo: 'tributos', destino, tributoId, etapa }]
 export function recordatoriosTributos(tributos, ahora, dias = LIMITES.diasAvisoVencimiento) {
   const resultado = [];
   for (const t of tributos ?? []) {
@@ -32,7 +37,7 @@ export function recordatoriosTributos(tributos, ahora, dias = LIMITES.diasAvisoV
     const etapa = falta <= 0 ? 'vencido' : 'por_vencer';
     const nombre = `${t.concepto} ${t.periodo}`;
     resultado.push({
-      id: `tributo-${t.id}-${diaCordoba(t.vence)}-${etapa}`,
+      id: idRecordatorioTributo(t.id, t.vence, etapa),
       titulo: etapa === 'vencido'
         ? 'Tenés un cedulón vencido'
         : `Tu ${nombre} ${cuandoVence(diasCalendario(ahora, t.vence))}`,

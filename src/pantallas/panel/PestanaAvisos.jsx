@@ -1,7 +1,7 @@
 // Pestaña Avisos del panel (S8, N1 y N3): formulario para publicar un aviso municipal. Se valida en
 // el cliente con los mismos límites que las reglas, se confirma en un diálogo (el requestId nace al
 // abrirlo) y se publica con publicarAviso: aviso + evento en un lote y después el envío del push.
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useMunicipal } from '../../datos/almacen';
 import { publicarAviso } from '../../datos/repositorio';
@@ -41,6 +41,8 @@ const OPCIONES_DESTINO = [
   ...SERVICIOS.map((s) => ({ valor: s.ruta, etiqueta: s.nombre })),
 ];
 const NOMBRE_DESTINO = Object.fromEntries(OPCIONES_DESTINO.map((o) => [o.valor, o.etiqueta]));
+// En el orden del formulario: el foco va al primero que tenga error.
+const CAMPOS = ['titulo', 'cuerpo', 'tipo', 'zona', 'detalle', 'enlace', 'vigencia'];
 
 // Mismos límites que validarAviso del repositorio y que las reglas: el error aparece antes de enviar.
 function validar(f) {
@@ -124,6 +126,20 @@ export default function PestanaAvisos({ eventosPorId }) {
   const [form, setForm] = useState(VACIO);
   const [errores, setErrores] = useState({});
   const [confirmacion, setConfirmacion] = useState(null);   // { requestId }
+  const refs = useRef(Object.fromEntries(CAMPOS.map((c) => [c, React.createRef()]))).current;
+
+  // Lleva el foco y la vista al primer campo con error (en un selector de chips, a su primera opción).
+  const enfocarPrimerError = (encontrados) => {
+    const campo = CAMPOS.find((c) => encontrados[c]);
+    if (!campo) return;
+    setTimeout(() => {
+      const nodo = refs[campo].current;
+      try {
+        nodo?.focus?.();
+        nodo?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+      } catch { /* sin foco en nativo */ }
+    }, 0);
+  };
 
   const publicacion = useComando(publicarAviso, {
     ...accionPanel((_, datos) => ({ accion: 'publicar_aviso', tipo: datos?.tipo, zona: datos?.zona })),
@@ -143,7 +159,10 @@ export default function PestanaAvisos({ eventosPorId }) {
   const revisar = () => {
     const encontrados = validar(form);
     setErrores(encontrados);
-    if (Object.keys(encontrados).length) return;
+    if (Object.keys(encontrados).length) {
+      enfocarPrimerError(encontrados);
+      return;
+    }
     publicacion.limpiar();
     setConfirmacion({ requestId: nuevoIdSolicitud() });
   };
@@ -178,6 +197,7 @@ export default function PestanaAvisos({ eventosPorId }) {
               maxLargo={LARGOS.titulo}
               placeholder="Ej.: Corte de agua en zona Sur"
               id="aviso-titulo"
+              ref={refs.titulo}
               testID="campo-aviso-titulo"
             />
             <Campo
@@ -189,6 +209,7 @@ export default function PestanaAvisos({ eventosPorId }) {
               multilinea
               maxLargo={LARGOS.cuerpo}
               id="aviso-cuerpo"
+              ref={refs.cuerpo}
               testID="campo-aviso-cuerpo"
             />
             <Selector
@@ -198,6 +219,7 @@ export default function PestanaAvisos({ eventosPorId }) {
               onCambio={cambiar('tipo')}
               error={errorDe('tipo')}
               testID="aviso-tipo"
+              ref={refs.tipo}
             />
             <Selector
               etiqueta="Zona"
@@ -206,6 +228,7 @@ export default function PestanaAvisos({ eventosPorId }) {
               onCambio={cambiar('zona')}
               error={errorDe('zona')}
               testID="aviso-zona"
+              ref={refs.zona}
             />
             <Campo
               etiqueta="Más información (opcional)"
@@ -216,6 +239,7 @@ export default function PestanaAvisos({ eventosPorId }) {
               multilinea
               maxLargo={LARGOS.detalle}
               id="aviso-detalle"
+              ref={refs.detalle}
               testID="campo-aviso-detalle"
             />
             <Selector
@@ -235,6 +259,7 @@ export default function PestanaAvisos({ eventosPorId }) {
               modoTeclado="url"
               maxLargo={LARGOS.enlace}
               id="aviso-enlace"
+              ref={refs.enlace}
               testID="campo-aviso-enlace"
             />
             <Selector
@@ -244,6 +269,7 @@ export default function PestanaAvisos({ eventosPorId }) {
               onCambio={cambiar('vigencia')}
               error={errorDe('vigencia')}
               testID="aviso-vigencia"
+              ref={refs.vigencia}
             />
             {form.tipo === 'emergencias' && form.vigencia !== SIN_VENCIMIENTO ? (
               <Aviso tono="alerta" mensaje="Mientras esté vigente, la emergencia se muestra en un cartel arriba de todo en la app." />

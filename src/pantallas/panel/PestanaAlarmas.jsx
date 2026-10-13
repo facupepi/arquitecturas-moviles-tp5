@@ -52,7 +52,7 @@ function AlarmaPanel({ alarma, evento, ahora }) {
             testID={`estado-alarma-panel-${alarma.id}`}
           />
         </View>
-        <Texto variante="chico" color={colores.textoSuave} numberOfLines={1}>
+        <Texto variante="chico" color={colores.textoSuave} numberOfLines={2}>
           {[`Zona ${zona}`, alarma.referencia].filter(Boolean).join(' · ')}
         </Texto>
       </View>

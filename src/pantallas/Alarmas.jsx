@@ -13,7 +13,8 @@ import { tiempoRelativo } from '../../shared/formato.mjs';
 import AvisosAlarmas from './alarmas/AvisosAlarmas';
 import TarjetaAlarma from './alarmas/TarjetaAlarma';
 import { llevarALaVista } from './bicicletas/llevarALaVista';
-import { ANCHO_LADO_A_LADO, Grilla, MapaYLista, useAncho } from './bicicletas/Disposicion';
+import { Grilla, MapaYLista, altoMapaLateral, esLadoALado, useAncho } from './bicicletas/Disposicion';
+import { useTarjetaALaVista } from './bicicletas/useTarjetaALaVista';
 import { nombreZona } from './bicicletas/utiles';
 
 const seleccionar = (s) => ({
@@ -41,17 +42,18 @@ export default function Alarmas({ ruta }) {
   const ahora = useAhora(30_000);
   const refMapa = useRef(null);
   const [ancho, alMedir] = useAncho();
-  const { height: altoVentana } = useWindowDimensions();
-  const ladoALado = ancho >= ANCHO_LADO_A_LADO;
+  const { width: anchoVentana, height: altoVentana } = useWindowDimensions();
+  const ladoALado = esLadoALado(ancho, anchoVentana);
   const refLadoALado = useRef(ladoALado);
   refLadoALado.current = ladoALado;
-  // En escritorio el mapa acompaña a la lista y ocupa casi todo el alto visible.
-  const altoMapa = ladoALado ? Math.round(Math.min(620, Math.max(380, altoVentana - 330))) : 280;
+  // En escritorio el mapa acompaña a la lista, fijo a la vista, y ocupa casi todo el alto visible.
+  const altoMapa = ladoALado ? altoMapaLateral(altoVentana) : 280;
   const [seleccionado, setSeleccionado] = useState(ruta?.id ?? null);
   // Las alarmas llegan por su propia suscripción: se espera un poco antes de decir "no hay".
   const [esperaVencida, setEsperaVencida] = useState(false);
 
-  const refsTarjetas = useRef({});
+  const tarjetas = useTarjetaALaVista();
+  const refsTarjetas = tarjetas.refs;
   const pendienteDeVista = useRef(ruta?.id ?? null);
 
   // Enlace profundo #/alarmas/a2 (por ejemplo, desde un aviso): la alarma queda elegida en el mapa
@@ -101,8 +103,17 @@ export default function Alarmas({ ruta }) {
     [alarmas],
   );
 
+  // Un punto elegido en el mapa: su tarjeta entra a la vista en la lista.
+  const elegirEnMapa = useCallback((id) => {
+    setSeleccionado(id);
+    tarjetas.pedir(id);
+  }, [tarjetas.pedir]);
+
+  // "Ver en mapa" centra el punto en el mapa aunque ya estuviera elegido (cada pedido es nuevo).
+  const [enfoque, setEnfoque] = useState(0);
   const verEnMapa = useCallback((id) => {
     setSeleccionado(id);
+    setEnfoque((n) => n + 1);
     // Lado a lado el mapa ya está a la vista: no hace falta desplazar la pantalla.
     if (!refLadoALado.current) llevarALaVista(refMapa);
   }, []);
@@ -127,7 +138,8 @@ export default function Alarmas({ ruta }) {
           <Mapa
             puntos={puntos}
             seleccionado={seleccionado}
-            onSeleccionar={setSeleccionado}
+            enfoque={enfoque}
+            onSeleccionar={elegirEnMapa}
             alto={altoMapa}
             etiqueta="Mapa de las alarmas comunitarias de San Francisco"
             testID="mapa-alarmas"
@@ -155,7 +167,7 @@ export default function Alarmas({ ruta }) {
           {ordenadas.map((a) => (
             <TarjetaAlarma
               key={a.id}
-              refContenedor={(nodo) => { refsTarjetas.current[a.id] = nodo; }}
+              refContenedor={tarjetas.registrar(a.id)}
               alarma={a}
               sigueZona={zonas.includes(a.zona)}
               cerca={idsCerca.has(a.id)}

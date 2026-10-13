@@ -16,6 +16,7 @@ const red = await import('./_dobles/red.mjs');
 const repo = await import('../../src/datos/repositorio.js');
 const repoTarjetas = await import('../../src/datos/repositorioTarjetas.js');
 const { catalogo } = await import('../../shared/catalogo.mjs');
+const { idRecordatorioTributo } = await import('../../shared/recordatorios.mjs');
 
 let entorno;
 const contextos = new Map();
@@ -123,6 +124,26 @@ describe('tributos', () => {
     await assert.rejects(repo.pagarTributo('T-0999', id(8), { ...VISA, tipo: 'billetera' }), sinTarjeta);
     await assert.rejects(repo.pagarTributo('T-0999', id(9), { ...VISA, ultimos4: '4242424242424242' }), sinTarjeta);
     await assert.rejects(repo.pagarTributo('T-0999', id(30), { ...VISA, vence: '01/20' }), sinTarjeta);
+  });
+
+  it('pagarTributo marca leídos los recordatorios de ese cedulón, y solo los de ese cedulón', async () => {
+    const vence = (await leer('usuarios/caro/tributos/T-1001')).vence.toMillis();
+    const recordatorio = `usuarios/caro/notificaciones/${idRecordatorioTributo('T-1001', vence, 'por_vencer')}`;
+    const otro = `usuarios/caro/notificaciones/${idRecordatorioTributo('T-1002', vence, 'por_vencer')}`;
+    const noLeida = {
+      titulo: 'Tu tasa vence en 2 días', cuerpo: 'Podés pagarla desde Tributos.', tipo: 'tributos', zona: null,
+      destino: '#/tributos/T-1001', enlace: null, creadoEn: ts(Date.now()), leida: false, leidaEn: null, origen: 'servidor',
+    };
+    await sembrar(entorno, async (db) => {
+      await setDoc(doc(db, recordatorio), noLeida);
+      await setDoc(doc(db, otro), { ...noLeida, destino: '#/tributos/T-1002' });
+    });
+    como('caro');
+    await repo.pagarTributo('T-1001', id(31), VISA);
+    const marcado = await leer(recordatorio);
+    assert.equal(marcado.leida, true);
+    assert.ok(marcado.leidaEn, 'leidaEn con la hora del servidor');
+    assert.equal((await leer(otro)).leida, false, 'el recordatorio de otro cedulón sigue sin leer');
   });
 
   it('sin sesión o sin red no intenta pagar', async () => {

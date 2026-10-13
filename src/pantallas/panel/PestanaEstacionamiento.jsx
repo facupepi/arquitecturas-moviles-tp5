@@ -15,7 +15,7 @@ import {
   Texto, Vacio, useAvisoFlotante,
 } from '../../ui';
 import { ETIQUETAS } from '../../../shared/constantes.mjs';
-import { codigoVecino, dinero, hora } from '../../../shared/formato.mjs';
+import { codigoVecino, dinero, hora, sinSuspensivos } from '../../../shared/formato.mjs';
 import { Grilla, Indicadores, accionPanel, estilosPanel, plural } from './comun';
 
 const POR_PAGINA = 12;
@@ -34,8 +34,10 @@ function textoRestante(min) {
 
 function coincide(sesion, texto) {
   if (!texto) return true;
-  const t = texto.toLocaleUpperCase('es-AR').replace(/[\s…-]/g, '');
-  return [sesion.patente, codigoVecino(sesion.uid).replace('…', ''), sesion.zonaNombre]
+  const t = sinSuspensivos(texto).toLocaleUpperCase('es-AR').replace(/[\s-]/g, '');
+  if (!t) return true;
+  // Por nombre de la zona ("Microcentro") o por su zona de la ciudad ("Centro"), como se muestra.
+  return [sesion.patente, sinSuspensivos(codigoVecino(sesion.uid)), sesion.zonaNombre, ETIQUETAS.zonas[sesion.zona]]
     .some((v) => typeof v === 'string' && v.toLocaleUpperCase('es-AR').replace(/[\s-]/g, '').includes(t));
 }
 

@@ -10,6 +10,7 @@ import Texto from './Texto';
 import { alPresionarEspacio } from './comun';
 
 const MARGEN_VISTA = 36; // lo que se deja a la vista de la pestaña vecina al llevar la elegida a la vista
+const ANCHO_FLECHA = 32; // estilos.borde: la flecha tapa ese ancho en cada lado donde hay más pestañas
 
 export default function Pestanas({ opciones = [], valor, onCambio, testID, etiqueta }) {
   const { width } = useWindowDimensions();
@@ -27,11 +28,19 @@ export default function Pestanas({ opciones = [], valor, onCambio, testID, etiqu
 
   // La pestaña elegida (por toque, teclado o enlace profundo) siempre queda entera a la vista.
   useEffect(() => {
-    const p = posiciones.current[String(valor)];
-    if (!p || !desplazable.current || sobra <= 2) return;
+    // La x sale de sumar los anchos de las pestañas anteriores (van pegadas, sin separación): en la web
+    // onLayout llega solo cuando cambia el tamaño, así que la x guardada queda vieja si una pestaña
+    // anterior se ensancha (por ejemplo, al aparecer su contador).
+    const indice = opciones.findIndex((o) => o.valor === valor);
+    const anchos = opciones.slice(0, indice + 1).map((o) => posiciones.current[String(o.valor)]?.ancho);
+    if (indice < 0 || anchos.some((a) => a == null) || !desplazable.current || sobra <= 2) return;
+    const p = { x: anchos.slice(0, -1).reduce((t, a) => t + a, 0), ancho: anchos[indice] };
+    // Lo que tapan las flechas no cuenta como "a la vista" (en el celular la flecha ocultaba la pestaña).
+    const tapaIzquierda = desplazado > 2 ? ANCHO_FLECHA : 0;
+    const tapaDerecha = desplazado < sobra - 2 ? ANCHO_FLECHA : 0;
     let destino = null;
-    if (p.x < desplazado) destino = p.x - MARGEN_VISTA;
-    else if (p.x + p.ancho > desplazado + anchoVista) destino = p.x + p.ancho - anchoVista + MARGEN_VISTA;
+    if (p.x < desplazado + tapaIzquierda) destino = p.x - MARGEN_VISTA;
+    else if (p.x + p.ancho > desplazado + anchoVista - tapaDerecha) destino = p.x + p.ancho - anchoVista + MARGEN_VISTA;
     if (destino === null) return;
     desplazable.current.scrollTo({ x: Math.max(0, Math.min(sobra, destino)), animated: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -145,7 +154,7 @@ const estilos = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 1,
-    width: 32,
+    width: ANCHO_FLECHA,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(244,247,250,0.94)',

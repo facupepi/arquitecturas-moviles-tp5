@@ -58,6 +58,12 @@ export default function TarjetaEstacion({ estacion, distanciaKm, seleccionada, a
           ) : null}
         </View>
 
+        {seleccionada ? (
+          <View style={estilos.elegidaEtiqueta}>
+            <EtiquetaEstado texto="Elegida en el mapa" tono="alerta" icono="ubicacion" testID={`elegida-${estacion.id}`} />
+          </View>
+        ) : null}
+
         <View style={estilos.pie}>
           <View style={estilos.numeros}>
             <Numero
@@ -104,8 +110,11 @@ export default function TarjetaEstacion({ estacion, distanciaKm, seleccionada, a
 const estilos = StyleSheet.create({
   contenedor: { flexGrow: 1, minWidth: 0 },
   tarjeta: { flexGrow: 1, minWidth: 0 },
-  // La elegida en el mapa se marca con borde (un fondo celeste bajaría el contraste de los botones).
-  elegida: { borderColor: colores.alertaAcento, borderWidth: 2 },
+  // La elegida en el mapa se marca con borde de 3 px de contraste suficiente (un fondo celeste
+  // bajaría el de los botones) y con la etiqueta "Elegida en el mapa", así no depende solo del color.
+  // El relleno baja lo que sube el borde: el contenido no se mueve.
+  elegida: { borderColor: colores.alerta, borderWidth: 3, padding: espacio.l - 2 },
+  elegidaEtiqueta: { flexDirection: 'row' },
   cabecera: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.s },
   titulo: { flex: 1, minWidth: 0 },
   etiqueta: { flexShrink: 0, paddingTop: 1 },

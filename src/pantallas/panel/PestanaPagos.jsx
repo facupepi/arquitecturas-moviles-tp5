@@ -4,14 +4,16 @@
 // pagar. El vecino se muestra con su código corto, nunca con nombre ni correo.
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useResumenAdmin } from '../../datos/useAdmin';
+import { useResumenAdmin, vencidosAl } from '../../datos/useAdmin';
 import { useAhora } from '../../datos/useAhora';
 import { colores, espacio } from '../../tema/tokens';
 import {
   Boton, Campo, Cargando, ErrorCarga, EtiquetaEstado, Seccion, Selector, Texto, Vacio,
 } from '../../ui';
 import { ZONA_HORARIA } from '../../../shared/constantes.mjs';
-import { codigoVecino, dinero, fecha, textoMedioPago, tiempoPasado } from '../../../shared/formato.mjs';
+import {
+  codigoVecino, dinero, fecha, sinSuspensivos, textoMedioPago, textoTarjeta, tiempoPasado,
+} from '../../../shared/formato.mjs';
 import { Indicadores, Tabla, fechaCorta, plural } from './comun';
 
 const POR_PAGINA = 20;
@@ -27,6 +29,11 @@ const nombreMes = new Intl.DateTimeFormat('es-AR', { month: 'long', timeZone: ZO
 const clave = (x) => `${x.uid}/${x.id}`;
 // "Tarjeta de crédito Visa •••• 4242" (la tarjeta siempre enmascarada; los pagos anteriores, solo el medio).
 const medioDe = (pago) => (pago.medio ? textoMedioPago(pago.medio, pago.tarjeta) ?? pago.medio : null);
+// En la columna de la tabla, la forma corta de Mi cuenta ("Visa crédito •••• 4242"): la larga ocupaba
+// tres o cuatro renglones a 1024 px.
+const medioCorto = (pago) => (pago.medio && pago.tarjeta?.ultimos4
+  ? textoTarjeta({ tipo: pago.medio, red: pago.tarjeta.red, ultimos4: pago.tarjeta.ultimos4 }) || medioDe(pago)
+  : medioDe(pago));
 
 // Qué se pagó: el cedulón (T-1001) o la patente de la sesión si sigue activa.
 function detalle(pago, patentes) {
@@ -36,8 +43,9 @@ function detalle(pago, patentes) {
 
 function coincide(pago, texto) {
   if (!texto) return true;
-  const t = texto.toLocaleUpperCase('es-AR').replace(/…/g, '');
-  return [pago.comprobante, codigoVecino(pago.uid).replace('…', ''), pago.refId]
+  const t = sinSuspensivos(texto).toLocaleUpperCase('es-AR');
+  if (!t) return true;
+  return [pago.comprobante, sinSuspensivos(codigoVecino(pago.uid)), pago.refId]
     .some((v) => typeof v === 'string' && v.toLocaleUpperCase('es-AR').includes(t));
 }
 
@@ -87,20 +95,21 @@ function UltimosPagos({ pagos, cargando, error, patentes, ahora, onReintentar })
   );
 
   const columnas = [
-    { clave: 'fecha', titulo: 'Fecha', flex: 1.1, celda: (p) => fechaCorta(p.creadoEn) },
-    { clave: 'vecino', titulo: 'Vecino', flex: 0.8, celda: (p) => codigoVecino(p.uid) || '—' },
+    { clave: 'fecha', titulo: 'Fecha', flex: 1, celda: (p) => fechaCorta(p.creadoEn) },
+    { clave: 'vecino', titulo: 'Vecino', flex: 0.7, celda: (p) => codigoVecino(p.uid) || '—' },
     {
       clave: 'concepto',
       titulo: 'Concepto',
-      flex: 2.4,
+      flex: 2.2,
+      // Si la patente no entra al lado de la etiqueta, baja al renglón de abajo entera (no se corta).
       celda: (p) => (
         <View style={estilos.concepto}>
           <TipoPago tipo={p.tipo} />
-          <Texto variante="chico" peso="700" numberOfLines={1} estilo={estilos.flexible}>{detalle(p, patentes)}</Texto>
+          <Texto variante="chico" peso="700" numberOfLines={1} estilo={estilos.detalleConcepto}>{detalle(p, patentes)}</Texto>
         </View>
       ),
     },
-    { clave: 'medio', titulo: 'Medio de pago', flex: 1.5, celda: (p) => medioDe(p) ?? '' },
+    { clave: 'medio', titulo: 'Medio de pago', flex: 1.9, celda: (p) => medioCorto(p) ?? '' },
     { clave: 'comprobante', titulo: 'Comprobante', flex: 1.4, celda: (p) => p.comprobante ?? '—' },
     {
       clave: 'importe',
@@ -200,20 +209,32 @@ function UltimosPagos({ pagos, cargando, error, patentes, ahora, onReintentar })
   );
 }
 
-function Vencidos({ vencidos, cargando, error, total, ahora, onReintentar }) {
+function Vencidos({ vencidos, cortada, cargando, error, total, ahora, onReintentar }) {
   const columnas = [
     { clave: 'vecino', titulo: 'Vecino', flex: 0.8, celda: (t) => codigoVecino(t.uid) || '—' },
     {
       clave: 'cedulon',
       titulo: 'Cedulón',
       flex: 2.6,
+      // Cedulón y período arriba (siempre enteros); el concepto, que es largo, abajo.
       celda: (t) => (
-        <Texto variante="chico" numberOfLines={1}>
-          {[t.id, t.concepto, t.periodo].filter(Boolean).join(' · ')}
-        </Texto>
+        <>
+          <Texto variante="chico" peso="700">{[t.id, t.periodo].filter(Boolean).join(' · ')}</Texto>
+          {t.concepto ? <Texto variante="chico" numberOfLines={1}>{t.concepto}</Texto> : null}
+        </>
       ),
     },
-    { clave: 'vence', titulo: 'Venció', flex: 1.6, celda: (t) => `${fecha(t.vence)} (${tiempoPasado(t.vence, ahora)})` },
+    {
+      clave: 'vence',
+      titulo: 'Venció',
+      flex: 1.6,
+      celda: (t) => (
+        <>
+          <Texto variante="chico">{fecha(t.vence)}</Texto>
+          <Texto variante="chico" color={colores.textoSuave}>{tiempoPasado(t.vence, ahora)}</Texto>
+        </>
+      ),
+    },
     {
       clave: 'importe',
       titulo: 'Importe',
@@ -261,7 +282,8 @@ function Vencidos({ vencidos, cargando, error, total, ahora, onReintentar }) {
             testID="lista-vencidos-panel"
             testIDFila={(t) => `vencido-panel-${t.uid}-${t.id}`}
           />
-          {cantidad > vencidos.length ? (
+          {/* "de M" solo si la escucha llegó a su tope: si no, la lista ya tiene todos los vencidos. */}
+          {cortada && cantidad > vencidos.length ? (
             <Texto variante="chico" color={colores.textoSuave}>
               {`Se muestran los ${vencidos.length} más atrasados de ${cantidad}.`}
             </Texto>
@@ -274,9 +296,11 @@ function Vencidos({ vencidos, cargando, error, total, ahora, onReintentar }) {
 
 export default function PestanaPagos({ control, onReintentar }) {
   const ahora = useAhora(60_000);
-  const { pagos, sesiones, vencidos, cargando, errores } = control;
-  // Cada pago nuevo (o un cedulón que deja de estar vencido) recalcula los totales del servidor.
-  const senal = `${pagos[0]?.id ?? ''}|${vencidos.length}`;
+  const { pagos, sesiones, cargando, errores } = control;
+  // La escucha trae los cedulones sin pagar; con el reloj del panel se ven los que ya vencieron.
+  const vencidos = useMemo(() => vencidosAl(control.vencidos, ahora), [control.vencidos, ahora]);
+  // Cada pago nuevo (o un cedulón que vence o deja de estar vencido) recalcula los totales del servidor.
+  const senal = `${pagos[0]?.id ?? ''}|${vencidos.lista.length}`;
   const { resumen, cargando: calculando, error: errorResumen } = useResumenAdmin(senal);
   const patentes = useMemo(() => new Map(sesiones.map((s) => [s.id, s.patente])), [sesiones]);
 
@@ -295,7 +319,8 @@ export default function PestanaPagos({ control, onReintentar }) {
         onReintentar={onReintentar}
       />
       <Vencidos
-        vencidos={vencidos}
+        vencidos={vencidos.lista}
+        cortada={vencidos.cortada}
         cargando={cargando.vencidos}
         error={errores.vencidos}
         total={resumen?.vencidos}
@@ -312,6 +337,7 @@ const estilos = StyleSheet.create({
   filtros: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', columnGap: espacio.xl, rowGap: espacio.l },
   filtro: { flexShrink: 0, maxWidth: '100%' },
   busqueda: { flexGrow: 1, flexBasis: 320, minWidth: 0 },
-  concepto: { flexDirection: 'row', alignItems: 'center', gap: espacio.s },
+  concepto: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: espacio.s, rowGap: espacio.xs },
+  detalleConcepto: { flexShrink: 0, maxWidth: '100%' },
   compactaCabecera: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: espacio.s },
 });

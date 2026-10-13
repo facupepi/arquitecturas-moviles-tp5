@@ -60,6 +60,8 @@ describe('lectura administrativa por grupo de colecciones', () => {
     const pagos = await assertSucceeds(getDocs(query(collectionGroup(adm, 'pagos'), orderBy('creadoEn', 'desc'), limit(100))));
     if (pagos.size < 2) throw new Error(`se esperaban pagos de dos vecinos y llegaron ${pagos.size}`);
     await assertSucceeds(getDocs(query(collectionGroup(adm, 'tributos'), where('pagadoEn', '==', null), where('vence', '<', ts(Date.now())))));
+    // La escucha del panel: los sin pagar por vence (la pantalla se queda con los vencidos).
+    await assertSucceeds(getDocs(query(collectionGroup(adm, 'tributos'), where('pagadoEn', '==', null), orderBy('vence', 'asc'), limit(50))));
     await assertSucceeds(getDocs(query(collectionGroup(adm, 'estacionamiento'), where('fin', '>', ts(Date.now())), orderBy('fin'))));
     await assertSucceeds(getDoc(doc(adm, 'usuarios/u2/estacionamiento/sesion-u2-0001')));
     await assertSucceeds(getAggregateFromServer(

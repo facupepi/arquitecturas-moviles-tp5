@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { recordatoriosTributos, recordatoriosEstacionamiento } from '../../shared/recordatorios.mjs';
+import {
+  ETAPAS_TRIBUTO, idRecordatorioTributo, recordatoriosTributos, recordatoriosEstacionamiento,
+} from '../../shared/recordatorios.mjs';
 import { datosInicialesVecino } from '../../shared/catalogo.mjs';
 import { ErrorDominio } from '../../shared/dominio.mjs';
 import { destinoValido } from '../../shared/rutas.mjs';
@@ -138,4 +140,13 @@ test('estacionamiento: varias sesiones y datos incompletos', () => {
   assert.deepEqual(r.map((x) => `${x.sesionId}:${x.etapa}`), ['a:por_vencer', 'c:finalizado']);
   assert.deepEqual(recordatoriosEstacionamiento(undefined, ahora, 5), []);
   assert.ok(r.every((x) => x.tipo === 'estacionamiento' && destinoValido(x.destino)));
+});
+
+test('idRecordatorioTributo: las dos claves posibles de un cedulón son las que usa recordatoriosTributos', () => {
+  const vence = Date.parse('2026-10-09T23:59:00-03:00');
+  const t = { id: 'T-1001', concepto: 'Tasa', periodo: '10/2026', importe: 18500, vence, pagadoEn: null };
+  const ids = ETAPAS_TRIBUTO.map((etapa) => idRecordatorioTributo('T-1001', vence, etapa));
+  assert.deepEqual(ids, ['tributo-T-1001-2026-10-09-por_vencer', 'tributo-T-1001-2026-10-09-vencido']);
+  assert.ok(ids.includes(recordatoriosTributos([t], vence - DIA)[0].id));
+  assert.ok(ids.includes(recordatoriosTributos([t], vence + DIA)[0].id));
 });

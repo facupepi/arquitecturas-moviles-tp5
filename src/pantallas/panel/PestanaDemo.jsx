@@ -284,7 +284,8 @@ export default function PestanaDemo({ eventos, reclamos, cargando, error, onRein
       >
         <Texto variante="cuerpo">
           Las bicicletas vuelven a sus cantidades iniciales, todas las alarmas se desactivan y la configuración
-          vuelve a sus valores de fábrica (horario estricto prendido, aviso 5 minutos antes, simulador apagado).
+          vuelve a sus valores de fábrica (cobro de estacionamiento solo en horario activado, aviso 5 minutos
+          antes del fin, simulador automático apagado).
         </Texto>
         <Texto variante="chico" color={colores.textoSuave}>
           Los reclamos, avisos y pagos de los vecinos no se borran.

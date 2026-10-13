@@ -105,13 +105,13 @@ En desarrollo, App Check necesita un token de depuración registrado en la conso
 
 La prueba de humo y la de carga solo miran lo público: no inician sesión ni crean cuentas en producción. La prueba de humo acepta el token de depuración de App Check en la variable `APPCHECK_TOKEN_HUMO`, que nunca se versiona.
 
-En la versión final, las pruebas de dominio dieron 83 de 83, las de reglas 123 de 123 y las de extremo a extremo 66 de 66 en Pixel 7 y en iPhone 13. El 12 de octubre de 2026, contra la dirección publicada, la prueba de humo dio 30 de 30 en los cinco navegadores y la de carga quedó por debajo de 3 segundos en las siete repeticiones. El detalle está en `docs/pruebas/`.
+En la versión final, las pruebas de dominio dieron 98 de 98, las de reglas 148 de 148 y las de extremo a extremo 140 de 140, 70 en Pixel 7 y 70 en iPhone 13. El 12 de octubre de 2026, contra la dirección publicada, la prueba de humo dio 30 de 30 en los cinco navegadores y la de carga quedó por debajo de 3 segundos en las siete repeticiones. El detalle está en `docs/pruebas/`.
 
 **Capturas para el informe.** `npm run capturas` genera las pantallas a 390 por 844 píxeles con escala 2. Con el modo compartido de los emuladores encendido (`npm run e2e:compartido`), recorre la aplicación con una cuenta de Google ficticia del emulador y usa un administrador ficticio para el panel, en un proyecto propio que se vacía al terminar. Con `node scripts/capturas.mjs --url <dirección>` solo captura la pantalla de ingreso de la aplicación publicada, porque entrar exige una cuenta de Google real. El modo compartido se apaga con `npm run e2e:compartido:apagar`.
 
 ## Cuentas administradoras
 
-El panel municipal solo se muestra a una cuenta de Google con un documento en la colección `administradores` de Firestore. Las reglas y las Edge Functions rechazan cualquier sesión anónima, aunque tenga ese documento, y ninguna cuenta puede crearlo desde la aplicación.
+El panel municipal solo se muestra a una cuenta de Google con un documento en la colección `administradores` de Firestore. Las reglas y las Edge Functions solo aceptan sesiones iniciadas con Google (`sign_in_provider` `google.com`) y rechazan cualquier otra (anónima, con contraseña o con token personalizado), aunque tenga ese documento, y ninguna cuenta puede crearlo desde la aplicación.
 
 1. Ingresar a la aplicación publicada con "Continuar con Google" usando la cuenta que se quiere habilitar.
 2. En la consola de Firebase, abrir Authentication, ubicar esa cuenta por su correo y copiar el valor de la columna "UID de usuario".

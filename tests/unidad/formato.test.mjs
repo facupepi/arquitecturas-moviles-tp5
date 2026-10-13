@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   dinero, fecha, fechaHora, hora, tiempoRelativo, duracion, enmascarada, textoTarjeta, textoMedioPago,
+  codigoVecino, sinSuspensivos,
 } from '../../shared/formato.mjs';
 
 const MIN = 60 * 1000;
@@ -80,4 +81,18 @@ test('tarjetas y medios de pago siempre enmascarados (espacio duro entre los pun
   assert.equal(textoMedioPago('billetera'), 'Billetera virtual', 'pagos anteriores');
   assert.equal(textoMedioPago('transferencia'), 'Transferencia bancaria');
   assert.equal(textoMedioPago(null), null);
+});
+
+test('codigoVecino: "…" y los últimos 4 del uid unidos por un word joiner (no se parte el renglón)', () => {
+  assert.equal(codigoVecino('ejemplo-7k2q9x'), '…⁠2Q9X');
+  assert.equal(codigoVecino(''), '');
+  assert.equal(codigoVecino(null), '');
+});
+
+test('sinSuspensivos: el código se busca igual con "…", con tres puntos o copiado de la pantalla', () => {
+  const buscado = 'A3F2';
+  for (const escrito of ['…A3F2', '...A3F2', '..A3F2', codigoVecino('uid-a3f2'), 'A3F2']) {
+    assert.equal(sinSuspensivos(escrito).toUpperCase(), buscado, escrito);
+  }
+  assert.equal(sinSuspensivos(undefined), '');
 });

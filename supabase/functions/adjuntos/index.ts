@@ -4,9 +4,11 @@ import { EXTENSION_ARCHIVO, LIMITES } from "../../../shared/constantes.mjs";
 import { accionDe, atender, leerJson, ok } from "../_shared/respuesta.ts";
 import { ErrorHttp, exigirAdmin, verificarAppCheck, verificarUsuario } from "../_shared/firebase-auth.ts";
 import { obtener } from "../_shared/firestore.ts";
-import { almacen } from "../_shared/almacenamiento.ts";
+import { almacen, listarArchivos } from "../_shared/almacenamiento.ts";
 
 const BYTES_MAX = Number((LIMITES as { bytesAdjunto?: number }).bytesAdjunto ?? 2 * 1024 * 1024);
+// Tope de archivos guardados por vecino en adjuntos-reclamos/{uid}/ (frena subidas ilimitadas).
+const ARCHIVOS_POR_VECINO = Number((LIMITES as { adjuntosPorVecino?: number }).adjuntosPorVecino ?? 30);
 const EXTENSIONES = EXTENSION_ARCHIVO as Record<string, string>;
 const VIGENCIA_URL_S = 300;
 // Ruta relativa al bucket, con el mismo patrón que exige la regla de reclamos.
@@ -58,6 +60,15 @@ async function subir(req: Request) {
   const nombre = recortarNombreArchivo(archivo.name || `adjunto.${extension}`) as string;
   const hash = (await sha256Hex(bytes)).slice(0, 12);
   const ruta = `${id.uid}/${reclamoId}/${indice}-${hash}.${extension}`;
+  // Tope por vecino; un reintento del mismo archivo (misma ruta) no suma.
+  const propios = await listarArchivos(id.uid);
+  if (propios.length >= ARCHIVOS_POR_VECINO && !propios.includes(ruta)) {
+    throw adjuntoInvalido(
+      429,
+      `Llegaste al máximo de ${ARCHIVOS_POR_VECINO} archivos adjuntos en tus reclamos. `
+        + "Podés enviar el reclamo sin archivos o llamar al 147.",
+    );
+  }
   // upsert: un reintento sobrescribe el mismo archivo.
   const { error } = await almacen().upload(ruta, bytes, { contentType: tipo, upsert: true });
   if (error) {

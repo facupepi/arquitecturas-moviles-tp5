@@ -4,8 +4,9 @@
 //
 // Implementa el contrato HTTP de 6.3 contra los emuladores de Auth y Firestore con firebase-admin:
 //   POST vecino/alta     perfil + datosInicialesVecino + recordatorios inmediatos de T4 (idempotente)
-//   POST vecino/baja     borra subcolecciones, bloqueos propios, adjuntos, perfil y el usuario de Auth
-//   POST adjuntos/subir  un archivo por solicitud; valida con shared/dominio.mjs; guarda en una carpeta temporal
+//   POST vecino/baja     borra subcolecciones, eventos con su uid, bloqueos propios, adjuntos, perfil y el usuario de Auth
+//   POST adjuntos/subir  un archivo por solicitud; valida con shared/dominio.mjs; tope por vecino (429);
+//                        guarda en una carpeta temporal
 //   POST adjuntos/url    { ruta } → { url, venceEn }; la URL la sirve este mismo servidor (GET /archivos/…)
 //   POST despachar       admin; escribe en el historial lo mismo que entrega.ts (aviso de alarma,
 //                        notificación de reclamo y de alarma cercana) y marca el evento enviado, sin push
@@ -13,8 +14,9 @@
 //   POST tareas          admin; diaria y resumen devuelven conteos; simulador aplica planificarPaso
 //
 // No verifica la firma del token (el emulador de Auth no firma), pero decodifica el payload y aplica
-// el mismo criterio que verificarUsuario de Supabase: una sesión anónima recibe 403 en todas las
-// funciones (aunque tenga documento en administradores), igual que en las reglas.
+// el mismo criterio que verificarUsuario de Supabase: una sesión que no es de Google (anónima, con
+// contraseña o con token personalizado) recibe 403 en todas las funciones (aunque tenga documento en
+// administradores), igual que en las reglas.
 //
 // Modo compartido (varios agentes contra los mismos emuladores): cada agente usa su propio proyecto
 // demo-* de Firestore y llama con el prefijo /p/<proyecto>, por ejemplo
@@ -23,7 +25,7 @@
 // por defecto del emulador (el SDK web no manda el proyecto al emulador de Auth).
 import { createServer } from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, rm, writeFile, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -43,6 +45,7 @@ const PUERTO = Number(process.env.PUERTO_EDGE) || 8787;
 const HOST = '127.0.0.1';
 const CARPETA = process.env.EDGE_SIMULADO_CARPETA || join(tmpdir(), 'conecta-edge-simulado');
 const BYTES_MAX = LIMITES.bytesAdjunto;
+const ARCHIVOS_POR_VECINO = LIMITES.adjuntosPorVecino;
 const DIA_MS = 24 * 60 * 60 * 1000;
 const MIN_MS = 60_000;
 const PATRON_RUTA = /^[A-Za-z0-9_-]{1,128}\/[A-Za-z0-9_-]{1,64}\/[0-2]-[a-f0-9]{12}\.(jpg|png|pdf)$/;
@@ -142,7 +145,7 @@ function verificarUsuario(req) {
     throw new ErrorHttp(401, 'sin-sesion', 'La sesión no es válida o venció.');
   }
   const proveedor = payload.firebase?.sign_in_provider ?? 'desconocido';
-  if (proveedor === 'anonymous') {
+  if (proveedor !== 'google.com') {
     throw new ErrorHttp(403, 'permiso', 'Ingresá con tu cuenta de Google para usar Conecta.');
   }
   return { uid: sub, proveedor, nombre: typeof payload.name === 'string' ? payload.name : null };
@@ -230,6 +233,16 @@ async function baja(db, proyecto, id) {
     }
     borrados += docs.length;
   }
+  // Eventos de la bandeja que guardan su uid, en páginas como consultarPaginado de Supabase.
+  for (;;) {
+    const pagina = await db.collection(C.eventos).where('uid', '==', id.uid).limit(300).get();
+    if (pagina.empty) break;
+    const lote = db.batch();
+    for (const d of pagina.docs) lote.delete(d.ref);
+    await lote.commit();
+    borrados += pagina.size;
+    if (pagina.size < 300) break;
+  }
   await rm(carpetaArchivos(proyecto, id.uid), { recursive: true, force: true });
   await raiz.delete();
   borrados += 1;
@@ -282,6 +295,14 @@ async function subir(req, proyecto) {
   const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 12);
   const ruta = `${id.uid}/${reclamoId}/${indice}-${hash}.${extension}`;
   const destino = carpetaArchivos(proyecto, ruta);
+  // Tope por vecino, como adjuntos/index.ts; un reintento del mismo archivo no suma.
+  const propios = await readdir(carpetaArchivos(proyecto, id.uid), { recursive: true, withFileTypes: true })
+    .then((items) => items.filter((d) => d.isFile()).map((d) => resolve(d.parentPath ?? d.path, d.name)))
+    .catch((e) => { if (e?.code === 'ENOENT') return []; throw e; });
+  if (propios.length >= ARCHIVOS_POR_VECINO && !propios.includes(destino)) {
+    throw new ErrorHttp(429, 'adjunto-invalido', `Llegaste al máximo de ${ARCHIVOS_POR_VECINO} archivos adjuntos en tus reclamos. `
+      + 'Podés enviar el reclamo sin archivos o llamar al 147.');
+  }
   await mkdir(resolve(destino, '..'), { recursive: true });
   await writeFile(destino, bytes);
   return { adjunto: { ruta, nombre, tipo, tamano: bytes.length } };

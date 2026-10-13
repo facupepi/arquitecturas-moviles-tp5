@@ -335,7 +335,7 @@ export default function Galeria() {
       >
         <FilaDato etiqueta="Concepto" valor="Tasa de servicios municipales" />
         <FilaDato etiqueta="Importe" valor="$ 18.500" />
-        <Aviso tono="info" mensaje="Guardamos solo los últimos 4 dígitos. Nunca te pedimos el código de seguridad." />
+        <Aviso tono="info" mensaje="Guardamos solo los últimos 4 dígitos de cada tarjeta." />
         <Texto variante="chico" color={colores.textoSuave}>
           Solicitud 3f2a9c1e-0000-4000-8000-000000000000
         </Texto>

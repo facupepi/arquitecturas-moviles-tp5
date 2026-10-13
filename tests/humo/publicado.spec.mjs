@@ -77,8 +77,12 @@ test.describe('Sitio publicado, sin sesión', () => {
     const csp = h['content-security-policy'] ?? '';
     expect(csp, 'Content-Security-Policy').toContain("default-src 'self'");
     expect(csp).toMatch(/script-src 'self'[^;]*https:\/\/apis\.google\.com/);
-    // El popup de Google pasa por el dominio de Auth del proyecto.
+    // El popup de Google pasa por el dominio de Auth del proyecto (authDomain = *.web.app).
+    expect(csp).toMatch(/frame-src [^;]*san-francisco-conecta-tp5\.web\.app/);
     expect(csp).toMatch(/frame-src [^;]*firebaseapp\.com/);
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("base-uri 'self'");
+    expect(csp).toContain("frame-ancestors 'self'");
     expect(csp).toMatch(/connect-src [^;]*\*\.supabase\.co/);
     expect(csp).not.toMatch(/script-src[^;]*'unsafe-eval'/);
     expect(h['x-content-type-options']).toBe('nosniff');

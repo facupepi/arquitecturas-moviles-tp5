@@ -2,19 +2,20 @@
 // tarjeta" (diálogo con FormularioTarjeta) y "Quitar" con confirmación. Son los únicos medios de la
 // pasarela de Tributos y Estacionamiento.
 // Seguridad: de cada tarjeta se guarda tipo, red, últimos 4 dígitos, titular y vencimiento. El
-// número completo vive solo en el formulario y se descarta al guardar o cerrar; no se pide el
-// código de seguridad.
+// número completo y el código de seguridad viven solo en el formulario y se descartan al guardar o
+// cerrar.
 import React, { useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useMunicipal } from '../../datos/almacen';
 import * as repositorio from '../../datos/repositorioTarjetas';
 import { useComando } from '../../datos/useComando';
-import { colores, espacio, radios } from '../../tema/tokens';
+import { colores, cortes, espacio, medidas, radios } from '../../tema/tokens';
 import { Aviso, Boton, Dialogo, ErrorCarga, EtiquetaEstado, Icono, Texto, useAvisoFlotante } from '../../ui';
+import { conFoco } from '../../ui/comun';
 import { LIMITES } from '../../../shared/constantes.mjs';
 import { tarjetaVencida } from '../../../shared/dominio.mjs';
-import { textoTarjeta } from '../../../shared/formato.mjs';
-import FormularioTarjeta, { NotaSeguridadTarjetas } from '../pagos/FormularioTarjeta';
+import { enmascarada, textoTarjeta } from '../../../shared/formato.mjs';
+import FormularioTarjeta from '../pagos/FormularioTarjeta';
 import { nombreAccesibleTarjeta } from '../pagos/MediosDePago';
 import { iconoMedio } from '../pagos/pasarela';
 import { useAltaTarjeta } from '../pagos/tarjetas';
@@ -22,7 +23,14 @@ import { useAltaTarjeta } from '../pagos/tarjetas';
 const seleccionar = (s) => ({ listo: s.listo, tarjetas: s.tarjetas, error: s.errores?.tarjetas ?? null });
 
 function FilaTarjeta({ tarjeta, onQuitar }) {
+  const { width } = useWindowDimensions();
+  const angosta = width < cortes.tableta;
   const vencida = tarjetaVencida(tarjeta.vence, Date.now());
+  // "•••• 4242" y "vence 08/30" no se parten entre renglones (los puntos admiten corte después de cada uno).
+  const mascara = enmascarada(tarjeta.ultimos4);
+  const nombre = textoTarjeta(tarjeta).replace(mascara, '').trim();
+  const quitar = () => onQuitar(tarjeta);
+  const etiquetaQuitar = `Quitar ${nombreAccesibleTarjeta(tarjeta)}`;
   return (
     <View style={estilos.fila} testID={`tarjeta-guardada-${tarjeta.id}`}>
       <View style={estilos.icono}>
@@ -30,10 +38,12 @@ function FilaTarjeta({ tarjeta, onQuitar }) {
       </View>
       <View style={estilos.textos}>
         <Texto variante="cuerpo" peso="700">
-          {textoTarjeta(tarjeta)}
+          {nombre}
+          {mascara ? <Texto variante="cuerpo" peso="700" estilo={estilos.sinCorte}>{` ${mascara}`}</Texto> : null}
         </Texto>
         <Texto variante="chico" color={colores.textoSuave}>
-          {[tarjeta.titular, `vence ${tarjeta.vence}`].filter(Boolean).join(' · ')}
+          {tarjeta.titular ? `${tarjeta.titular} · ` : ''}
+          <Texto variante="chico" color={colores.textoSuave} estilo={estilos.sinCorte}>{`vence ${tarjeta.vence}`}</Texto>
         </Texto>
         {vencida ? (
           <View style={estilos.etiqueta}>
@@ -41,14 +51,27 @@ function FilaTarjeta({ tarjeta, onQuitar }) {
           </View>
         ) : null}
       </View>
-      <Boton
-        titulo="Quitar"
-        icono="quitar"
-        variante="texto"
-        onPress={() => onQuitar(tarjeta)}
-        etiquetaAccesible={`Quitar ${nombreAccesibleTarjeta(tarjeta)}`}
-        testID={`quitar-${tarjeta.id}`}
-      />
+      {angosta ? (
+        // En el celular, solo el ícono: el texto de la tarjeta usa ese ancho.
+        <Pressable
+          role="button"
+          aria-label={etiquetaQuitar}
+          onPress={conFoco(quitar)}
+          testID={`quitar-${tarjeta.id}`}
+          style={({ hovered, pressed }) => [estilos.quitarIcono, (hovered || pressed) && estilos.quitarResaltado]}
+        >
+          <Icono nombre="quitar" tamano={20} color={colores.accion} />
+        </Pressable>
+      ) : (
+        <Boton
+          titulo="Quitar"
+          icono="quitar"
+          variante="texto"
+          onPress={quitar}
+          etiquetaAccesible={etiquetaQuitar}
+          testID={`quitar-${tarjeta.id}`}
+        />
+      )}
     </View>
   );
 }
@@ -125,7 +148,6 @@ export default function Tarjetas() {
           testID="agregar-tarjeta"
         />
       )}
-      <NotaSeguridadTarjetas />
 
       <Dialogo
         visible={agregando}
@@ -206,5 +228,15 @@ const estilos = StyleSheet.create({
     backgroundColor: colores.celesteClaro,
   },
   textos: { flex: 1, minWidth: 0, gap: 2 },
+  sinCorte: { whiteSpace: 'nowrap' },
+  quitarIcono: {
+    width: medidas.toqueMinimo,
+    height: medidas.toqueMinimo,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radios.pildora,
+    cursor: 'pointer',
+  },
+  quitarResaltado: { backgroundColor: '#eef7fd' },
   etiqueta: { flexDirection: 'row', paddingTop: 2 },
 });

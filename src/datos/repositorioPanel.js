@@ -34,11 +34,14 @@ export function suscribirSesionesActivasAdmin(limite = 200, alCambiar, alFallar)
   );
 }
 
-// Cedulones vencidos sin pagar, del más atrasado al más reciente (índice pagadoEn + vence).
+// Cedulones sin pagar, del más atrasado al más reciente (índice pagadoEn + vence). No se corta por
+// vence < ahora en la consulta: ese ahora quedaría fijo al suscribirse y un cedulón que vence con el
+// panel abierto no aparecería. La pantalla filtra con useAhora (vencidosAl) y, como van ordenados por
+// vence, los vencidos son siempre los primeros de la lista.
 export function suscribirTributosVencidosAdmin(limite = 50, alCambiar, alFallar) {
   if (typeof limite === 'function') return suscribirTributosVencidosAdmin(50, limite, alCambiar);
   return escucharColeccion(
-    query(collectionGroup(db, C.tributos), where('pagadoEn', '==', null), where('vence', '<', Timestamp.now()), orderBy('vence', 'asc'), limit(limite)),
+    query(collectionGroup(db, C.tributos), where('pagadoEn', '==', null), orderBy('vence', 'asc'), limit(limite)),
     tributoDeGrupoDesdeDoc, alCambiar, alFallar,
   );
 }

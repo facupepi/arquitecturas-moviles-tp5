@@ -364,7 +364,8 @@ test.describe('Panel municipal', () => {
     const fila = page.getByTestId(`pago-panel-${id}`);
     await expect(fila).toBeVisible({ timeout: 10_000 });
     await expect(fila).toContainText(codigo);
-    await expect(fila).toContainText('Tarjeta de débito Mastercard •••• 8210');
+    // En la lista del celular va el medio completo; en la tabla de la computadora, la forma corta.
+    await expect(fila).toContainText(/(Tarjeta de débito Mastercard|Mastercard débito) ••••\s8210/);
     await expect(fila).toContainText(codigoVecino(vecino.uid));
     await expect(fila).not.toContainText(/Vecino E2E|@ejemplo\.test/);
     await expect.poll(() => hoy.textContent(), { timeout: 10_000 }).not.toBe(antes);

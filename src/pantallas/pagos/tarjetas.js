@@ -2,14 +2,14 @@
 // pasarela (cuando el vecino no tiene tarjetas, la carga sin salir del pago).
 // Seguridad: el número completo vive solo en este estado. repositorio.guardarTarjeta lo usa para
 // validarlo y guarda { tipo, red, ultimos4, titular, vence }; al guardar, al cancelar o al cerrar,
-// el formulario vuelve a vacío. Nunca se pide el código de seguridad.
+// el formulario vuelve a vacío. El código de seguridad se valida y se descarta: nunca se guarda.
 import { useCallback, useMemo, useRef, useState } from 'react';
 import * as repositorio from '../../datos/repositorioTarjetas';
 import { useComando } from '../../datos/useComando';
 import { LIMITES } from '../../../shared/constantes.mjs';
 import { revisarTarjeta } from '../../../shared/tarjetas.mjs';
 
-export const CAMPOS_TARJETA = ['tipo', 'numero', 'titular', 'vence'];
+export const CAMPOS_TARJETA = ['tipo', 'numero', 'titular', 'vence', 'codigo'];
 
 export const OPCIONES_TIPO_TARJETA = [
   { valor: 'credito', etiqueta: 'Crédito' },
@@ -18,7 +18,7 @@ export const OPCIONES_TIPO_TARJETA = [
 
 export const NOTA_SEGURIDAD_TARJETAS = 'Guardamos solo los últimos 4 dígitos. Nunca te pedimos el código de seguridad.';
 
-const VACIO = { tipo: null, numero: '', titular: '', vence: '' };
+const VACIO = { tipo: null, numero: '', titular: '', vence: '', codigo: '' };
 
 /** "4242424242424242" → "4242 4242 4242 4242" (solo dígitos, hasta 19, en grupos de 4). */
 export function formatearNumero(texto) {
@@ -41,7 +41,7 @@ export function useAltaTarjeta({ alGuardar } = {}) {
   const [valores, setValores] = useState(VACIO);
   const [errores, setErrores] = useState({});
   const refs = useRef(null);
-  if (!refs.current) refs.current = { tipo: { current: null }, numero: { current: null }, titular: { current: null }, vence: { current: null } };
+  if (!refs.current) refs.current = { tipo: { current: null }, numero: { current: null }, titular: { current: null }, vence: { current: null }, codigo: { current: null } };
   const alGuardarRef = useRef(alGuardar);
   alGuardarRef.current = alGuardar;
   const guardado = useComando(repositorio.guardarTarjeta);
@@ -70,7 +70,8 @@ export function useAltaTarjeta({ alGuardar } = {}) {
       enfocar(CAMPOS_TARJETA.find((c) => revision.errores[c]));
       return null;
     }
-    const guardada = await ejecutar(valores);
+    const { codigo, ...datos } = valores;   // el código de seguridad no sale de este formulario
+    const guardada = await ejecutar(datos);
     if (!guardada) {
       enfocar('numero');   // "Esa tarjeta ya está guardada" va debajo del número
       return null;

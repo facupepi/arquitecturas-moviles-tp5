@@ -69,11 +69,12 @@ function medirPrimeraTesela(capa) {
   }
 }
 
-export default function MapaLeaflet({ puntos = [], seleccionado, onSeleccionar, ubicacion, alto = 300, etiqueta }) {
+export default function MapaLeaflet({ puntos = [], seleccionado, enfoque = 0, onSeleccionar, ubicacion, alto = 300, etiqueta }) {
   const contenedor = useRef(null);
   const mapa = useRef(null);
   const capas = useRef(null);
   const encuadrado = useRef(false);
+  const enfoqueAnterior = useRef(enfoque);
   const alSeleccionar = useRef(onSeleccionar);
   const [errorTeselas, setErrorTeselas] = useState(false);
   alSeleccionar.current = onSeleccionar;
@@ -183,27 +184,38 @@ export default function MapaLeaflet({ puntos = [], seleccionado, onSeleccionar, 
         .addTo(grupo);
     }
     // Encuadre inicial: la primera vez que hay puntos. Se mide el contenedor antes de encuadrar
-    // (al montarse dentro de Suspense, Leaflet puede haber tomado un tamaño provisorio).
+    // (al montarse dentro de Suspense, Leaflet puede haber tomado un tamaño provisorio). Arriba a la
+    // izquierda deja lugar para los botones de zoom: ningún marcador queda debajo de ellos.
     if (!encuadrado.current && limites.length) {
       encuadrado.current = true;
       // Encuadre instantáneo: evita una animación que puede quedar viva si el vecino sale de
       // la pantalla enseguida.
       instancia.invalidateSize({ pan: false });
       if (limites.length === 1) instancia.setView(limites[0], 16, { animate: false });
-      else instancia.fitBounds(limites, { padding: [28, 28], maxZoom: 16, animate: false });
+      else {
+        instancia.fitBounds(limites, {
+          paddingTopLeft: [64, 28],
+          paddingBottomRight: [28, 28],
+          maxZoom: 16,
+          animate: false,
+        });
+      }
     }
   }, [puntos, seleccionado, ubicacion]);
 
   // Llevar a la vista el punto elegido (por ejemplo, desde la lista o un enlace profundo), solo
-  // si quedó afuera: así no se pierde el encuadre de todos los puntos.
+  // si quedó afuera: así no se pierde el encuadre de todos los puntos. Un `enfoque` nuevo ("Ver en
+  // mapa", aunque sea el punto ya elegido) lo centra siempre.
   useEffect(() => {
     const punto = puntos.find((p) => p.id === seleccionado);
     const instancia = mapa.current;
+    const pedido = enfoque !== enfoqueAnterior.current;
+    enfoqueAnterior.current = enfoque;
     if (!punto || !instancia) return;
     const posicion = L.latLng(punto.lat, punto.lng);
-    if (!instancia.getBounds().pad(-0.1).contains(posicion)) instancia.panTo(posicion);
+    if (pedido || !instancia.getBounds().pad(-0.1).contains(posicion)) instancia.panTo(posicion);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seleccionado]);
+  }, [seleccionado, enfoque]);
 
   return (
     <View style={[estilos.marco, { height: alto }]}>

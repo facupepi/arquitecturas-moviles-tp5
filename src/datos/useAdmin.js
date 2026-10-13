@@ -32,10 +32,19 @@ export function useAdmin() {
   return estado;
 }
 
+// Tope de la escucha de cedulones sin pagar: si los vencidos llenan la lista, puede haber más.
+export const LIMITE_VENCIDOS = 50;
+
+/** Los cedulones de la escucha que ya vencieron a `ahora` y si la lista quedó cortada por el tope. */
+export function vencidosAl(impagos, ahora) {
+  const lista = impagos.filter((t) => t.vence != null && t.vence < ahora);
+  return { lista, cortada: impagos.length >= LIMITE_VENCIDOS && lista.length === impagos.length };
+}
+
 const SUSCRIPCIONES_CONTROL = {
   pagos: (ok, mal) => suscribirPagosAdmin(100, ok, mal),
   sesiones: (ok, mal) => suscribirSesionesActivasAdmin(200, ok, mal),
-  vencidos: (ok, mal) => suscribirTributosVencidosAdmin(50, ok, mal),
+  vencidos: (ok, mal) => suscribirTributosVencidosAdmin(LIMITE_VENCIDOS, ok, mal),
 };
 
 /** Una porción del control: { lista, cargando, error }. Escucha solo mientras `activa` es true. */
@@ -55,7 +64,8 @@ function usePorcionControl(porcion, activa) {
 
 /**
  * Escuchas del control de pagos y estacionamiento, cada porción con su carga y su error:
- * { pagos (últimos 100), sesiones (activas), vencidos (50 cedulones más atrasados),
+ * { pagos (últimos 100), sesiones (activas), vencidos (los 50 cedulones sin pagar más atrasados;
+ *   la pantalla se queda con los ya vencidos usando vencidosAl),
  *   cargando: { pagos, sesiones, vencidos }, errores: { pagos, sesiones, vencidos } }.
  * `activas` elige qué porciones escuchar: los pagos y los vencidos son las más pesadas (en un
  * celular modesto, con caché persistente, procesarlas demora las escrituras del resto del panel),

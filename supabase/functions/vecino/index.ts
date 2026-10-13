@@ -5,12 +5,14 @@ import { accionDe, atender, ok } from "../_shared/respuesta.ts";
 import { ErrorHttp, type Identidad, verificarAppCheck, verificarUsuario } from "../_shared/firebase-auth.ts";
 import {
   conFechas,
+  consultarPaginado,
   type Escritura,
   escribirLote,
   HORA_SERVIDOR,
   listar,
   obtener,
   obtenerVarios,
+  q,
 } from "../_shared/firestore.ts";
 import { notificacionPersonal } from "../_shared/comun.ts";
 import { almacen, listarArchivos } from "../_shared/almacenamiento.ts";
@@ -134,6 +136,12 @@ async function baja(id: Identidad): Promise<{ borrados: number }> {
     .filter((s) => bloqueos.get(`bloqueosPatente/${s.datos.patente}`)?.datos.sesionId === s.id)
     .map((s) => `bloqueosPatente/${s.datos.patente}`);
 
+  // Eventos de la bandeja de salida que guardan su uid (avance de sus reclamos).
+  const eventos: string[] = [];
+  await consultarPaginado({ ...q.desde("eventos"), where: q.campo("EQUAL", "uid", id.uid) }, async (docs) => {
+    for (const d of docs) eventos.push(d.ruta);
+  });
+
   // Adjuntos del bucket privado: adjuntos-reclamos/{uid}/…
   const archivos = await listarArchivos(id.uid);
   for (let i = 0; i < archivos.length; i += 100) {
@@ -143,6 +151,7 @@ async function baja(id: Identidad): Promise<{ borrados: number }> {
 
   const escrituras: Escritura[] = [
     ...documentos.map((d) => ({ tipo: "borrar" as const, ruta: d.ruta })),
+    ...eventos.map((r) => ({ tipo: "borrar" as const, ruta: r })),
     ...[...new Set(bloqueosPropios)].map((r) => ({ tipo: "borrar" as const, ruta: r })),
   ];
   const resultados = await escribirLote(escrituras);

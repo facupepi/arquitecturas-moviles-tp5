@@ -36,6 +36,13 @@ body {
   outline-offset: 3px;
 }
 
+/* Un campo dentro de un contenedor que ya marca el foco (el buscador de Inicio, una píldora con borde
+   resaltado): sin el contorno rectangular adentro de la píldora. */
+[data-foco-contenedor]:focus,
+[data-foco-contenedor]:focus-visible {
+  outline: none;
+}
+
 /* El título de cada pantalla recibe el foco por programa al navegar: no necesita el contorno. */
 [data-foco-titulo]:focus,
 [data-foco-titulo]:focus-visible {

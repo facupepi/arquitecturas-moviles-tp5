@@ -208,6 +208,8 @@ function Buscador({ valor, onCambio, onEnviar }) {
         autoCapitalize="none"
         maxLength={60}
         testID="buscar-servicios"
+        // El foco lo marca la píldora (estilos.buscadorEnfocado); reset.css no le dibuja contorno.
+        dataSet={{ focoContenedor: true }}
         onFocus={() => setEnfocado(true)}
         onBlur={() => setEnfocado(false)}
         style={estilos.entrada}
@@ -253,7 +255,9 @@ function Acceso({ servicio, dato, ancho, completo, vertical, onPress }) {
       onPress={onPress}
       etiquetaAccesible={`${servicio.nombre}: ${dato.accesible ?? dato.texto.split(SALTO).join(', ')}`}
       testID={`servicio-${servicio.ruta}`}
-      estilo={[estilos.acceso, { width: ancho }, vertical && estilos.accesoVertical]}
+      // En la fila única de escritorio cada acceso toma una parte igual del ancho (flex), sin
+      // anchos calculados que por un píxel de redondeo manden el último a otra fila.
+      estilo={[estilos.acceso, vertical ? estilos.accesoFlexible : { width: ancho }, vertical && estilos.accesoVertical]}
     >
       {vertical ? (
         // Escritorio: los siete accesos en una sola fila, con el ícono arriba.
@@ -292,13 +296,14 @@ function Grilla({ servicios, resumen, onElegir }) {
   const columnas = columnasPara(ancho, servicios.length);
   const vertical = ancho >= ANCHO_FILA_UNICA;
   const gap = vertical ? GAP_ANCHO : GAP;
-  const anchoAcceso = Math.floor((ancho - gap * (columnas - 1)) / columnas);
+  // Un píxel de margen: el redondeo del navegador no debe pasar un acceso a la fila siguiente.
+  const anchoAcceso = Math.floor((ancho - gap * (columnas - 1)) / columnas) - 1;
   const sobrante = servicios.length % columnas;
 
   return (
     <View
       testID="grilla-servicios"
-      style={[estilos.grilla, { gap }]}
+      style={[estilos.grilla, { gap }, vertical && estilos.grillaFilaUnica]}
       onLayout={(e) => {
         const w = Math.round(e.nativeEvent.layout.width);
         if (w > 0 && w !== medido) setMedido(w);
@@ -416,9 +421,14 @@ function Resumen({ r, navegar }) {
   } else if (!r.impagos.length) {
     deuda = { valor: 'Sin deuda', detalle: 'Estás al día con tus tributos.', tono: 'exito' };
   } else if (r.vencidos.length) {
+    // El valor es el total de lo impago: el detalle cuenta todos los cedulones y cuántos vencieron.
+    const total = r.impagos.length;
+    const cuantos = r.vencidos.length === total
+      ? plural(total, 'cedulón vencido', 'cedulones vencidos')
+      : `${plural(total, 'cedulón a pagar', 'cedulones a pagar')}, ${plural(r.vencidos.length, 'vencido', 'vencidos')}`;
     deuda = {
       valor: dinero(r.deuda),
-      detalle: `${plural(r.vencidos.length, 'cedulón vencido', 'cedulones vencidos')}. Pagalo desde Mis tributos.`,
+      detalle: `${cuantos}. ${total === 1 ? 'Pagalo' : 'Pagalos'} desde Tributos.`,
       tono: 'peligro',
     };
   } else {
@@ -664,6 +674,8 @@ const estilos = StyleSheet.create({
   },
   borrarResaltado: { backgroundColor: colores.fondo },
   grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
+  grillaFilaUnica: { flexWrap: 'nowrap' },
+  accesoFlexible: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 },
   acceso: { padding: espacio.m, gap: 0, alignSelf: 'auto', minHeight: 76, justifyContent: 'center' },
   accesoVertical: { minHeight: 0, justifyContent: 'flex-start', alignItems: 'flex-start', gap: espacio.s, paddingVertical: espacio.l },
   accesoIconoVertical: { width: 42, height: 42 },

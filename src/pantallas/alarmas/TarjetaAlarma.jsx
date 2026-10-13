@@ -44,6 +44,9 @@ export default function TarjetaAlarma({ alarma, sigueZona, cerca, seleccionada, 
           </Texto>
         ) : null}
         <View style={estilos.marcas}>
+          {seleccionada ? (
+            <EtiquetaEstado texto="Elegida en el mapa" tono="alerta" icono="ubicacion" sobreColor={activa} testID={`elegida-${alarma.id}`} />
+          ) : null}
           <EtiquetaEstado texto={`Zona ${nombreZona(alarma.zona)}`} tono="neutro" sobreColor={activa} />
           {sigueZona ? <EtiquetaEstado texto="Seguís esta zona" tono="info" icono="campana" sobreColor={activa} /> : null}
           {cerca ? <EtiquetaEstado texto="Cerca tuyo" tono="info" icono="ubicacion" sobreColor={activa} testID={`cerca-${alarma.id}`} /> : null}
@@ -71,7 +74,9 @@ export default function TarjetaAlarma({ alarma, sigueZona, cerca, seleccionada, 
 const estilos = StyleSheet.create({
   contenedor: { flexGrow: 1, minWidth: 0 },
   tarjeta: { flexGrow: 1, minWidth: 0 },
-  elegida: { borderColor: colores.alertaAcento, borderWidth: 2 },
+  // Borde de 3 px de contraste suficiente y etiqueta "Elegida en el mapa" (no solo color); el
+  // relleno baja lo que sube el borde, así el contenido no se mueve.
+  elegida: { borderColor: colores.alerta, borderWidth: 3, padding: espacio.l - 2 },
   cabecera: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.s },
   titulo: { flex: 1, minWidth: 0 },
   etiqueta: { flexShrink: 0, paddingTop: 1 },

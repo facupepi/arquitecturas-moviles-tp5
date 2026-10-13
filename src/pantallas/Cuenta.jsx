@@ -229,6 +229,9 @@ export default function Cuenta() {
             testID="borrar-datos"
           />
         </View>
+        <Texto variante="chico" color={colores.textoSuave} testID="cuenta-version">
+          San Francisco Conecta · versión {version}
+        </Texto>
       </Tarjeta>
     </Seccion>
   );
@@ -269,10 +272,6 @@ export default function Cuenta() {
         </View>
       )}
       </View>
-
-      <Texto variante="chico" color={colores.textoSuave} alineacion="center" testID="cuenta-version">
-        San Francisco Conecta · versión {version}
-      </Texto>
 
       {/* Confirmación del borrado. */}
       <Dialogo

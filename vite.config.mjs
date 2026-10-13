@@ -47,7 +47,6 @@ export default defineConfig(({ mode }) => ({
       manifest: MANIFIESTO,
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,woff2,png,svg,webmanifest}'],
-        globIgnores: ['**/brand/README.md'],
         maximumFileSizeToCacheInBytes: 3_000_000,
       },
       devOptions: { enabled: mode === 'development', type: 'module' },

@@ -10,6 +10,19 @@ import { etiquetaMedio } from '../pagos/pasarela';
 
 export default function HistorialPagos({ pagos, tributosPorId, hayMas, error, ahora, onVerComprobante, onCargarMas, onReintentar }) {
   if (error && !pagos.length) return <ErrorCarga error={error} onReintentar={onReintentar} testID="error-pagos" />;
+  // La escucha trae los pagos más nuevos de todo tipo: si ninguno es de un cedulón pero hay más,
+  // no es cierto que no haya pagos; se ofrece seguir buscando en lugar del vacío.
+  if (!pagos.length && hayMas) {
+    return (
+      <Vacio
+        icono="tributo"
+        titulo="Tus últimos pagos no son de cedulones"
+        mensaje="Cargá pagos anteriores para ver los de tus tributos."
+        accion={{ titulo: 'Cargar más pagos', onPress: onCargarMas, testID: 'cargar-mas-pagos' }}
+        testID="pagos-sin-tributos"
+      />
+    );
+  }
   if (!pagos.length) {
     return <Vacio icono="tributo" titulo="Todavía no registraste pagos" testID="pagos-vacio" />;
   }

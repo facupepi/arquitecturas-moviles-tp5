@@ -15,7 +15,6 @@ import { LIMITES } from '../../../shared/constantes.mjs';
 import { tarjetaVencida } from '../../../shared/dominio.mjs';
 import { textoTarjeta } from '../../../shared/formato.mjs';
 import { iconoMedio } from './pasarela';
-import { NotaSeguridadTarjetas } from './FormularioTarjeta';
 
 const SIGUIENTE = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
 
@@ -154,7 +153,6 @@ const MediosDePago = forwardRef(function MediosDePago({ medio, deshabilitado = f
           testID="agregar-tarjeta-pago"
         />
       ) : null}
-      <NotaSeguridadTarjetas testID="nota-seguridad-pago" />
     </View>
   );
 });

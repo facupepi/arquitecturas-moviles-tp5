@@ -28,6 +28,7 @@ const Campo = forwardRef(function Campo({
   teclaEnter,
   onEnviar,
   autoCompletar,
+  oculto = false,
 }, ref) {
   const [enfocado, setEnfocado] = useState(false);
   const idEtiqueta = `${id}-etiqueta`;
@@ -55,6 +56,7 @@ const Campo = forwardRef(function Campo({
         autoCapitalize={mayusculas ? 'characters' : 'sentences'}
         autoCorrect={!mayusculas && !autoCompletar}
         autoComplete={autoCompletar}
+        secureTextEntry={oculto}
         maxLength={maxLargo}
         enterKeyHint={teclaEnter ?? (multilinea ? undefined : 'done')}
         onSubmitEditing={multilinea ? undefined : onEnviar}

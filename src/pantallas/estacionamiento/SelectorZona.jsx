@@ -1,7 +1,11 @@
 // Selector de zona de estacionamiento (S6, E1). Cada zona es una opción de radio con su tarifa,
 // el horario de cobro (horarioTexto) y la etiqueta "En horario" / "Fuera de horario" (enHorario).
-// testID de cada opción: zona-<id>.
-import React from 'react';
+// testID de cada opción: zona-<id>. `refOpcion(id)` devuelve la ref de cada opción (para llevar a la
+// vista la zona que se eligió en el mapa).
+// Teclado como el patrón radiogroup de WAI-ARIA (igual que pagos/MediosDePago.jsx): solo la zona
+// elegida entra en el orden de tabulación y las flechas pasan a la anterior o a la siguiente
+// (eligiéndola y llevándole el foco); espacio o Enter eligen la enfocada.
+import React, { useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { colores, espacio, medidas, radios } from '../../tema/tokens';
 import { EtiquetaEstado, Icono, Texto } from '../../ui';
@@ -9,14 +13,21 @@ import { alPresionarEspacio, useIdAccesible } from '../../ui/comun';
 import { dinero } from '../../../shared/formato.mjs';
 import { zonaEnHorario } from './util';
 
-function OpcionZona({ zona, elegida, cobra, onElegir }) {
+const SIGUIENTE = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
+
+function OpcionZona({ zona, elegida, enfocable, cobra, onElegir, onTecla, refOpcion }) {
   const elegir = () => onElegir(zona.id);
   return (
     <Pressable
+      ref={refOpcion}
       role="radio"
       aria-checked={elegida}
+      tabIndex={enfocable ? 0 : -1}
       onPress={elegir}
-      onKeyDown={alPresionarEspacio(elegir)}
+      onKeyDown={(evento) => {
+        if (onTecla(evento)) return;
+        alPresionarEspacio(elegir)(evento);
+      }}
       testID={`zona-${zona.id}`}
       style={({ hovered }) => [
         estilos.opcion,
@@ -57,23 +68,50 @@ function OpcionZona({ zona, elegida, cobra, onElegir }) {
   );
 }
 
-export default function SelectorZona({ zonas, valor, onCambio, ahora }) {
+export default function SelectorZona({ zonas, valor, onCambio, ahora, refOpcion }) {
   const idEtiqueta = useIdAccesible('zona-etiqueta');
+  const opciones = useRef({});
+  // Si ninguna está elegida (todavía), la primera es la que recibe el foco con Tab.
+  const indiceElegida = zonas.findIndex((z) => z.id === valor);
+  const enfocable = indiceElegida >= 0 ? indiceElegida : 0;
+
+  /** Flechas: elige la zona anterior o la siguiente (en ronda) y le lleva el foco. */
+  const alTeclear = (indice) => (evento) => {
+    const tecla = evento?.nativeEvent?.key ?? evento?.key;
+    const paso = SIGUIENTE[tecla];
+    if (!paso || !zonas.length) return false;
+    evento.preventDefault?.();
+    const destino = zonas[(indice + paso + zonas.length) % zonas.length];
+    onCambio(destino.id);
+    opciones.current[destino.id]?.focus?.();
+    return true;
+  };
+
   return (
     <View style={estilos.contenedor}>
       <Texto id={idEtiqueta} variante="chico" peso="700">
         Zona
       </Texto>
       <View role="radiogroup" aria-labelledby={idEtiqueta} style={estilos.lista}>
-        {zonas.map((z) => (
-          <OpcionZona
-            key={z.id}
-            zona={z}
-            elegida={z.id === valor}
-            cobra={zonaEnHorario(z, ahora)}
-            onElegir={onCambio}
-          />
-        ))}
+        {zonas.map((z, i) => {
+          const externa = refOpcion?.(z.id);
+          return (
+            <OpcionZona
+              key={z.id}
+              zona={z}
+              elegida={z.id === valor}
+              enfocable={i === enfocable}
+              cobra={zonaEnHorario(z, ahora)}
+              onElegir={onCambio}
+              onTecla={alTeclear(i)}
+              refOpcion={(nodo) => {
+                if (nodo) opciones.current[z.id] = nodo;
+                else delete opciones.current[z.id];
+                externa?.(nodo);
+              }}
+            />
+          );
+        })}
       </View>
     </View>
   );

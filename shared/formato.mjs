@@ -76,9 +76,17 @@ export function tiempoPasado(ms, ahora = Date.now()) {
 
 // Código corto de un vecino (últimos 4 caracteres del uid, "…A3F2"): lo ve el vecino en Mi cuenta
 // y la Municipalidad en el panel, para saber de quién es cada reclamo sin mostrar datos personales.
+// Entre "…" y las letras va un word joiner (U+2060, invisible): el renglón no se corta en el medio.
+export const UNION_CODIGO = '⁠';
 export function codigoVecino(uid) {
   const corto = String(uid ?? '').replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase();
-  return corto ? `…${corto}` : '';
+  return corto ? `…${UNION_CODIGO}${corto}` : '';
+}
+
+// Texto de búsqueda sin los puntos suspensivos del código de vecino: "…A3F2", "...A3F2" (escrito con
+// tres puntos) y el código copiado de la pantalla (con el word joiner) buscan lo mismo que "A3F2".
+export function sinSuspensivos(texto) {
+  return String(texto ?? '').replace(/⁠|…|\.{2,}/g, '');
 }
 
 // "HH:MM:SS" para el temporizador del estacionamiento. Negativo o inválido → "00:00:00".

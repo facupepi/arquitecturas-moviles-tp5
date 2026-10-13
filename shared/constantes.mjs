@@ -39,7 +39,7 @@ export const REDES_TARJETA = congelar(['Visa', 'Mastercard', 'American Express',
 export const IDS_TARJETA = congelar(['tarjeta-1', 'tarjeta-2', 'tarjeta-3', 'tarjeta-4', 'tarjeta-5']);
 
 export const LIMITES = congelar({
-  adjuntos: 3, bytesAdjunto: 2 * 1024 * 1024, ladoImagen: 1600, largoNombreAdjunto: 100,
+  adjuntos: 3, adjuntosPorVecino: 30, bytesAdjunto: 2 * 1024 * 1024, ladoImagen: 1600, largoNombreAdjunto: 100,
   bloqueMinutos: 15, minutosMax: 240, toleranciaFinMin: 2, radioAlarmaKm: 1,
   avisoEstacionamientoMinPorDefecto: 5, avisoEstacionamientoMinMax: 14, // el valor vigente está en municipal/config
   diasAvisoVencimiento: 3, cercaniaMin: 30, cercaniaMaxMin: 60, desfaseCordobaHoras: -3,

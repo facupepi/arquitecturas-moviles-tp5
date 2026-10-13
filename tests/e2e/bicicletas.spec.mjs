@@ -160,4 +160,56 @@ test.describe('Bicicletas', () => {
     await expect(page.locator('[data-testid^="estacion-b"]')).toHaveCount(ESTACIONES.length);
     await revisarAccesibilidad(page, 'bicicletas-busqueda', { excluir: ['.leaflet-tile-pane'] });
   });
+
+  test('escritorio: el mapa queda fijo al recorrer la lista y elegir un punto lleva su tarjeta a la vista', async ({ vecino }) => {
+    const { page } = vecino;
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await abrirBicicletas(page);
+    const marcadores = page.locator('[data-testid="mapa-estaciones"] path.leaflet-interactive');
+    await expect(marcadores).toHaveCount(ESTACIONES.length);
+    const pantalla = page.getByTestId('pantalla-bicicletas');
+
+    // ¿Está entera dentro del área que se desplaza (la pantalla, debajo del encabezado de la app)?
+    const aLaVista = (testId) => pantalla.evaluate((s, id) => {
+      const nodo = s.querySelector(`[data-testid="${id}"]`);
+      if (!nodo) return false;
+      const v = s.getBoundingClientRect();
+      const r = nodo.getBoundingClientRect();
+      return r.top >= v.top - 1 && r.bottom <= v.bottom + 1;
+    }, testId);
+
+    // Lado a lado: el mapa a la izquierda de la lista.
+    const orden = await ordenVisible(page);
+    const cajaMapa = await page.getByTestId('mapa-estaciones').boundingBox();
+    const cajaTarjeta = await page.getByTestId(orden[0]).boundingBox();
+    expect(cajaMapa.x + cajaMapa.width).toBeLessThanOrEqual(cajaTarjeta.x);
+
+    // Hasta la última tarjeta: la primera ya pasó, pero el mapa sigue entero a la vista.
+    await pantalla.evaluate((s, id) => {
+      const ultima = s.querySelector(`[data-testid="${id}"]`);
+      s.scrollTop += ultima.getBoundingClientRect().bottom - s.getBoundingClientRect().bottom;
+    }, orden.at(-1));
+    await expect.poll(() => aLaVista(orden.at(-1))).toBe(true);
+    await expect.poll(() => aLaVista(orden[0])).toBe(false);
+    await expect.poll(() => aLaVista('mapa-estaciones')).toBe(true);
+
+    // El marcador de la primera estación de la lista (la que quedó arriba, fuera de la vista).
+    const primera = ESTACIONES.find((e) => `estacion-${e.id}` === orden[0]);
+    const tooltip = page.locator('[data-testid="mapa-estaciones"] .leaflet-tooltip');
+    let marcador = null;
+    for (let i = 0; i < ESTACIONES.length && !marcador; i += 1) {
+      await marcadores.nth(i).dispatchEvent('mouseover');
+      const nombre = (await tooltip.last().textContent({ timeout: 2000 }).catch(() => ''))?.trim();
+      await marcadores.nth(i).dispatchEvent('mouseout');
+      if (nombre === primera.nombre) marcador = marcadores.nth(i);
+    }
+    expect(marcador, `marcador de ${primera.nombre}`).not.toBeNull();
+
+    // Elegirla en el mapa la marca, la anuncia y lleva su tarjeta a la vista; el mapa no se mueve.
+    await marcador.click({ force: true });
+    await expect(page.getByTestId('mapa-estaciones-seleccion')).toHaveText(primera.nombre);
+    await expect(page.getByTestId('mapa-estaciones-anuncio')).toHaveText(`Elegiste ${primera.nombre}.`);
+    await expect.poll(() => aLaVista(orden[0]), { timeout: 5000 }).toBe(true);
+    await expect.poll(() => aLaVista('mapa-estaciones')).toBe(true);
+  });
 });

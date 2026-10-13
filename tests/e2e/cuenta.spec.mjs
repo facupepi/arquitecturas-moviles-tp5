@@ -106,14 +106,15 @@ test.describe('Mi cuenta', () => {
     const seccion = page.getByTestId('cuenta-medios-pago');
     await expect(seccion.getByRole('heading', { name: 'Medios de pago' })).toBeVisible();
     await expect(page.getByTestId('sin-tarjetas')).toContainText('Todavía no guardaste tarjetas');
-    await expect(page.getByTestId('nota-seguridad-tarjetas')).toHaveText('Guardamos solo los últimos 4 dígitos. Nunca te pedimos el código de seguridad.');
+    await expect(page.getByTestId('nota-seguridad-tarjetas')).toHaveCount(0);
     await expect(page.getByTestId('dato-tarjetas')).toContainText('0');
 
-    // El diálogo de alta: tipo, número, titular y vencimiento; nada de código de seguridad.
+    // El diálogo de alta: tipo, número, titular, vencimiento y código de seguridad (oculto).
     await page.getByTestId('agregar-tarjeta').click();
     const alta = await dialogo(page, 'dialogo-tarjeta');
-    await expect(alta.locator('input')).toHaveCount(3);
-    await expect(alta).not.toContainText(/CVV|CVC|código de seguridad de/i);
+    await expect(alta.locator('input')).toHaveCount(4);
+    await expect(page.getByTestId('tarjeta-codigo')).toHaveAttribute('type', 'password');
+    await expect(page.getByTestId('tarjeta-codigo')).toHaveAttribute('autocomplete', 'cc-csc');
     await expect(page.getByTestId('tarjeta-numero')).toHaveAttribute('autocomplete', 'cc-number');
     await expect(page.getByTestId('tarjeta-vence')).toHaveAttribute('autocomplete', 'cc-exp');
     // Las áreas táctiles del tipo tienen al menos 48 px.
@@ -126,11 +127,13 @@ test.describe('Mi cuenta', () => {
     await page.getByTestId('tarjeta-numero').fill('4242 4242 4242 4241');   // falla Luhn
     await page.getByTestId('tarjeta-titular').fill('A');
     await page.getByTestId('tarjeta-vence').fill('0120');                     // vencida
+    await page.getByTestId('tarjeta-codigo').fill('12');                      // corto
     await page.getByTestId('guardar-tarjeta').click();
     await expect(alta).toContainText('Revisá el número: no corresponde a una tarjeta válida.');
     await expect(alta).toContainText('Usá entre 2 y 60 caracteres.');
     await expect(alta).toContainText('La tarjeta está vencida.');
-    for (const campo of ['tarjeta-numero', 'tarjeta-titular', 'tarjeta-vence']) {
+    await expect(alta).toContainText('Son 3 números, al dorso de la tarjeta.');
+    for (const campo of ['tarjeta-numero', 'tarjeta-titular', 'tarjeta-vence', 'tarjeta-codigo']) {
       await expect(page.getByTestId(campo)).toHaveAttribute('aria-invalid', 'true');
     }
     await expect(page.getByTestId('tarjeta-numero')).toBeFocused();
@@ -146,6 +149,7 @@ test.describe('Mi cuenta', () => {
     await expect(alta).toContainText('Tarjeta Visa.');
     await page.getByTestId('tarjeta-titular').fill('Vecina Prueba');
     await page.getByTestId('tarjeta-vence').fill('1230');
+    await page.getByTestId('tarjeta-codigo').fill('123');
     await page.getByTestId('guardar-tarjeta').click();
     await expect(page.getByTestId('dialogo-tarjeta')).toHaveCount(0);
     const fila = page.getByTestId('tarjeta-guardada-tarjeta-1');
@@ -155,7 +159,7 @@ test.describe('Mi cuenta', () => {
     const guardada = (await adminDb.doc(`usuarios/${uid}/tarjetas/tarjeta-1`).get()).data();
     expect(Object.keys(guardada).sort()).toEqual(['creadoEn', 'red', 'tipo', 'titular', 'ultimos4', 'vence']);
     expect(guardada).toMatchObject({ tipo: 'credito', red: 'Visa', ultimos4: '4242', titular: 'Vecina Prueba', vence: '12/30' });
-    expect(JSON.stringify(guardada)).not.toMatch(/4242424242|cvv|numero/i);
+    expect(JSON.stringify(guardada)).not.toMatch(/4242424242|cvv|codigo|numero|"123"/i);
     // Al volver a abrir, el formulario está vacío.
     await page.getByTestId('agregar-tarjeta').click();
     await dialogo(page, 'dialogo-tarjeta');
@@ -165,6 +169,7 @@ test.describe('Mi cuenta', () => {
     await page.getByTestId('tarjeta-numero').fill('4242424242424242');
     await page.getByTestId('tarjeta-titular').fill('Vecina Prueba');
     await page.getByTestId('tarjeta-vence').fill('1230');
+    await page.getByTestId('tarjeta-codigo').fill('123');
     await page.getByTestId('guardar-tarjeta').click();
     await expect(page.getByTestId('dialogo-tarjeta')).toContainText('Esa tarjeta ya está guardada.');
     await page.getByTestId('cancelar-tarjeta').click();

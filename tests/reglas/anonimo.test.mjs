@@ -8,7 +8,7 @@ import {
   doc, getDoc, getDocs, collection, collectionGroup, query, orderBy, limit,
   setDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp,
 } from 'firebase/firestore';
-import { crearEntorno, vecino, anonimo, sembrar, ts, assertSucceeds, assertFails, PREFERENCIAS } from './_entorno.mjs';
+import { crearEntorno, vecino, anonimo, conProveedor, sembrar, ts, assertSucceeds, assertFails, PREFERENCIAS } from './_entorno.mjs';
 
 let entorno;
 const ID_DISPOSITIVO = 'a'.repeat(32);
@@ -152,5 +152,18 @@ describe('sesión anónima: administración', () => {
     await assertSucceeds(getDoc(doc(db, 'administradores/anon-admin')));
     await assertSucceeds(updateDoc(doc(db, 'estaciones/b1'), { bicicletas: 3, estado: 'operativa', actualizadoEn: serverTimestamp() }));
     await assertSucceeds(getDocs(query(collectionGroup(db, 'reclamos'), orderBy('creadoEn', 'desc'), limit(10))));
+  });
+});
+
+describe('otros proveedores: solo se ingresa con Google', () => {
+  it('una sesión con contraseña o con token personalizado no lee sus datos ni administra', async () => {
+    for (const proveedor of ['password', 'custom']) {
+      await assertFails(getDoc(doc(conProveedor(entorno, 'anon', proveedor), 'usuarios/anon')));
+      await assertFails(getDocs(collection(conProveedor(entorno, 'anon', proveedor), 'usuarios/anon/tributos')));
+      const admin = conProveedor(entorno, 'anon-admin', proveedor);
+      await assertFails(getDoc(doc(admin, 'administradores/anon-admin')));
+      await assertFails(updateDoc(doc(admin, 'estaciones/b1'), { bicicletas: 3, estado: 'operativa', actualizadoEn: serverTimestamp() }));
+    }
+    await assertSucceeds(getDoc(doc(vecino(entorno, 'anon'), 'usuarios/anon')));
   });
 });

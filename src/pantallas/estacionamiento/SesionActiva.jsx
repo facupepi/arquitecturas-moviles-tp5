@@ -28,7 +28,9 @@ function textoRestante(ms) {
   if (min < 60) return `Te quedan ${min} minutos`;
   const h = Math.floor(min / 60);
   const m = min % 60;
-  return `Te quedan ${h} ${h === 1 ? 'hora' : 'horas'}${m ? ` y ${m} minutos` : ''}`;
+  const horas = `${h} ${h === 1 ? 'hora' : 'horas'}`;
+  // "Te queda 1 hora", "Te quedan 2 horas y 1 minuto": el verbo concuerda con lo que se cuenta primero.
+  return `${h === 1 ? 'Te queda' : 'Te quedan'} ${horas}${m ? ` y ${m} ${m === 1 ? 'minuto' : 'minutos'}` : ''}`;
 }
 
 export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar = false }) {

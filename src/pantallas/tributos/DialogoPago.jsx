@@ -4,7 +4,9 @@
 // diálogo no se puede cerrar). Al aprobarse, Tributos abre el comprobante (DialogoComprobante).
 // El código de operación (del requestId) se genera al abrir el diálogo y se reutiliza en los
 // reintentos: un reintento después de un corte no cobra dos veces (idempotencia, sección 0).
-// Los errores del comando (ya-pagado, sin-conexion…) van en el pie del diálogo, arriba del botón.
+// Los errores del comando (ya-pagado, sin-conexion, una tarjeta que el repositorio rechaza…) van en el
+// pie del diálogo, arriba del botón. La falta de tarjeta elegida la marca MediosDePago antes de llamar al
+// comando, así que un error del comando con campo 'medio' no se repite: también va en el pie.
 import React, { useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { colores, espacio, radios } from '../../tema/tokens';
@@ -25,7 +27,7 @@ export default function DialogoPago({
   const importe = dinero(tributo.importe);
   const errorMostrado = yaPagado
     ? { titulo: 'Este cedulón ya está pagado', mensaje: 'Se registró un pago desde otro dispositivo o pestaña. No hace falta pagarlo de nuevo.' }
-    : error && error.campo !== 'medio'
+    : error
       ? { titulo: 'No se pudo completar el pago', mensaje: error.message }
       : null;
   const reintentar = !yaPagado && error && (error.codigo === 'sin-conexion' || error.codigo === 'servidor');

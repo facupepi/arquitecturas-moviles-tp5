@@ -3,13 +3,13 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===================== Utilidades =====================
-    // Solo se ingresa con Google: una sesión anónima (de una versión anterior que tenía invitados,
-    // o creada a mano contra la API) no lee ni escribe datos de vecino ni administra.
-    // Mismo criterio que verificarUsuario de Supabase (6.4).
-    function noAnonimo() { return request.auth.token.firebase.sign_in_provider != 'anonymous'; }
-    function autenticado() { return request.auth != null && noAnonimo(); }
-    function esDueno(uid) { return request.auth != null && request.auth.uid == uid && noAnonimo(); }
-    // Mismo criterio que exigirAdmin de Supabase (6.4): cuenta no anónima y documento en administradores.
+    // Solo se ingresa con Google: cualquier otra sesión (anónima de una versión anterior que tenía
+    // invitados, con correo y contraseña o con token personalizado creada a mano contra la API)
+    // no lee ni escribe datos de vecino ni administra. Mismo criterio que verificarUsuario de Supabase (6.4).
+    function conGoogle() { return request.auth.token.firebase.sign_in_provider == 'google.com'; }
+    function autenticado() { return request.auth != null && conGoogle(); }
+    function esDueno(uid) { return request.auth != null && request.auth.uid == uid && conGoogle(); }
+    // Mismo criterio que exigirAdmin de Supabase (6.4): cuenta de Google y documento en administradores.
     function esAdmin() {
       return autenticado()
         && exists(/databases/$(database)/documents/administradores/$(request.auth.uid));
