@@ -31,6 +31,32 @@
         { "fieldPath": "tipo", "order": "ASCENDING" },
         { "fieldPath": "creadoEn", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "pagos",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "creadoEn", "order": "ASCENDING" },
+        { "fieldPath": "importe", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pagos",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "tipo", "order": "ASCENDING" },
+        { "fieldPath": "creadoEn", "order": "ASCENDING" },
+        { "fieldPath": "importe", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tributos",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "pagadoEn", "order": "ASCENDING" },
+        { "fieldPath": "vence", "order": "ASCENDING" },
+        { "fieldPath": "importe", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
