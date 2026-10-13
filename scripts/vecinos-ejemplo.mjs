@@ -18,7 +18,8 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { catalogo, datosInicialesVecino } from '../shared/catalogo.mjs';
 import { COLECCIONES as C, PREFERENCIAS_POR_DEFECTO } from '../shared/constantes.mjs';
-import { codigoReclamo, comprobante, costoEstacionamiento, validarTarjeta } from '../shared/dominio.mjs';
+import { codigoReclamo, comprobante, costoEstacionamiento } from '../shared/dominio.mjs';
+import { validarTarjeta } from '../shared/tarjetas.mjs';
 import { aFirestore, documentosVecino } from './sembrar.mjs';
 
 const MIN = 60 * 1000;

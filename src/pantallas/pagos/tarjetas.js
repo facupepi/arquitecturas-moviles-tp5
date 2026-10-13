@@ -4,10 +4,10 @@
 // validarlo y guarda { tipo, red, ultimos4, titular, vence }; al guardar, al cancelar o al cerrar,
 // el formulario vuelve a vacío. Nunca se pide el código de seguridad.
 import { useCallback, useMemo, useRef, useState } from 'react';
-import * as repositorio from '../../datos/repositorio';
+import * as repositorio from '../../datos/repositorioTarjetas';
 import { useComando } from '../../datos/useComando';
 import { LIMITES } from '../../../shared/constantes.mjs';
-import { revisarTarjeta } from '../../../shared/dominio.mjs';
+import { revisarTarjeta } from '../../../shared/tarjetas.mjs';
 
 export const CAMPOS_TARJETA = ['tipo', 'numero', 'titular', 'vence'];
 

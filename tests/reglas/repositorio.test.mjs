@@ -14,6 +14,7 @@ const { fijarUsuario } = await import('./_dobles/auth.mjs');
 const funciones = await import('./_dobles/funciones.mjs');
 const red = await import('./_dobles/red.mjs');
 const repo = await import('../../src/datos/repositorio.js');
+const repoTarjetas = await import('../../src/datos/repositorioTarjetas.js');
 const { catalogo } = await import('../../shared/catalogo.mjs');
 
 let entorno;
@@ -219,7 +220,7 @@ describe('tarjetas guardadas', () => {
     como('caro');
     const vistas = [];
     const cancelar = repo.suscribirTarjetas('caro', (lista) => vistas.push(lista));
-    const t = await repo.guardarTarjeta({ tipo: 'credito', numero: '4242 4242 4242 4242', titular: ' Caro  Díaz ', vence: '0830' });
+    const t = await repoTarjetas.guardarTarjeta({ tipo: 'credito', numero: '4242 4242 4242 4242', titular: ' Caro  Díaz ', vence: '0830' });
     assert.equal(t.id, 'tarjeta-1');
     const guardada = await leer('usuarios/caro/tarjetas/tarjeta-1');
     assert.deepEqual(Object.keys(guardada).sort(), ['creadoEn', 'red', 'tipo', 'titular', 'ultimos4', 'vence']);
@@ -227,15 +228,15 @@ describe('tarjetas guardadas', () => {
       tipo: 'credito', red: 'Visa', ultimos4: '4242', titular: 'Caro Díaz', vence: '08/30', creadoEn: null,
     });
     assert.ok(!JSON.stringify(guardada).includes('424242'), 'el número completo no se guarda');
-    const segunda = await repo.guardarTarjeta({ tipo: 'debito', numero: '5200828282828210', titular: 'Caro Díaz', vence: '12/29' });
+    const segunda = await repoTarjetas.guardarTarjeta({ tipo: 'debito', numero: '5200828282828210', titular: 'Caro Díaz', vence: '12/29' });
     assert.equal(segunda.id, 'tarjeta-2');
     // La misma tarjeta otra vez: error debajo del número, sin escribir.
-    await assert.rejects(repo.guardarTarjeta({ tipo: 'credito', numero: '4242424242424242', titular: 'Caro', vence: '08/30' }),
+    await assert.rejects(repoTarjetas.guardarTarjeta({ tipo: 'credito', numero: '4242424242424242', titular: 'Caro', vence: '08/30' }),
       (e) => e.codigo === 'validacion' && e.campo === 'numero' && /ya está guardada/.test(e.message));
     // Validación del dominio: Luhn y vencimiento.
-    await assert.rejects(repo.guardarTarjeta({ tipo: 'credito', numero: '4242424242424241', titular: 'Caro', vence: '08/30' }),
+    await assert.rejects(repoTarjetas.guardarTarjeta({ tipo: 'credito', numero: '4242424242424241', titular: 'Caro', vence: '08/30' }),
       (e) => e.codigo === 'validacion' && e.campo === 'numero');
-    await assert.rejects(repo.guardarTarjeta({ tipo: 'credito', numero: '4242424242424242', titular: 'Caro', vence: '01/20' }),
+    await assert.rejects(repoTarjetas.guardarTarjeta({ tipo: 'credito', numero: '4242424242424242', titular: 'Caro', vence: '01/20' }),
       (e) => e.codigo === 'validacion' && e.campo === 'vence');
     await new Promise((r) => { setTimeout(r, 300); });
     cancelar();
@@ -246,22 +247,22 @@ describe('tarjetas guardadas', () => {
   it('hasta 5 tarjetas; quitarTarjeta libera el lugar', async () => {
     como('caro');
     const numeros = ['378282246310005', '5555555555554444', '4000056655665556'];
-    for (const numero of numeros) await repo.guardarTarjeta({ tipo: 'credito', numero, titular: 'Caro Díaz', vence: '08/30' });
-    await assert.rejects(repo.guardarTarjeta({ tipo: 'debito', numero: '2223003122003222', titular: 'Caro Díaz', vence: '08/30' }),
+    for (const numero of numeros) await repoTarjetas.guardarTarjeta({ tipo: 'credito', numero, titular: 'Caro Díaz', vence: '08/30' });
+    await assert.rejects(repoTarjetas.guardarTarjeta({ tipo: 'debito', numero: '2223003122003222', titular: 'Caro Díaz', vence: '08/30' }),
       (e) => e.codigo === 'validacion' && e.campo === 'tarjetas' && /hasta 5/.test(e.message));
-    await repo.quitarTarjeta('tarjeta-3');
+    await repoTarjetas.quitarTarjeta('tarjeta-3');
     assert.equal(await leer('usuarios/caro/tarjetas/tarjeta-3'), null);
-    const nueva = await repo.guardarTarjeta({ tipo: 'debito', numero: '2223003122003222', titular: 'Caro Díaz', vence: '08/30' });
+    const nueva = await repoTarjetas.guardarTarjeta({ tipo: 'debito', numero: '2223003122003222', titular: 'Caro Díaz', vence: '08/30' });
     assert.equal(nueva.id, 'tarjeta-3');
     assert.equal(nueva.red, 'Mastercard');
-    await esperarError(repo.quitarTarjeta('otra-cosa'), 'no-encontrado');
+    await esperarError(repoTarjetas.quitarTarjeta('otra-cosa'), 'no-encontrado');
   });
 
   it('sin red no guarda la tarjeta', async () => {
     como('beto');
     red.estado.enLinea = false;
     try {
-      await esperarError(repo.guardarTarjeta({ tipo: 'credito', numero: '4242424242424242', titular: 'Beto', vence: '08/30' }), 'sin-conexion');
+      await esperarError(repoTarjetas.guardarTarjeta({ tipo: 'credito', numero: '4242424242424242', titular: 'Beto', vence: '08/30' }), 'sin-conexion');
     } finally {
       red.estado.enLinea = true;
     }

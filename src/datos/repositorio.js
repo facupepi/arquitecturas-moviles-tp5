@@ -18,10 +18,10 @@ import {
 } from './mapeadores';
 import {
   codigoReclamo, comprobante, costoEstacionamiento, enHorario, minutosValidos,
-  normalizarPatente, pagoConTarjeta, siguienteEstadoReclamo, validarPreferencias, validarReclamo, validarTarjeta,
+  normalizarPatente, pagoConTarjeta, siguienteEstadoReclamo, validarPreferencias, validarReclamo,
 } from '../../shared/dominio.mjs';
 import {
-  COLECCIONES as C, IDS_TARJETA, LIMITES, PREFERENCIAS_POR_DEFECTO, TIPOS_AVISO, ZONAS,
+  COLECCIONES as C, LIMITES, PREFERENCIAS_POR_DEFECTO, TIPOS_AVISO, ZONAS,
 } from '../../shared/constantes.mjs';
 import { dinero, textoMedioPago } from '../../shared/formato.mjs';
 
@@ -213,13 +213,6 @@ export function suscribirNotificaciones(uid, limite = 50, alCambiar, alFallar) {
   return escucharColeccion(query(coleccionDe(uid, C.notificaciones), orderBy('creadoEn', 'desc'), limit(limite)), notificacionDesdeDoc, alCambiar, alFallar, { metadatos: true });
 }
 
-// Tarjetas guardadas, de la más vieja a la más nueva (son 5 como máximo).
-export function suscribirTarjetas(uid, alCambiar, alFallar) {
-  return escucharColeccion(query(coleccionDe(uid, C.tarjetas), limit(LIMITES.tarjetas)), tarjetaDesdeDoc, (items, meta) => {
-    alCambiar([...items].sort((a, b) => (a.creadoEn - b.creadoEn) || a.id.localeCompare(b.id)), meta);
-  }, alFallar, { metadatos: true });
-}
-
 export function suscribirAvisosLeidos(uid, alCambiar, alFallar) {
   return onSnapshot(
     query(coleccionDe(uid, C.avisosLeidos), limit(300)),
@@ -360,37 +353,13 @@ export async function aceptarPrivacidad() {
   ));
 }
 
-// ===================== Tarjetas guardadas (medios de pago) =====================
+// ===================== Tarjetas guardadas (alta y baja en repositorioTarjetas.js) =====================
 
-const igualTarjeta = (a, b) => a.tipo === b.tipo && a.red === b.red && a.ultimos4 === b.ultimos4 && a.vence === b.vence;
-
-/**
- * Guarda una tarjeta de crédito o de débito: { tipo, numero, titular, vence }. El número completo
- * se usa solo para validarlo (Luhn) y sacar la red y los últimos 4: lo que se escribe es
- * { tipo, red, ultimos4, titular, vence, creadoEn }. No se pide código de seguridad.
- * Ocupa el primer lugar libre de IDS_TARJETA (hasta 5 tarjetas).
- */
-export async function guardarTarjeta(datos) {
-  const uid = uidActual();
-  const tarjeta = validar(() => validarTarjeta(datos ?? {}, Date.now()));
-  exigirConexion('Para guardar la tarjeta necesitás conexión. Revisá tu red e intentá de nuevo.');
-  await altaLista(uid);
-  return conErrores(async () => {
-    const guardadas = (await getDocs(coleccionDe(uid, C.tarjetas))).docs.map((d) => ({ id: d.id, ...d.data() }));
-    if (guardadas.some((t) => igualTarjeta(t, tarjeta))) throw errorCampo('numero', 'Esa tarjeta ya está guardada.');
-    const id = IDS_TARJETA.find((x) => !guardadas.some((t) => t.id === x));
-    if (!id) {
-      throw new ErrorApp('validacion', `Podés guardar hasta ${LIMITES.tarjetas} tarjetas. Quitá una para agregar otra.`, { campo: 'tarjetas' });
-    }
-    await setDoc(refDe(uid, C.tarjetas, id), { ...tarjeta, creadoEn: serverTimestamp() });
-    return { id, ...tarjeta, creadoEn: Date.now(), pendiente: false };
-  });
-}
-
-export async function quitarTarjeta(id) {
-  const uid = uidActual();
-  if (!IDS_TARJETA.includes(id)) throw new ErrorApp('no-encontrado', 'No encontramos esa tarjeta.');
-  await conErrores(() => escribirSinBloquear(deleteDoc(refDe(uid, C.tarjetas, id)), 'quitar la tarjeta'));
+// Tarjetas guardadas, de la más vieja a la más nueva (son 5 como máximo).
+export function suscribirTarjetas(uid, alCambiar, alFallar) {
+  return escucharColeccion(query(coleccionDe(uid, C.tarjetas), limit(LIMITES.tarjetas)), tarjetaDesdeDoc, (items, meta) => {
+    alCambiar([...items].sort((a, b) => (a.creadoEn - b.creadoEn) || a.id.localeCompare(b.id)), meta);
+  }, alFallar, { metadatos: true });
 }
 
 // ===================== Reclamos =====================
@@ -852,4 +821,4 @@ export async function restablecerDemo() {
 }
 
 // Ayudantes que comparte src/datos/repositorioPanel.js (cargado solo con el panel municipal).
-export { conErrores, escucharColeccion, exigirConexion, refDe, uidActual };
+export { coleccionDe, conErrores, errorCampo, escribirSinBloquear, escucharColeccion, exigirConexion, refDe, uidActual, validar };

@@ -6,8 +6,9 @@ import {
   ordenarPorCercania, enHorario, estadoTributo, siguienteEstadoReclamo, validarReclamo, validarArchivo,
   recortarNombreArchivo, tipoPorFirma, validarPreferencias, codigoReclamo, comprobante, codigoPagoTributo,
   nuevoIdSolicitud, finSesion, diaCordoba, digitoLuhn, luhnValido, inicioDiaCordoba, inicioMesCordoba,
-  redTarjeta, normalizarVence, tarjetaVencida, revisarTarjeta, validarTarjeta, pagoConTarjeta,
+  tarjetaVencida, pagoConTarjeta,
 } from '../../shared/dominio.mjs';
+import { digitosTarjeta, redTarjeta, normalizarVence, revisarTarjeta, validarTarjeta } from '../../shared/tarjetas.mjs';
 import { catalogo } from '../../shared/catalogo.mjs';
 import { TIPOS_NOTIFICACION } from '../../shared/constantes.mjs';
 

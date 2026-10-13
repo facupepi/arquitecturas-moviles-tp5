@@ -96,7 +96,7 @@ En desarrollo, App Check necesita un token de depuración registrado en la conso
 | Dominio y React Native | `npm test` | Funciones de `shared/`, mapeadores, errores y que `src/` use solo componentes de React Native fuera de los archivos `.web.js` |
 | Reglas de seguridad | `npm run test:reglas` | Las reglas de Firestore contra el emulador, con casos permitidos y rechazados por colección |
 | Extremo a extremo | `npm run test:e2e` | Cada pantalla en Pixel 7 (Chromium) e iPhone 13 (WebKit) contra los emuladores, con revisión de accesibilidad de axe |
-| Paquete | `npm run build` | Compila y falla si el JavaScript inicial supera 347 KB con gzip |
+| Paquete | `npm run build` | Compila y falla si el JavaScript inicial supera 350 KB con gzip |
 | Humo | `npm run test:humo` | La dirección publicada en celulares y navegadores de escritorio |
 | Carga | `npm run test:carga` | El requisito de carga en menos de 3 segundos con red y procesador limitados |
 | Todo lo local | `npm run test:todo` | Dominio, reglas, compilación y extremo a extremo en secuencia |

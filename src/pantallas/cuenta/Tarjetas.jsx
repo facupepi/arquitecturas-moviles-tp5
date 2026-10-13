@@ -7,7 +7,7 @@
 import React, { useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useMunicipal } from '../../datos/almacen';
-import * as repositorio from '../../datos/repositorio';
+import * as repositorio from '../../datos/repositorioTarjetas';
 import { useComando } from '../../datos/useComando';
 import { colores, espacio, radios } from '../../tema/tokens';
 import { Aviso, Boton, Dialogo, ErrorCarga, EtiquetaEstado, Icono, Texto, useAvisoFlotante } from '../../ui';

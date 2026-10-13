@@ -7,7 +7,7 @@ import { StyleSheet, View } from 'react-native';
 import { colores, espacio } from '../../tema/tokens';
 import { Campo, Icono, Selector, Texto } from '../../ui';
 import { useIdAccesible } from '../../ui/comun';
-import { digitosTarjeta, redTarjeta } from '../../../shared/dominio.mjs';
+import { digitosTarjeta, redTarjeta } from '../../../shared/tarjetas.mjs';
 import { NOTA_SEGURIDAD_TARJETAS, OPCIONES_TIPO_TARJETA, formatearNumero, formatearVence } from './tarjetas';
 
 /** Nota con el candado: qué se guarda de una tarjeta y qué no se pide nunca. */
