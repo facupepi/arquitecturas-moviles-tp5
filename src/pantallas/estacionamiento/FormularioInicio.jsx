@@ -25,7 +25,9 @@ const OPCIONES = OPCIONES_MINUTOS.map((n) => ({ valor: String(n), etiqueta: text
 
 const MENSAJE_FUERA_DE_HORARIO = 'Esta zona no cobra en este momento. Elegí otra zona o volvé dentro del horario indicado.';
 
-export default function FormularioInicio({ zona, config, ahora, alIniciar, patente: patenteExterna, onPatente }) {
+// oculto: con una sesión en curso (una por vecino) no se muestran los campos, pero el componente sigue
+// montado: el diálogo del comprobante de la sesión recién pagada vive acá y tiene que seguir abierto.
+export default function FormularioInicio({ zona, config, ahora, alIniciar, patente: patenteExterna, onPatente, oculto = false }) {
   const [patenteLocal, setPatenteLocal] = useState('');
   const patente = patenteExterna ?? patenteLocal;
   const setPatente = onPatente ?? setPatenteLocal;
@@ -149,6 +151,7 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
 
   return (
     <View style={estilos.formulario}>
+      {oculto ? null : (<>
       <Campo
         id="campo-patente"
         testID="campo-patente"
@@ -218,6 +221,7 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
           </View>
         ) : null}
       </View>
+      </>)}
 
       <Dialogo
         visible={!!confirmacion}

@@ -123,8 +123,13 @@ export async function finalizarSesionAdmin({ uid, sesionId } = {}) {
     if (!snapBloqueo.exists() || snapBloqueo.get('sesionId') !== sesionId) {
       throw new ErrorApp('validacion', `La patente ${sesion.patente} ya no figura a nombre de esta sesión.`);
     }
+    // El bloqueo del vecino (una sesión por vez) se libera si es de esta sesión; las sesiones
+    // anteriores a ese bloqueo no lo tienen.
+    const refVecino = doc(db, C.usuarios, uid, C.bloqueoVecino, 'actual');
+    const snapVecino = await tx.get(refVecino);
     tx.update(refSesion, { fin: serverTimestamp(), actualizadoEn: serverTimestamp() });
     tx.set(refBloqueo, { sesionId, fin: serverTimestamp() });
+    if (snapVecino.exists() && snapVecino.get('sesionId') === sesionId) tx.update(refVecino, { fin: serverTimestamp() });
     return { id: sesionId, uid, patente: sesion.patente };
   }));
 }

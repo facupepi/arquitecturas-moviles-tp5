@@ -194,8 +194,9 @@ export default function Estacionamiento({ ruta }) {
   );
   const formulario = (
     <>
-      <AvisoHorario zona={zona} estricto={estricto} cobra={cobra} />
+      {activas.length ? null : <AvisoHorario zona={zona} estricto={estricto} cobra={cobra} />}
       <FormularioInicio
+        oculto={activas.length > 0}
         zona={zona}
         config={config}
         ahora={ahoraLento}
@@ -212,13 +213,22 @@ export default function Estacionamiento({ ruta }) {
       {ancho ? null : mapa}
       <Tarjeta>
         {selector}
+        {/* Una sola sesión vigente por vecino: con una en curso se explica cómo seguir. */}
+        {activas.length ? (
+          <Aviso
+            tono="info"
+            titulo="Ya tenés un estacionamiento en curso"
+            mensaje="Para sumar tiempo, extendelo. Para estacionar en otro lugar, terminalo antes."
+            testID="sesion-en-curso"
+          />
+        ) : null}
         {formulario}
       </Tarjeta>
     </>
   );
 
   const seccionFormulario = (
-    <Seccion titulo={activas.length ? 'Iniciar otro estacionamiento' : 'Iniciar un estacionamiento'} testID="iniciar">
+    <Seccion titulo={activas.length ? 'Zonas de estacionamiento' : 'Iniciar un estacionamiento'} testID="iniciar">
       {cuerpoFormulario}
     </Seccion>
   );

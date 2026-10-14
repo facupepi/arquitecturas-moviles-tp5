@@ -20,7 +20,7 @@ function comprobante(prefijo, id) {
 function loteInicio(db, uid, {
   sesionId, patente, zonaId = 'p1', minutos = 60, importe, fin, zonaNombre, zona = 'centro',
   sinBloqueo = false, sinPago = false, bloqueoExtra = {}, finBloqueo, medio = 'debito', sinMedio = false,
-  tarjeta = { red: 'Visa', ultimos4: '5556' }, sinTarjeta = false,
+  tarjeta = { red: 'Visa', ultimos4: '5556' }, sinTarjeta = false, sinVecino = false, finVecino,
 }) {
   const z = zonas[zonaId] || zonas.p1;   // las zonas de la prueba de dayOfWeek copian p1
   const finTs = fin ?? ts(Date.now() + minutos * MIN);
@@ -34,6 +34,8 @@ function loteInicio(db, uid, {
   if (!sinBloqueo) {
     lote.set(doc(db, `bloqueosPatente/${patente}`), { sesionId, fin: finBloqueo ?? finTs, ...bloqueoExtra });
   }
+  // Una sola sesión vigente por vecino: su bloqueo propio apunta a esta sesión.
+  if (!sinVecino) lote.set(doc(db, `usuarios/${uid}/bloqueoEstacionamiento/actual`), { sesionId, fin: finVecino ?? finTs });
   if (!sinPago) {
     const pago = {
       tipo: 'estacionamiento', refId: sesionId, importe: importe ?? (z.tarifaHora * minutos) / 60,
@@ -47,7 +49,7 @@ function loteInicio(db, uid, {
 }
 
 // Lote de extensión sobre una sesión conocida (minutos, importe y fin actuales).
-function loteExtension(db, uid, { sesionId, patente, actual, extra = 15, pagoId, importeExtra, sinBloqueo = false, sinPago = false, tarifa = 800, medio = 'credito', tarjeta = { red: 'Mastercard', ultimos4: '4444' } }) {
+function loteExtension(db, uid, { sesionId, patente, actual, extra = 15, pagoId, importeExtra, sinBloqueo = false, sinPago = false, tarifa = 800, medio = 'credito', tarjeta = { red: 'Mastercard', ultimos4: '4444' }, sinVecino = false }) {
   const minutos = actual.minutos + extra;
   const fin = ts(actual.fin.toMillis() + extra * MIN);
   const importeDelta = importeExtra ?? (tarifa * extra) / 60;
@@ -57,6 +59,7 @@ function loteExtension(db, uid, { sesionId, patente, actual, extra = 15, pagoId,
     ultimoPagoId: pagoId, avisoPorVencer: false, actualizadoEn: serverTimestamp(),
   });
   if (!sinBloqueo) lote.set(doc(db, `bloqueosPatente/${patente}`), { sesionId, fin });
+  if (!sinVecino) lote.set(doc(db, `usuarios/${uid}/bloqueoEstacionamiento/actual`), { sesionId, fin });
   if (!sinPago) {
     const pago = {
       tipo: 'extension', refId: sesionId, importe: importeDelta, comprobante: comprobante('EXT', pagoId),
@@ -69,11 +72,21 @@ function loteExtension(db, uid, { sesionId, patente, actual, extra = 15, pagoId,
   return { lote, nuevo: { minutos, fin, importe: actual.importe + importeDelta, extensiones: actual.extensiones + 1 } };
 }
 
-function loteFinalizar(db, uid, { sesionId, patente, fin = serverTimestamp(), finBloqueo = serverTimestamp(), sinBloqueo = false }) {
+function loteFinalizar(db, uid, { sesionId, patente, fin = serverTimestamp(), finBloqueo = serverTimestamp(), sinBloqueo = false, sinVecino = false }) {
   const lote = writeBatch(db);
   lote.update(doc(db, `usuarios/${uid}/estacionamiento/${sesionId}`), { fin, actualizadoEn: serverTimestamp() });
   if (!sinBloqueo) lote.set(doc(db, `bloqueosPatente/${patente}`), { sesionId, fin: finBloqueo });
+  if (!sinVecino) lote.set(doc(db, `usuarios/${uid}/bloqueoEstacionamiento/actual`), { sesionId, fin: finBloqueo });
   return lote;
+}
+
+// Cada intento de inicio en las pruebas de validación usa un vecino distinto: con una sesión
+// vigente por vecino, reutilizar uno haría fallar el intento por el bloqueo y no por lo que se prueba.
+let vecinosNuevos = 0;
+function nuevoVecino() {
+  vecinosNuevos += 1;
+  const uid = `v-inicio-${vecinosNuevos}`;
+  return [vecino(entorno, uid), uid];
 }
 
 async function fijarHorarioEstricto(valor) {
@@ -111,52 +124,53 @@ after(async () => { await entorno?.cleanup(); });
 describe('inicio de sesión', () => {
   it('con importe = tarifa × minutos / 60 pasa', async () => {
     const db = vecino(entorno, 'u2');
-    const { lote } = loteInicio(db, 'u2', { sesionId: 'sesion-ok-000001', patente: 'ABC123', minutos: 60 });
+    const { lote } = loteInicio(...nuevoVecino(), { sesionId: 'sesion-ok-000001', patente: 'ABC123', minutos: 60 });
     await assertSucceeds(lote.commit());
-    const { lote: otro } = loteInicio(db, 'u2', { sesionId: 'sesion-ok-000002', patente: 'AB123CD', minutos: 15 });
+    const { lote: otro } = loteInicio(...nuevoVecino(), { sesionId: 'sesion-ok-000002', patente: 'AB123CD', minutos: 15 });
     await assertSucceeds(otro.commit());
   });
 
   it('el pago del inicio exige una tarjeta de crédito o de débito, enmascarada', async () => {
     const db = vecino(entorno, 'u2');
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-medio-0001', patente: 'MED001', minutos: 15, sinMedio: true }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-medio-0002', patente: 'MED002', minutos: 15, medio: 'efectivo' }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-medio-0003', patente: 'MED003', minutos: 15, medio: null }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-medio-0005', patente: 'MED005', minutos: 15, medio: 'transferencia' }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-medio-0006', patente: 'MED006', minutos: 15, medio: 'billetera' }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-medio-0007', patente: 'MED007', minutos: 15, sinTarjeta: true }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-medio-0009', patente: 'MED009', minutos: 15, tarjeta: null }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-medio-0008', patente: 'MED008', minutos: 15, tarjeta: { red: 'Visa', ultimos4: '4000056655665556' } }).lote.commit());
-    await assertSucceeds(loteInicio(db, 'u2', { sesionId: 'sesion-medio-0004', patente: 'MED004', minutos: 15, medio: 'credito' }).lote.commit());
-    const pago = (await getDoc(doc(db, 'usuarios/u2/pagos/sesion-medio-0004'))).data();
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-medio-0001', patente: 'MED001', minutos: 15, sinMedio: true }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-medio-0002', patente: 'MED002', minutos: 15, medio: 'efectivo' }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-medio-0003', patente: 'MED003', minutos: 15, medio: null }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-medio-0005', patente: 'MED005', minutos: 15, medio: 'transferencia' }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-medio-0006', patente: 'MED006', minutos: 15, medio: 'billetera' }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-medio-0007', patente: 'MED007', minutos: 15, sinTarjeta: true }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-medio-0009', patente: 'MED009', minutos: 15, tarjeta: null }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-medio-0008', patente: 'MED008', minutos: 15, tarjeta: { red: 'Visa', ultimos4: '4000056655665556' } }).lote.commit());
+    const [dbMedio, uidMedio] = nuevoVecino();
+    await assertSucceeds(loteInicio(dbMedio, uidMedio, { sesionId: 'sesion-medio-0004', patente: 'MED004', minutos: 15, medio: 'credito' }).lote.commit());
+    const pago = (await getDoc(doc(dbMedio, `usuarios/${uidMedio}/pagos/sesion-medio-0004`))).data();
     assert.equal(pago.medio, 'credito');
     assert.deepEqual(pago.tarjeta, { red: 'Visa', ultimos4: '5556' });
   });
 
   it('importe distinto, minutos fuera de bloque o más de 240 se rechazan', async () => {
     const db = vecino(entorno, 'u2');
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-mal-00001', patente: 'CCC001', minutos: 60, importe: 799 }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-mal-00002', patente: 'CCC002', minutos: 20, importe: 800 * 20 / 60 }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-mal-00003', patente: 'CCC003', minutos: 255 }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-mal-00004', patente: 'CCC004', minutos: 300 }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-mal-00005', patente: 'CCC005', minutos: 0, importe: 0 }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-mal-00001', patente: 'CCC001', minutos: 60, importe: 799 }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-mal-00002', patente: 'CCC002', minutos: 20, importe: 800 * 20 / 60 }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-mal-00003', patente: 'CCC003', minutos: 255 }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-mal-00004', patente: 'CCC004', minutos: 300 }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-mal-00005', patente: 'CCC005', minutos: 0, importe: 0 }).lote.commit());
   });
 
   it('se rechaza un fin lejos de inicio + minutos, una patente inválida o datos de zona falsos', async () => {
     const db = vecino(entorno, 'u2');
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-mal-00006', patente: 'DDD001', minutos: 15, fin: ts(Date.now() + 60 * MIN) }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-mal-00007', patente: 'abc123', minutos: 15 }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-mal-00008', patente: 'DDD002', minutos: 15, zonaNombre: 'Otra' }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-mal-00009', patente: 'DDD003', minutos: 15, zona: 'norte' }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'corto', patente: 'DDD004', minutos: 15 }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-mal-00006', patente: 'DDD001', minutos: 15, fin: ts(Date.now() + 60 * MIN) }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-mal-00007', patente: 'abc123', minutos: 15 }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-mal-00008', patente: 'DDD002', minutos: 15, zonaNombre: 'Otra' }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-mal-00009', patente: 'DDD003', minutos: 15, zona: 'norte' }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'corto', patente: 'DDD004', minutos: 15 }).lote.commit());
   });
 
   it('con horarioEstricto fuera de horario se rechaza y sin él pasa', async () => {
     const db = vecino(entorno, 'u2');
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-hor-00001', patente: 'EEE001', zonaId: 'cerrada', minutos: 15 }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-hor-00001', patente: 'EEE001', zonaId: 'cerrada', minutos: 15 }).lote.commit());
     await fijarHorarioEstricto(false);
     try {
-      await assertSucceeds(loteInicio(db, 'u2', { sesionId: 'sesion-hor-00002', patente: 'EEE002', zonaId: 'cerrada', minutos: 15 }).lote.commit());
+      await assertSucceeds(loteInicio(...nuevoVecino(), { sesionId: 'sesion-hor-00002', patente: 'EEE002', zonaId: 'cerrada', minutos: 15 }).lote.commit());
     } finally {
       await fijarHorarioEstricto(true);
     }
@@ -177,28 +191,28 @@ describe('inicio de sesión', () => {
       });
     });
     const db = vecino(entorno, 'u2');
-    await assertSucceeds(loteInicio(db, 'u2', { sesionId: 'sesion-dia-00001', patente: 'FFF001', zonaId: 'hoy', minutos: 15 }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-dia-00002', patente: 'FFF002', zonaId: 'otro-dia', minutos: 15 }).lote.commit());
-    await assertSucceeds(loteInicio(db, 'u2', { sesionId: 'sesion-dia-00003', patente: 'FFF003', zonaId: 'esta-hora', minutos: 15 }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-dia-00004', patente: 'FFF004', zonaId: 'otra-hora', minutos: 15 }).lote.commit());
+    await assertSucceeds(loteInicio(...nuevoVecino(), { sesionId: 'sesion-dia-00001', patente: 'FFF001', zonaId: 'hoy', minutos: 15 }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-dia-00002', patente: 'FFF002', zonaId: 'otro-dia', minutos: 15 }).lote.commit());
+    await assertSucceeds(loteInicio(...nuevoVecino(), { sesionId: 'sesion-dia-00003', patente: 'FFF003', zonaId: 'esta-hora', minutos: 15 }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-dia-00004', patente: 'FFF004', zonaId: 'otra-hora', minutos: 15 }).lote.commit());
   });
 });
 
 describe('bloqueo de patente', () => {
   it('una patente bloqueada por otro vecino se rechaza y una vencida pasa', async () => {
     const db = vecino(entorno, 'u2');
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-blq-00001', patente: 'AAA111', minutos: 15 }).lote.commit());
-    await assertSucceeds(loteInicio(db, 'u2', { sesionId: 'sesion-blq-00002', patente: 'BBB222', minutos: 15 }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-blq-00001', patente: 'AAA111', minutos: 15 }).lote.commit());
+    await assertSucceeds(loteInicio(...nuevoVecino(), { sesionId: 'sesion-blq-00002', patente: 'BBB222', minutos: 15 }).lote.commit());
   });
 
   it('otro vecino que crea una sesión con el mismo sesionId del bloqueo ajeno no lo toma', async () => {
     const db = vecino(entorno, 'u2');
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-ajena-0001', patente: 'AAA111', minutos: 15 }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-ajena-0001', patente: 'AAA111', minutos: 15 }).lote.commit());
   });
 
   it('el bloqueo no tiene uid ni otros campos', async () => {
     const db = vecino(entorno, 'u2');
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-blq-00003', patente: 'GGG001', minutos: 15, bloqueoExtra: { uid: 'u2' } }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-blq-00003', patente: 'GGG001', minutos: 15, bloqueoExtra: { uid: 'u2' } }).lote.commit());
     const leido = await assertSucceeds(getDoc(doc(db, 'bloqueosPatente/ABC123')));
     assert.deepEqual(Object.keys(leido.data()).sort(), ['fin', 'sesionId']);
   });
@@ -212,14 +226,38 @@ describe('bloqueo de patente', () => {
 
   it('una sesión sin bloqueo o sin pago en el lote se rechaza', async () => {
     const db = vecino(entorno, 'u2');
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-blq-00004', patente: 'GGG002', minutos: 15, sinBloqueo: true }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-blq-00005', patente: 'GGG003', minutos: 15, sinPago: true }).lote.commit());
-    await assertFails(loteInicio(db, 'u2', { sesionId: 'sesion-blq-00006', patente: 'GGG004', minutos: 15, finBloqueo: ts(Date.now() + 5 * MIN) }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-blq-00004', patente: 'GGG002', minutos: 15, sinBloqueo: true }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-blq-00005', patente: 'GGG003', minutos: 15, sinPago: true }).lote.commit());
+    await assertFails(loteInicio(...nuevoVecino(), { sesionId: 'sesion-blq-00006', patente: 'GGG004', minutos: 15, finBloqueo: ts(Date.now() + 5 * MIN) }).lote.commit());
   });
 
   it('un bloqueo suelto, sin sesión en el lote, se rechaza', async () => {
     const db = vecino(entorno, 'u2');
     await assertFails(setDoc(doc(db, 'bloqueosPatente/HHH001'), { sesionId: 'sesion-suelta-001', fin: ts(Date.now() + 15 * MIN) }));
+  });
+});
+
+describe('una sesión vigente por vecino', () => {
+  it('con una sesión en curso no puede iniciar otra, ni con otra patente', async () => {
+    const db = vecino(entorno, 'u-una');
+    await assertSucceeds(loteInicio(db, 'u-una', { sesionId: 'sesion-una-00001', patente: 'UNA001', minutos: 30 }).lote.commit());
+    await assertFails(loteInicio(db, 'u-una', { sesionId: 'sesion-una-00002', patente: 'UNA002', minutos: 15 }).lote.commit());
+    // Tampoco sin escribir su bloqueo propio
+    await assertFails(loteInicio(db, 'u-una', { sesionId: 'sesion-una-00003', patente: 'UNA003', minutos: 15, sinVecino: true }).lote.commit());
+  });
+
+  it('al terminarla, puede iniciar otra', async () => {
+    const db = vecino(entorno, 'u-dos');
+    await assertSucceeds(loteInicio(db, 'u-dos', { sesionId: 'sesion-dos-00001', patente: 'DOS001', minutos: 30 }).lote.commit());
+    await assertSucceeds(loteFinalizar(db, 'u-dos', { sesionId: 'sesion-dos-00001', patente: 'DOS001' }).commit());
+    await assertSucceeds(loteInicio(db, 'u-dos', { sesionId: 'sesion-dos-00002', patente: 'DOS002', minutos: 15 }).lote.commit());
+  });
+
+  it('el bloqueo propio no se adelanta suelto ni lo escribe otro vecino', async () => {
+    const db = vecino(entorno, 'u-una');
+    await assertFails(setDoc(doc(db, 'usuarios/u-una/bloqueoEstacionamiento/actual'), { sesionId: 'sesion-una-00001', fin: ts(Date.now()) }));
+    await assertFails(setDoc(doc(vecino(entorno, 'u3'), 'usuarios/u-una/bloqueoEstacionamiento/actual'), { sesionId: 'sesion-una-00009', fin: ts(Date.now()) }));
+    await assertFails(getDoc(doc(vecino(entorno, 'u3'), 'usuarios/u-una/bloqueoEstacionamiento/actual')));
   });
 });
 

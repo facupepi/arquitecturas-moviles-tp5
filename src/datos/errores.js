@@ -3,7 +3,7 @@
 
 export const CODIGOS = Object.freeze([
   'sin-sesion', 'sin-conexion', 'app-check', 'permiso', 'validacion', 'no-encontrado', 'ya-pagado',
-  'patente-ocupada', 'fuera-de-horario', 'sesion-vencida', 'maximo-alcanzado', 'adjunto-invalido',
+  'patente-ocupada', 'sesion-en-curso', 'fuera-de-horario', 'sesion-vencida', 'maximo-alcanzado', 'adjunto-invalido',
   'popup-bloqueado', 'no-soportado', 'cuota', 'servidor', 'desconocido',
 ]);
 
@@ -16,6 +16,7 @@ export const MENSAJES = Object.freeze({
   'no-encontrado': 'No encontramos el registro.',
   'ya-pagado': 'Este cedulón ya está pagado.',
   'patente-ocupada': 'La patente ya tiene una sesión activa.',
+  'sesion-en-curso': 'Ya tenés un estacionamiento en curso. Extendelo o terminalo antes de iniciar otro.',
   'fuera-de-horario': 'La zona está fuera de su horario de cobro.',
   'sesion-vencida': 'La sesión venció. Iniciá una nueva.',
   'maximo-alcanzado': 'El máximo por sesión es de 4 horas.',

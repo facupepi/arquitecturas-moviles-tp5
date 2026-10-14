@@ -22,7 +22,7 @@ La aplicación reúne siete servicios en una sola pantalla de inicio.
 
 El vecino entra con su cuenta de Google, la misma en el celular y en la computadora; no hay acceso como invitado. La aplicación se instala en la pantalla de inicio del teléfono y funciona sin conexión con los últimos datos.
 
-Una cuenta de Google registrada como administradora accede además al panel municipal, que reemplaza a los sistemas del municipio para avanzar reclamos, seguir los pagos y la recaudación, controlar y finalizar los estacionamientos en curso, activar alarmas, cambiar la disponibilidad de bicicletas, publicar avisos y controlar la simulación.
+Una cuenta de Google registrada como administradora accede además al panel municipal, que reemplaza a los sistemas del municipio para avanzar reclamos, seguir los pagos y la recaudación, controlar y finalizar los estacionamientos en curso (cada vecino tiene una sola sesión vigente a la vez), activar alarmas, cambiar la disponibilidad de bicicletas, publicar avisos y controlar la simulación.
 
 ## Arquitectura
 
@@ -105,7 +105,7 @@ En desarrollo, App Check necesita un token de depuración registrado en la conso
 
 La prueba de humo y la de carga solo miran lo público: no inician sesión ni crean cuentas en producción. La prueba de humo acepta el token de depuración de App Check en la variable `APPCHECK_TOKEN_HUMO`, que nunca se versiona.
 
-En la última corrida, las pruebas de dominio dieron 100 de 100, las de reglas 148 de 148 y las de extremo a extremo 147 de 150 (75 en Pixel 7 y 75 en iPhone 13). Las tres que fallaron pasaron al repetirlas: eran demoras del emulador en una máquina cargada, que también aparecen con la versión anterior del código. El 14 de octubre de 2026, contra la dirección publicada, la prueba de humo dio 30 de 30 en los cinco navegadores.
+En la última corrida, las pruebas de dominio dieron 100 de 100, las de reglas 152 de 152 y las de extremo a extremo 144 de 150 en la corrida completa (75 en Pixel 7 y 75 en iPhone 13). Las seis que fallaron son demoras del emulador en una máquina cargada, que también aparecen con la versión anterior del código y cambian de una corrida a otra: pasan al repetirlas, salvo la del pago en vivo del panel, que falló una de cuatro veces. El 14 de octubre de 2026, contra la dirección publicada, la prueba de humo dio 30 de 30 en los cinco navegadores.
 
 La prueba de carga del 13 de octubre de 2026, contra la dirección publicada, midió siete repeticiones con red móvil lenta y procesador limitado. En la primera visita, el contenido quedó visible en 1,27 s de mediana y el ingreso utilizable en 2,88 s de mediana, con un peor caso de 3,13 s, 0,13 s por encima del límite de 3 segundos. En la visita repetida, con la app guardada por el service worker, el ingreso quedó utilizable en 1,95 s de mediana. El detalle está en `docs/pruebas/`.
 
@@ -225,5 +225,5 @@ La demostración usa dos dispositivos.
 - No se guarda el correo del vecino ni su ubicación. Para las alarmas cercanas, el teléfono registra solo los identificadores de las alarmas próximas durante treinta minutos.
 - De cada tarjeta guardada, de crédito o de débito y hasta cinco por vecino, se guardan solo el tipo, la red, los últimos cuatro dígitos, el titular y el vencimiento. El número completo y el código de seguridad se validan al cargar la tarjeta y se descartan: no llegan a Firestore, y de la tarjeta usada cada pago guarda solo el tipo, la red y los últimos cuatro dígitos.
 - Las reglas de Firestore y las Edge Functions solo aceptan sesiones de Google, salvo las de las cuentas de ejemplo (uid `ejemplo-…`), que solo se abren con un token personalizado emitido con la cuenta de servicio. Las reglas limitan cada documento a su dueño, validan importes, estados y transiciones, y exigen una de esas sesiones con documento en `administradores` para toda acción municipal.
-- "Borrar mis datos" elimina el perfil, los cedulones, los pagos, las tarjetas guardadas, los reclamos con sus adjuntos, los estacionamientos y los bloqueos de patente de todas sus sesiones, las notificaciones y los avisos leídos, los celulares registrados para las notificaciones push, los eventos de la bandeja de salida con su uid, el documento de administrador si lo tenía y el usuario de Authentication.
+- "Borrar mis datos" elimina el perfil, los cedulones, los pagos, las tarjetas guardadas, los reclamos con sus adjuntos, los estacionamientos, su bloqueo de sesión vigente y los bloqueos de patente de todas sus sesiones, las notificaciones y los avisos leídos, los celulares registrados para las notificaciones push, los eventos de la bandeja de salida con su uid, el documento de administrador si lo tenía y el usuario de Authentication.
 - La configuración web de Firebase es pública por diseño, pero no se versiona. Las claves privadas y los secretos de Supabase nunca se incluyen en el repositorio.

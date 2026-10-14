@@ -53,6 +53,8 @@ export const COLECCIONES = congelar({
   tributos: 'tributos', pagos: 'pagos', reclamos: 'reclamos', estacionamiento: 'estacionamiento',
   notificaciones: 'notificaciones', avisosLeidos: 'avisosLeidos', dispositivos: 'dispositivos',
   tarjetas: 'tarjetas',
+  // usuarios/{uid}/bloqueoEstacionamiento/actual: la sesión vigente del vecino (una por vez).
+  bloqueoVecino: 'bloqueoEstacionamiento',
 });
 
 // Congelado: quien necesite modificarlas parte de una copia (datosInicialesVecino ya entrega una).

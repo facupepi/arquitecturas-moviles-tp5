@@ -11,7 +11,7 @@ test('errores.js no importa nada (lo usan WP4 y WP6 sin ciclos)', () => {
 });
 
 test('todos los códigos de la tabla 4.2 tienen mensaje', () => {
-  assert.equal(CODIGOS.length, 17);
+  assert.equal(CODIGOS.length, 18);
   assert.ok(!CODIGOS.includes('cuenta-existente'), 'sin vínculo de invitados no hay cuenta existente');
   for (const codigo of CODIGOS) assert.ok(MENSAJES[codigo], codigo);
   assert.equal(MENSAJES['sin-conexion'], 'No hay conexión. Revisá tu red e intentá de nuevo.');

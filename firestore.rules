@@ -307,6 +307,23 @@ service cloud.firestore {
               && ahoraLocal().hours() >= z.horario.desde
               && ahoraLocal().hours() < z.horario.hasta);
       }
+      // Una sola sesión vigente por vecino: el bloqueo propio apunta a la sesión del lote y a su fin.
+      function vecinoTomado(sesionId, fin) {
+        let v = getAfter(rutaPropia('bloqueoEstacionamiento', 'actual'));
+        return v != null && v.data.sesionId == sesionId && v.data.fin == fin;
+      }
+      match /bloqueoEstacionamiento/{id} {
+        allow read: if esDueno(uid);
+        allow delete: if false;
+        // Libre, vencido o de la misma sesión (extender o terminar), y la sesión del lote tiene ese fin.
+        allow create, update: if esDueno(uid) && id == 'actual'
+          && claves(['sesionId', 'fin'])
+          && idSolicitud(nuevo().sesionId)
+          && nuevo().fin is timestamp
+          && (resource == null || viejo().fin <= request.time || viejo().sesionId == nuevo().sesionId)
+          && getAfter(rutaPropia('estacionamiento', nuevo().sesionId)) != null
+          && getAfter(rutaPropia('estacionamiento', nuevo().sesionId)).data.fin == nuevo().fin;
+      }
       function bloqueoTomado(sesionId, patente, fin) {
         let b = getAfter(/databases/$(database)/documents/bloqueosPatente/$(patente));
         return b != null && b.data.sesionId == sesionId && b.data.fin == fin;
@@ -319,6 +336,7 @@ service cloud.firestore {
           && d.zona == z.zona
           && enHorarioZona(z, c)
           && bloqueoTomado(sesionId, d.patente, d.fin)
+          && vecinoTomado(sesionId, d.fin)
           && existsAfter(rutaPropia('pagos', sesionId));
       }
       function extensionValida(sesionId, a, d) {
@@ -333,13 +351,15 @@ service cloud.firestore {
           && idSolicitud(d.ultimoPagoId)
           && d.ultimoPagoId != a.ultimoPagoId
           && existsAfter(rutaPropia('pagos', d.ultimoPagoId))
-          && bloqueoTomado(sesionId, a.patente, d.fin);
+          && bloqueoTomado(sesionId, a.patente, d.fin)
+          && vecinoTomado(sesionId, d.fin);
       }
       // Terminar antes de tiempo (sin reintegro): fin = hora del servidor, y el bloqueo igual.
       function finalizacionValida(sesionId, a, d) {
         return soloCambian(['fin', 'actualizadoEn'])
           && d.fin == request.time
-          && bloqueoTomado(sesionId, a.patente, d.fin);
+          && bloqueoTomado(sesionId, a.patente, d.fin)
+          && vecinoTomado(sesionId, d.fin);
       }
       match /estacionamiento/{sesionId} {
         allow read: if esDueno(uid);
@@ -507,7 +527,22 @@ service cloud.firestore {
         && soloCambian(['fin', 'actualizadoEn'])
         && nuevo().fin == request.time
         && nuevo().actualizadoEn == request.time
-        && bloqueoLiberadoEnLote(sesionId, viejo().patente);
+        && bloqueoLiberadoEnLote(sesionId, viejo().patente)
+        && vecinoLiberadoEnLote(uid, sesionId);
+    }
+    // El bloqueo del vecino, si es de esta sesión, también pasa a "ahora" en el lote.
+    function vecinoLiberadoEnLote(uid, sesionId) {
+      let v = getAfter(/databases/$(database)/documents/usuarios/$(uid)/bloqueoEstacionamiento/actual);
+      return v == null || v.data.sesionId != sesionId || v.data.fin == request.time;
+    }
+    match /usuarios/{uid}/bloqueoEstacionamiento/{id} {
+      // Lee el bloqueo del vecino para liberarlo junto con su sesión (finalizar desde el panel).
+      allow read: if esAdmin();
+      allow update: if esAdmin()
+        && claves(['sesionId', 'fin'])
+        && nuevo().sesionId == viejo().sesionId
+        && viejo().fin > request.time
+        && nuevo().fin == request.time;
     }
     // El bloqueo no tiene uid: el administrador solo puede adelantar a "ahora" el fin de un bloqueo
     // vigente, sin cambiar su sesión. No crea bloqueos ni los extiende.

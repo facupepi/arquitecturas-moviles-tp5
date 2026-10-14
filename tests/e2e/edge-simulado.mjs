@@ -52,7 +52,7 @@ const DIA_MS = 24 * 60 * 60 * 1000;
 const MIN_MS = 60_000;
 const PATRON_RUTA = /^[A-Za-z0-9_-]{1,128}\/[A-Za-z0-9_-]{1,64}\/[0-2]-[a-f0-9]{12}\.(jpg|png|pdf)$/;
 const PATRON_PROYECTO = /^demo-[a-z0-9-]{1,40}$/;
-const SUBCOLECCIONES = [C.tributos, C.pagos, C.reclamos, C.estacionamiento, C.notificaciones, C.avisosLeidos, C.dispositivos, C.tarjetas];
+const SUBCOLECCIONES = [C.tributos, C.pagos, C.reclamos, C.estacionamiento, C.notificaciones, C.avisosLeidos, C.dispositivos, C.tarjetas, C.bloqueoVecino];
 
 process.env.FIRESTORE_EMULATOR_HOST ??= '127.0.0.1:8086';
 process.env.FIREBASE_AUTH_EMULATOR_HOST ??= '127.0.0.1:9098';

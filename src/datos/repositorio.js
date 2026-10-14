@@ -520,7 +520,9 @@ export async function iniciarEstacionamiento({ zonaId, patente, minutos, tarjeta
     if (snapSesion.exists()) {   // reintento ya confirmado: el comprobante, con el pago registrado
       return { ...sesionDesdeDoc(snapSesion), pago: pagoRegistrado(await tx.get(refDe(uid, C.pagos, requestId))) };
     }
+    const refVecino = refDe(uid, C.bloqueoVecino, 'actual');
     const snapBloqueo = await tx.get(refBloqueo);
+    const snapVecino = await tx.get(refVecino);
     const snapZona = await tx.get(doc(db, C.zonas, zonaId));
     const snapConfig = await tx.get(doc(db, C.municipal, 'config'));
     if (!snapZona.exists()) throw new ErrorApp('no-encontrado', 'No encontramos esa zona de estacionamiento.');
@@ -528,6 +530,8 @@ export async function iniciarEstacionamiento({ zonaId, patente, minutos, tarjeta
     const config = snapConfig.exists() ? snapConfig.data() : {};
     const ahora = Date.now();
     if (config.horarioEstricto !== false && !enHorario(zona.horario, ahora)) throw new ErrorApp('fuera-de-horario');
+    // Una sola sesión vigente por vecino: para sumar tiempo se extiende la que está en curso.
+    if (snapVecino.exists() && (snapVecino.get('fin')?.toMillis?.() ?? 0) > ahora) throw new ErrorApp('sesion-en-curso');
     if (snapBloqueo.exists()) {
       const finBloqueo = snapBloqueo.get('fin')?.toMillis?.() ?? 0;
       if (finBloqueo > ahora) throw new ErrorApp('patente-ocupada', undefined, { campo: 'patente', datos: { fin: finBloqueo } });
@@ -541,6 +545,7 @@ export async function iniciarEstacionamiento({ zonaId, patente, minutos, tarjeta
     };
     tx.set(refSesion, datos);
     tx.set(refBloqueo, { sesionId: requestId, fin });
+    tx.set(refVecino, { sesionId: requestId, fin });
     tx.set(refDe(uid, C.pagos, requestId), {
       tipo: 'estacionamiento', refId: requestId, importe, comprobante: comprobante('EST', requestId), medio,
       tarjeta: enmascarada, proveedor: PROVEEDOR_PAGO, creadoEn: serverTimestamp(),
@@ -582,6 +587,7 @@ export async function extenderEstacionamiento(sesionId, minutosExtra, requestId,
     };
     tx.update(refSesion, cambios);
     tx.set(doc(db, C.bloqueos, actual.patente), { sesionId, fin });
+    tx.set(refDe(uid, C.bloqueoVecino, 'actual'), { sesionId, fin });
     tx.set(refPago, {
       tipo: 'extension', refId: sesionId, importe: importeExtra, comprobante: comprobante('EXT', requestId), medio,
       tarjeta: enmascarada, proveedor: PROVEEDOR_PAGO, creadoEn: serverTimestamp(),
@@ -606,6 +612,7 @@ export async function finalizarEstacionamiento(sesionId) {
     if (!sesion.fin || sesion.fin.toMillis() <= Date.now()) throw new ErrorApp('sesion-vencida');
     tx.update(refSesion, { fin: serverTimestamp(), actualizadoEn: serverTimestamp() });
     tx.set(doc(db, C.bloqueos, sesion.patente), { sesionId, fin: serverTimestamp() });
+    tx.set(refDe(uid, C.bloqueoVecino, 'actual'), { sesionId, fin: serverTimestamp() });
   }), permisoConReloj);
 }
 

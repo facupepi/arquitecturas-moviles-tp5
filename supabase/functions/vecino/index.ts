@@ -20,6 +20,7 @@ import { borrarUsuarioAuth } from "../_shared/identidad.ts";
 
 const SUBCOLECCIONES = [
   "tributos", "pagos", "reclamos", "estacionamiento", "notificaciones", "avisosLeidos", "dispositivos", "tarjetas",
+  "bloqueoEstacionamiento",
 ];
 
 type Item = Record<string, unknown> & { id?: string };

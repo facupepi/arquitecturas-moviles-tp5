@@ -124,6 +124,23 @@ describe('finalizar sesión desde el panel', () => {
     await assertFails(loteFinalizar(adm, 'u2', 'sesion-vieja-001', 'VVV999').commit());
   });
 
+  it('el admin lee y libera el bloqueo propio del vecino junto con su sesión (una por vecino)', async () => {
+    const adm = google(entorno, ADMIN);
+    await sembrar(entorno, async (db) => {
+      await setDoc(doc(db, 'usuarios/u3/estacionamiento/sesion-u3-0001'), sesion('MNO345', Date.now() + 60 * MIN));
+      await setDoc(doc(db, 'bloqueosPatente/MNO345'), { sesionId: 'sesion-u3-0001', fin: ts(Date.now() + 60 * MIN) });
+      await setDoc(doc(db, 'usuarios/u3/bloqueoEstacionamiento/actual'), { sesionId: 'sesion-u3-0001', fin: ts(Date.now() + 60 * MIN) });
+    });
+    // Lo lee, pero un vecino ajeno no.
+    await assertSucceeds(getDoc(doc(adm, 'usuarios/u3/bloqueoEstacionamiento/actual')));
+    await assertFails(getDoc(doc(vecino(entorno, 'u1'), 'usuarios/u3/bloqueoEstacionamiento/actual')));
+    // Finalizar la sesión sin liberar su bloqueo propio se rechaza; con el bloqueo a la hora del servidor, pasa.
+    await assertFails(loteFinalizar(adm, 'u3', 'sesion-u3-0001', 'MNO345').commit());
+    const lote = loteFinalizar(adm, 'u3', 'sesion-u3-0001', 'MNO345');
+    lote.update(doc(adm, 'usuarios/u3/bloqueoEstacionamiento/actual'), { fin: serverTimestamp() });
+    await assertSucceeds(lote.commit());
+  });
+
   it('una cuenta anónima con documento de administrador no finaliza sesiones', async () => {
     await assertFails(loteFinalizar(anonimo(entorno, 'admin-anonimo'), 'u2', 'sesion-u2-0003', 'JKL012').commit());
   });

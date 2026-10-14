@@ -234,7 +234,7 @@ function vecinos() {
 
 // ---------- Escritura ----------
 const sinId = ({ id, ...resto }) => resto;
-const DATOS = [C.tributos, C.pagos, C.reclamos, C.estacionamiento, C.notificaciones, C.avisosLeidos, C.tarjetas];
+const DATOS = [C.tributos, C.pagos, C.reclamos, C.estacionamiento, C.notificaciones, C.avisosLeidos, C.tarjetas, C.bloqueoVecino];
 
 // ---------- Adjuntos de los reclamos ----------
 let avisoSinClave = false;
@@ -356,7 +356,11 @@ async function cargarVecino(v, { conPerfil = true } = {}) {
   escribir(C.reclamos, v.reclamos);
   escribir(C.estacionamiento, v.estacionamiento);
   escribir(C.notificaciones, [...v.base.notificaciones.map((n) => ({ ...n, creadoEn: alta, leida: true, leidaEn: alta })), ...v.notificaciones]);
-  if (v.bloqueo) lote.set(db.doc(`${C.bloqueos}/${v.bloqueo.patente}`), { sesionId: v.bloqueo.sesionId, fin: Timestamp.fromMillis(v.bloqueo.fin) });
+  if (v.bloqueo) {
+    const tomado = { sesionId: v.bloqueo.sesionId, fin: Timestamp.fromMillis(v.bloqueo.fin) };
+    lote.set(db.doc(`${C.bloqueos}/${v.bloqueo.patente}`), tomado);
+    lote.set(ref.collection(C.bloqueoVecino).doc('actual'), tomado);   // una sesión vigente por vecino
+  }
   await lote.commit();
 }
 

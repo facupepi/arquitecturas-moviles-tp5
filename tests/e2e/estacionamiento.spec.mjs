@@ -204,6 +204,13 @@ test.describe('Estacionamiento medido', () => {
     const bloqueo = (await adminDb.doc(`bloqueosPatente/${patente}`).get()).data();
     expect(bloqueo.sesionId).toBe(sesionId);
     expect(bloqueo).not.toHaveProperty('uid');
+    // Una sola sesión vigente por vecino: el bloqueo propio apunta a esta sesión, y en lugar del
+    // formulario de inicio queda el aviso, con las zonas a la vista.
+    const propio = (await adminDb.doc(`usuarios/${uid}/bloqueoEstacionamiento/actual`).get()).data();
+    expect(propio.sesionId).toBe(sesionId);
+    await expect(page.getByTestId('sesion-en-curso')).toBeVisible();
+    await expect(page.getByTestId('iniciar-estacionamiento')).toHaveCount(0);
+    await expect(page.getByTestId('zona-p1')).toBeVisible();
 
     await revisarAccesibilidad(page, 'estacionamiento-sesion-activa', { excluir: EXCLUIR_AXE });
   });
