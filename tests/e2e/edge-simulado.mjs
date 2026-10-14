@@ -145,7 +145,7 @@ function verificarUsuario(req) {
     throw new ErrorHttp(401, 'sin-sesion', 'La sesión no es válida o venció.');
   }
   const proveedor = payload.firebase?.sign_in_provider ?? 'desconocido';
-  if (proveedor !== 'google.com') {
+  if (proveedor !== 'google.com' && !(proveedor === 'custom' && /^ejemplo-[a-z0-9-]+$/.test(sub))) {
     throw new ErrorHttp(403, 'permiso', 'Ingresá con tu cuenta de Google para usar Conecta.');
   }
   return { uid: sub, proveedor, nombre: typeof payload.name === 'string' ? payload.name : null };

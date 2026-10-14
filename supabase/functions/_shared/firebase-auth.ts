@@ -56,7 +56,10 @@ export async function verificarUsuario(req: Request): Promise<Identidad> {
   // Solo se ingresa con Google: cualquier otra sesión (anónima de la versión que tenía invitados, con
   // contraseña o con token personalizado creada a mano contra la API de Auth) no usa ninguna función.
   // Mismo criterio que conGoogle() de las reglas de Firestore.
-  if (firebase.sign_in_provider !== "google.com") {
+  // Excepción, igual que en las reglas: las cuentas de ejemplo ("ejemplo-…") con token personalizado,
+  // que solo puede emitir la cuenta de servicio del proyecto.
+  const deEjemplo = firebase.sign_in_provider === "custom" && /^ejemplo-[a-z0-9-]+$/.test(sub);
+  if (firebase.sign_in_provider !== "google.com" && !deEjemplo) {
     throw new ErrorHttp(403, "permiso", "Ingresá con tu cuenta de Google para usar Conecta.");
   }
   return {

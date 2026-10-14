@@ -164,6 +164,11 @@ describe('otros proveedores: solo se ingresa con Google', () => {
       await assertFails(getDoc(doc(admin, 'administradores/anon-admin')));
       await assertFails(updateDoc(doc(admin, 'estaciones/b1'), { bicicletas: 3, estado: 'operativa', actualizadoEn: serverTimestamp() }));
     }
+    // Las cuentas de ejemplo ("ejemplo-…") sí entran con token personalizado, y solo a lo suyo.
+    await sembrar(entorno, async (db) => { await setDoc(doc(db, 'usuarios/ejemplo-abc123/tributos/T-1'), { importe: 1 }); });
+    await assertSucceeds(getDoc(doc(conProveedor(entorno, 'ejemplo-abc123', 'custom'), 'usuarios/ejemplo-abc123/tributos/T-1')));
+    await assertFails(getDoc(doc(conProveedor(entorno, 'ejemplo-abc123', 'custom'), 'usuarios/anon/tributos/T-1')));
+    await assertFails(getDoc(doc(conProveedor(entorno, 'ejemplo-abc123', 'password'), 'usuarios/ejemplo-abc123/tributos/T-1')));
     await assertSucceeds(getDoc(doc(vecino(entorno, 'anon'), 'usuarios/anon')));
   });
 });

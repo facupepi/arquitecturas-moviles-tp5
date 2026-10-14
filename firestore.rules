@@ -6,7 +6,13 @@ service cloud.firestore {
     // Solo se ingresa con Google: cualquier otra sesión (anónima de una versión anterior que tenía
     // invitados, con correo y contraseña o con token personalizado creada a mano contra la API)
     // no lee ni escribe datos de vecino ni administra. Mismo criterio que verificarUsuario de Supabase (6.4).
-    function conGoogle() { return request.auth.token.firebase.sign_in_provider == 'google.com'; }
+    // Solo se ingresa con Google. Única excepción: las cuentas de ejemplo (uid "ejemplo-…"), que no
+    // tienen proveedor de ingreso y solo abren sesión con un token personalizado, que únicamente puede
+    // emitir quien tiene la cuenta de servicio del proyecto (para las capturas y la demostración).
+    function conGoogle() {
+      return request.auth.token.firebase.sign_in_provider == 'google.com'
+        || (request.auth.token.firebase.sign_in_provider == 'custom' && request.auth.uid.matches('ejemplo-[a-z0-9-]+'));
+    }
     function autenticado() { return request.auth != null && conGoogle(); }
     function esDueno(uid) { return request.auth != null && request.auth.uid == uid && conGoogle(); }
     // Mismo criterio que exigirAdmin de Supabase (6.4): cuenta de Google y documento en administradores.
