@@ -4,7 +4,8 @@
 //
 // Implementa el contrato HTTP de 6.3 contra los emuladores de Auth y Firestore con firebase-admin:
 //   POST vecino/alta     perfil + datosInicialesVecino + recordatorios inmediatos de T4 (idempotente)
-//   POST vecino/baja     borra subcolecciones, eventos con su uid, bloqueos propios, adjuntos, perfil y el usuario de Auth
+//   POST vecino/baja     borra subcolecciones, eventos con su uid, los bloqueos de patente de todas sus
+//                        sesiones, su documento de administrador, adjuntos, perfil y el usuario de Auth
 //   POST adjuntos/subir  un archivo por solicitud; valida con shared/dominio.mjs; tope por vecino (429);
 //                        guarda en una carpeta temporal
 //   POST adjuntos/url    { ruta } → { url, venceEn }; la URL la sirve este mismo servidor (GET /archivos/…)
@@ -16,7 +17,8 @@
 // No verifica la firma del token (el emulador de Auth no firma), pero decodifica el payload y aplica
 // el mismo criterio que verificarUsuario de Supabase: una sesión que no es de Google (anónima, con
 // contraseña o con token personalizado) recibe 403 en todas las funciones (aunque tenga documento en
-// administradores), igual que en las reglas.
+// administradores), igual que en las reglas. Única excepción: las cuentas de ejemplo (uid "ejemplo-…")
+// con token personalizado, que en producción solo emite la cuenta de servicio.
 //
 // Modo compartido (varios agentes contra los mismos emuladores): cada agente usa su propio proyecto
 // demo-* de Firestore y llama con el prefijo /p/<proyecto>, por ejemplo
@@ -209,20 +211,25 @@ async function alta(db, id) {
 
 async function baja(db, proyecto, id) {
   const raiz = db.doc(`${C.usuarios}/${id.uid}`);
-  const ahora = Date.now();
   let borrados = 0;
+  // Bloqueos de patente de cualquiera de sus sesiones (en curso, vencida o terminada antes), solo si
+  // siguen apuntando a una sesión suya, como vecino/index.ts.
   const sesiones = await raiz.collection(C.estacionamiento).get();
-  for (const s of sesiones.docs) {
-    const fin = s.get('fin');
-    const patente = s.get('patente');
-    const finMs = fin instanceof Timestamp ? fin.toMillis() : Number(fin);
-    if (!patente || !(finMs > ahora)) continue;
+  const propias = new Set(sesiones.docs.map((s) => s.id));
+  const patentes = new Set(sesiones.docs.map((s) => s.get('patente')).filter((p) => typeof p === 'string' && p));
+  for (const patente of patentes) {
     const bloqueo = db.doc(`${C.bloqueos}/${patente}`);
     const snap = await bloqueo.get();
-    if (snap.exists && snap.get('sesionId') === s.id) {
+    if (snap.exists && propias.has(snap.get('sesionId'))) {
       await bloqueo.delete();
       borrados += 1;
     }
+  }
+  // Su documento de administrador, si lo tenía.
+  const admin = db.doc(`${C.administradores}/${id.uid}`);
+  if ((await admin.get()).exists) {
+    await admin.delete();
+    borrados += 1;
   }
   for (const col of SUBCOLECCIONES) {
     const docs = await raiz.collection(col).listDocuments();
@@ -374,7 +381,7 @@ async function historialAlarma(db, eventoId, ev) {
   const destino = `#/alarmas/${ev.refId}`;
   const nombre = String(a.nombre ?? 'comunitaria');
   const titulo = `Alarma activada: ${nombre}`.slice(0, 100);
-  const cuerpo = `Se activó la alarma ${nombre}${a.referencia ? ` (${a.referencia})` : ''}. `
+  const cuerpo = `Se activó la alarma comunitaria${a.referencia ? ` (${a.referencia})` : ''}. `
     + 'Mantené la calma y seguí las indicaciones de las autoridades.';
   await crearSiNoExiste(db.doc(`${C.avisos}/alarma-${eventoId}`), {
     titulo,
@@ -512,7 +519,8 @@ async function tareaSimulador(db, ahora) {
       creadoEn: FieldValue.serverTimestamp(), procesadoEn: FieldValue.serverTimestamp(), enviados: 0,
     });
     await lote.commit();
-    cambios.push({ tipo: 'reclamo', id: r.id, uid: r.uid, antes: doc.get('estado'), despues: r.estado });
+    // Sin el uid del vecino, como simulacion.ts (el resultado se guarda en public.ejecuciones).
+    cambios.push({ tipo: 'reclamo', id: r.id, antes: doc.get('estado'), despues: r.estado });
   }
   await db.doc(`${C.municipal}/config`).set({ ultimaSimulacion: FieldValue.serverTimestamp() }, { merge: true });
   return { cambios };

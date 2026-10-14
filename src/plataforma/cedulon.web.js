@@ -13,7 +13,7 @@
 // imprimirCedulon(tributo, info) → Promise<{ modo: 'impresion' | 'pestana' }>
 //   tributo: { id, concepto, periodo, … }   (solo para el título)
 //   info: {
-//     titulo, subtitulo, municipio, pie, leyenda, aviso,
+//     titulo, subtitulo, municipio, pie, leyenda (la nota académica: una línea discreta al final), aviso,
 //     estado: { texto, tono: 'exito' | 'alerta' | 'peligro' | 'neutro' },
 //     filas: [[etiqueta, valor], …], importe, codigo, codigoAgrupado,
 //     barras: [{ barra, ancho }], unidades, silencio, emitido,
@@ -57,7 +57,6 @@ const CSS_CEDULON = `
 #${ID_CONTENEDOR} h1{font-size:24px;margin:2px 0 0}
 #${ID_CONTENEDOR} .sub{margin:2px 0 0;color:#526174}
 #${ID_CONTENEDOR} .estado{display:inline-block;padding:3px 12px;border-radius:999px;font-weight:700;border:1px solid currentColor;white-space:nowrap}
-#${ID_CONTENEDOR} .leyenda{margin:12px 0;padding:8px 12px;border:1px dashed #7a5e00;color:#7a5e00;font-size:12px}
 #${ID_CONTENEDOR} table{width:100%;border-collapse:collapse;margin:8px 0}
 #${ID_CONTENEDOR} th,#${ID_CONTENEDOR} td{text-align:left;padding:8px 4px;border-bottom:1px solid #dce4eb;vertical-align:top}
 #${ID_CONTENEDOR} th{color:#526174;font-weight:500;width:38%}
@@ -70,6 +69,7 @@ const CSS_CEDULON = `
 #${ID_CONTENEDOR} .digitos{font-family:"Courier New",monospace;font-size:16px;font-weight:700;letter-spacing:1px;white-space:nowrap}
 #${ID_CONTENEDOR} .aviso{margin:12px 0 0;font-weight:700}
 #${ID_CONTENEDOR} .pie{margin-top:16px;color:#526174;font-size:12px}
+#${ID_CONTENEDOR} .leyenda{margin:4px 0 0;color:#526174;font-size:11px}
 `;
 
 const CSS_IMPRESION = `
@@ -99,12 +99,12 @@ function cuerpoCedulon(tributo, info = {}) {
   </div>
   ${info.estado?.texto ? `<span class="estado" style="background:${fondo};color:${tinta}">${esc(info.estado.texto)}</span>` : ''}
 </div>
-<p class="leyenda">${esc(info.leyenda ?? 'Proyecto académico UTN FRSFCO')}</p>
 <table><tbody>${filas}</tbody></table>
 ${info.importe ? `<div class="importe"><span>Importe</span><strong>${esc(info.importe)}</strong></div>` : ''}
 ${codigo}
 ${info.aviso ? `<p class="aviso">${esc(info.aviso)}</p>` : ''}
-<p class="pie">${esc(info.emitido ?? '')}${info.pie ? ` · ${esc(info.pie)}` : ''}</p>`;
+<p class="pie">${esc(info.emitido ?? '')}${info.pie ? ` · ${esc(info.pie)}` : ''}</p>
+<p class="leyenda">${esc(info.leyenda ?? 'Proyecto académico UTN FRSFCO')}</p>`;
 }
 
 /** Documento completo, para la vista en pestaña aparte. */

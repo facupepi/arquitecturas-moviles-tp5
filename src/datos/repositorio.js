@@ -66,6 +66,14 @@ function medioDePago(tarjeta) {
   return validar(() => pagoConTarjeta(tarjeta));
 }
 
+// Lo que muestra el comprobante del pago registrado en pagos/{requestId}: { medio, tarjeta, importe,
+// creadoEn }, o null si no está. En un reintento ya confirmado sale de ahí y no de la tarjeta elegida
+// ahora: el vecino pudo haber elegido otra antes de reintentar, pero se pagó con la primera.
+function pagoRegistrado(snap) {
+  const p = pagoDesdeDoc(snap);
+  return p ? { medio: p.medio, tarjeta: p.tarjeta, importe: p.importe, creadoEn: p.creadoEn } : null;
+}
+
 function exigirConexion(mensaje) {
   if (!estaEnLinea()) throw new ErrorApp('sin-conexion', mensaje);
 }
@@ -467,9 +475,11 @@ export async function pagarTributo(tributoId, requestId, tarjeta) {
     for (const r of recordatorios) {
       if (r.exists() && r.get('leida') !== true) tx.update(r.ref, { leida: true, leidaEn: serverTimestamp() });
     }
+    // Se juntan los espacios repetidos sin tocar los duros de dinero() y enmascarada(): "$ 24.750" y
+    // "•••• 4242" no se parten entre renglones (\s también incluye el espacio duro).
     tx.set(refDe(uid, C.notificaciones, `pago-${requestId}`), {
       titulo: 'Pago registrado',
-      cuerpo: `${tributo.concepto ?? 'Tributo'} ${tributo.periodo ?? ''}: ${dinero(importe)} con ${conMinuscula(textoMedioPago(medio, enmascarada))}. Comprobante ${codigoComprobante}.`.replace(/\s+/g, ' ').slice(0, 500),
+      cuerpo: `${tributo.concepto ?? 'Tributo'} ${tributo.periodo ?? ''}: ${dinero(importe)} con ${conMinuscula(textoMedioPago(medio, enmascarada))}. Comprobante ${codigoComprobante}.`.replace(/[^\S\u00a0]+/g, ' ').slice(0, 500),
       tipo: 'tributos', zona: null, destino: `#/tributos/${tributoId}`, enlace: null,
       creadoEn: serverTimestamp(), leida: false, leidaEn: null, origen: 'vecino',
     });
@@ -507,7 +517,9 @@ export async function iniciarEstacionamiento({ zonaId, patente, minutos, tarjeta
     const refSesion = refDe(uid, C.estacionamiento, requestId);
     const refBloqueo = doc(db, C.bloqueos, pat);
     const snapSesion = await tx.get(refSesion);
-    if (snapSesion.exists()) return sesionDesdeDoc(snapSesion);   // reintento ya confirmado
+    if (snapSesion.exists()) {   // reintento ya confirmado: el comprobante, con el pago registrado
+      return { ...sesionDesdeDoc(snapSesion), pago: pagoRegistrado(await tx.get(refDe(uid, C.pagos, requestId))) };
+    }
     const snapBloqueo = await tx.get(refBloqueo);
     const snapZona = await tx.get(doc(db, C.zonas, zonaId));
     const snapConfig = await tx.get(doc(db, C.municipal, 'config'));
@@ -533,7 +545,7 @@ export async function iniciarEstacionamiento({ zonaId, patente, minutos, tarjeta
       tipo: 'estacionamiento', refId: requestId, importe, comprobante: comprobante('EST', requestId), medio,
       tarjeta: enmascarada, proveedor: PROVEEDOR_PAGO, creadoEn: serverTimestamp(),
     });
-    return sesionLocal(requestId, datos, ahora);
+    return { ...sesionLocal(requestId, datos, ahora), pago: { medio, tarjeta: enmascarada, importe, creadoEn: ahora } };
   }), permisoConReloj);
 }
 
@@ -551,7 +563,9 @@ export async function extenderEstacionamiento(sesionId, minutosExtra, requestId,
     const snapSesion = await tx.get(refSesion);
     if (!snapSesion.exists()) throw new ErrorApp('no-encontrado');
     const actual = snapSesion.data();
-    if (actual.ultimoPagoId === requestId) return sesionDesdeDoc(snapSesion);   // reintento ya confirmado
+    if (actual.ultimoPagoId === requestId) {   // reintento ya confirmado: el comprobante, con el pago registrado
+      return { ...sesionDesdeDoc(snapSesion), pago: pagoRegistrado(await tx.get(refPago)) };
+    }
     const finActual = actual.fin;   // Timestamp: se suma exacto, sin pasar por ms
     if (!finActual || finActual.toMillis() <= Date.now()) throw new ErrorApp('sesion-vencida');
     const total = actual.minutos + extra;
@@ -575,7 +589,7 @@ export async function extenderEstacionamiento(sesionId, minutosExtra, requestId,
     const ahora = Date.now();
     return {
       id: sesionId, ...actual, ...cambios, inicio: actual.inicio?.toMillis?.() ?? null, fin: fin.toMillis(),
-      actualizadoEn: ahora, pendiente: false,
+      actualizadoEn: ahora, pendiente: false, pago: { medio, tarjeta: enmascarada, importe: importeExtra, creadoEn: ahora },
     };
   }), permisoConReloj);
 }

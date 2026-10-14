@@ -53,18 +53,18 @@ export async function verificarUsuario(req: Request): Promise<Identidad> {
     throw new ErrorHttp(401, "sin-sesion", "La sesión no es válida.");
   }
   const firebase = (payload.firebase ?? {}) as { sign_in_provider?: string };
-  // Solo se ingresa con Google: cualquier otra sesión (anónima de la versión que tenía invitados, con
-  // contraseña o con token personalizado creada a mano contra la API de Auth) no usa ninguna función.
-  // Mismo criterio que conGoogle() de las reglas de Firestore.
-  // Excepción, igual que en las reglas: las cuentas de ejemplo ("ejemplo-…") con token personalizado,
-  // que solo puede emitir la cuenta de servicio del proyecto.
+  // Solo se ingresa con Google (sign_in_provider "google.com"), mismo criterio que conGoogle() de las
+  // reglas de Firestore. Única excepción: las cuentas de ejemplo (uid "ejemplo-…"), que no tienen
+  // proveedor de ingreso y solo abren sesión con un token personalizado, que únicamente puede emitir
+  // quien tiene la cuenta de servicio del proyecto. Cualquier otra sesión (anónima de la versión que
+  // tenía invitados, con contraseña o con token personalizado de otro uid) no usa ninguna función.
   const deEjemplo = firebase.sign_in_provider === "custom" && /^ejemplo-[a-z0-9-]+$/.test(sub);
   if (firebase.sign_in_provider !== "google.com" && !deEjemplo) {
     throw new ErrorHttp(403, "permiso", "Ingresá con tu cuenta de Google para usar Conecta.");
   }
   return {
     uid: sub,
-    proveedor: firebase.sign_in_provider,
+    proveedor: deEjemplo ? "custom" : "google.com",
     nombre: typeof payload.name === "string" ? payload.name : null,
   };
 }
@@ -93,8 +93,8 @@ export function verificarCron(req: Request): boolean {
   return dif === 0;
 }
 
-// Admin = cuenta de Google (verificarUsuario ya rechaza las demás) con administradores/{uid} en
-// Firestore. MISMO criterio que esAdmin() de las reglas.
+// Admin = sesión que aceptó verificarUsuario (cuenta de Google o de ejemplo) con administradores/{uid}
+// en Firestore. MISMO criterio que esAdmin() de las reglas.
 export async function exigirAdmin(id: Identidad, firestore: { obtener(r: string): Promise<unknown> }) {
   if (!(await firestore.obtener(`administradores/${id.uid}`))) {
     throw new ErrorHttp(403, "permiso", "Esta operación corresponde al personal municipal.");

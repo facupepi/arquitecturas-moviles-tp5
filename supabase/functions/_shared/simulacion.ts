@@ -16,14 +16,25 @@ import { despacharEvento } from "./entrega.ts";
 
 const MIN_MS = 60_000;
 
+// Sin el uid del vecino: el resultado queda guardado en public.ejecuciones y el panel identifica el
+// reclamo por su id, que es único.
 export type Cambio = {
   tipo: "bicicletas" | "reclamo";
   id: string;
-  uid?: string;
   antes: number | string;
   despues: number | string;
 };
 export type Cambios = { cambios: Cambio[] };
+
+type Plan = {
+  estaciones?: Array<{ id: string; bicicletas: number }>;
+  reclamos?: Array<{ uid: string; id: string; estado: string }>;
+};
+// planificarPaso está en JavaScript y sus listas por defecto ([]) se infieren como never[]: la firma
+// que usa esta tarea se declara acá.
+const planificar = planificarPaso as unknown as (
+  entrada: { estaciones: Array<Record<string, unknown>>; reclamos: Array<Record<string, unknown>>; ahora: number },
+) => Plan;
 
 function candidatos(estado: string, antesDe: number): Promise<Doc[]> {
   // Índice compuesto de grupo reclamos (estado, actualizadoEn) de 2.5.
@@ -41,11 +52,11 @@ export async function pasoSimulador(ahora: number): Promise<Cambios> {
     candidatos("en_proceso", ahora - 5 * MIN_MS),
   ]);
   const docsReclamos = [...recibidos, ...enProceso];
-  const plan = planificarPaso({
+  const plan = planificar({
     estaciones: estaciones.map((d) => ({ ...d.datos, id: d.id })),
     reclamos: docsReclamos.map((d) => ({ ...d.datos, id: d.id, uid: uidDe(d.ruta) })),
     ahora,
-  }) as { estaciones?: Array<{ id: string; bicicletas: number }>; reclamos?: Array<{ uid: string; id: string; estado: string }> };
+  });
 
   const cambios: Cambio[] = [];
 
@@ -102,7 +113,7 @@ export async function pasoSimulador(ahora: number): Promise<Cambios> {
           },
         },
       ]);
-      cambios.push({ tipo: "reclamo", id: r.id, uid: r.uid, antes: String(doc.datos.estado), despues: r.estado });
+      cambios.push({ tipo: "reclamo", id: r.id, antes: String(doc.datos.estado), despues: r.estado });
       eventos.push(eventoId);
     } catch (e) {
       if (!esPrecondicion(e)) throw e;

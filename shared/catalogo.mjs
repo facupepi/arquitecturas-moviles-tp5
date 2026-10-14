@@ -111,6 +111,8 @@ export function catalogo(ahora = Date.now()) {
     whatsapp: medios.whatsapp ?? null, sitio: medios.sitio ?? null, orden,
   });
   const CIUDAD = 'San Francisco, Córdoba';
+  // El área no repite la categoría: en la tarjeta van juntas (el área arriba del nombre y la
+  // categoría en la etiqueta de color), así que dice para qué se llama.
   const contactos = [
     contacto('c01', 1, 'municipal', 'Atención ciudadana', 'Línea 147',
       'Consultas, solicitudes y orientación municipal.', 'Línea municipal de atención al vecino',
@@ -127,16 +129,16 @@ export function catalogo(ahora = Date.now()) {
     contacto('c05', 5, 'municipal', 'Comunicación', 'Prensa municipal',
       'Información y comunicación institucional.', 'Contacto por correo electrónico',
       DIRECCION_MUNICIPALIDAD, { correo: 'prensa@sanfrancisco.gov.ar' }),
-    contacto('c06', 6, 'salud', 'Salud', 'Hospital Regional J. B. Iturraspe',
+    contacto('c06', 6, 'salud', 'Atención médica', 'Hospital Regional J. B. Iturraspe',
       'Hospital regional de referencia.', 'Guardia y atención hospitalaria',
       'Dominga Cullen 450', { telefono: '+543564443718' }),
-    contacto('c07', 7, 'emergencias', 'Emergencias', 'Emergencias médicas',
+    contacto('c07', 7, 'emergencias', 'Ambulancias', 'Emergencias médicas',
       'Ambulancias y emergencias médicas.', 'Atención permanente', CIUDAD, { telefono: '107' }),
-    contacto('c08', 8, 'emergencias', 'Emergencias', 'Policía',
+    contacto('c08', 8, 'emergencias', 'Seguridad', 'Policía',
       'Emergencias policiales.', 'Atención permanente', CIUDAD, { telefono: '101' }),
-    contacto('c09', 9, 'emergencias', 'Emergencias', 'Bomberos',
+    contacto('c09', 9, 'emergencias', 'Incendios', 'Bomberos',
       'Incendios y rescates.', 'Atención permanente', CIUDAD, { telefono: '100' }),
-    contacto('c10', 10, 'emergencias', 'Emergencias', 'Defensa Civil',
+    contacto('c10', 10, 'emergencias', 'Temporales', 'Defensa Civil',
       'Temporales, inundaciones y situaciones de riesgo.', 'Atención permanente', CIUDAD, { telefono: '103' }),
   ];
 

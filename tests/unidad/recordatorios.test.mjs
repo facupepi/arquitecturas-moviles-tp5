@@ -23,7 +23,7 @@ test('tributos: el alta de un vecino ya tiene T4 (T-1001 por vencer y T-0999 ven
   const r = recordatoriosTributos(tributos, ahora);
   assert.deepEqual(r.map((x) => x.id).sort(), ['tributo-T-0999-2026-08-28-vencido', 'tributo-T-1001-2026-10-09-por_vencer']);
   const porVencer = r.find((x) => x.etapa === 'por_vencer');
-  assert.equal(porVencer.titulo, 'Tu Tasa de servicios municipales 10/2026 vence en 2 días');
+  assert.equal(porVencer.titulo, 'Tu Tasa de servicios municipales 10/2026 vence en 2\u00a0días');
   assert.equal(porVencer.tipo, 'tributos');
   assert.equal(porVencer.destino, '#/tributos/T-1001');
   assert.match(porVencer.cuerpo.replace(/\s/g, ' '), /\$ 18\.500/);
@@ -43,12 +43,12 @@ test('tributos: umbral de 3 días, sin duplicados por clave, vencido y pago (her
   assert.equal(recordatoriosTributos([tributo], ahora + 2 * DIA - MIN).length, 0, 'faltan 3 días y un minuto');
   const primero = recordatoriosTributos([tributo], ahora + 2 * DIA);
   assert.equal(primero.length, 1, 'faltan exactamente 3 días');
-  assert.equal(primero[0].titulo, 'Tu Tasa 10/2026 vence en 3 días');
+  assert.equal(primero[0].titulo, 'Tu Tasa 10/2026 vence en 3\u00a0días');
   assert.equal(crearNuevas(existentes, primero).length, 1);
   // Al día siguiente la misma etapa da la misma clave: la tarea diaria no repite
   const segundo = recordatoriosTributos([tributo], ahora + 3 * DIA);
   assert.equal(segundo[0].id, primero[0].id);
-  assert.equal(segundo[0].titulo, 'Tu Tasa 10/2026 vence en 2 días');
+  assert.equal(segundo[0].titulo, 'Tu Tasa 10/2026 vence en 2\u00a0días');
   assert.equal(crearNuevas(existentes, segundo).length, 0);
   assert.equal(recordatoriosTributos([tributo], ahora + 4 * DIA)[0].titulo, 'Tu Tasa 10/2026 vence mañana');
   // Vencido: otra etapa, otra clave

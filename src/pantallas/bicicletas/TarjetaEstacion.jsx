@@ -96,6 +96,7 @@ export default function TarjetaEstacion({ estacion, distanciaKm, seleccionada, a
             <Boton
               titulo="Reportar"
               variante="texto"
+              enLinea
               onPress={() => onReportar(estacion)}
               etiquetaAccesible={`Reportar un problema en ${estacion.nombre}`}
               testID={`reportar-${estacion.id}`}

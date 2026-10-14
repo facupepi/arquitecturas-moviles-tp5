@@ -127,7 +127,7 @@ export default function Galeria() {
         <Muestra titulo="Variantes">
           <Boton titulo="Primario" onPress={() => aviso.mostrar('Tocaste el botón primario')} testID="galeria-boton-primario" />
           <Boton titulo="Secundario" variante="secundario" onPress={() => {}} />
-          <Boton titulo="Texto" variante="texto" onPress={() => {}} />
+          <Boton titulo="Texto" variante="texto" enLinea onPress={() => {}} />
           <Boton titulo="Peligro" variante="peligro" icono="alerta" onPress={() => {}} />
         </Muestra>
         <Muestra titulo="Estados">

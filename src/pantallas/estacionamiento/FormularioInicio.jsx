@@ -18,7 +18,7 @@ import MediosDePago from '../pagos/MediosDePago';
 import Procesando from '../pagos/Procesando';
 import ComprobantePago from '../pagos/ComprobantePago';
 import AltaEnPago, { dialogoAlta } from '../pagos/AltaEnPago';
-import { conProcesamiento, etiquetaTarjeta, useMedioPago } from '../pagos/pasarela';
+import { conProcesamiento, etiquetaMedio, useMedioPago } from '../pagos/pasarela';
 import { MS_MINUTO, OPCIONES_MINUTOS, horarioEstricto, importeSeguro, textoMinutos, zonaEnHorario } from './util';
 
 const OPCIONES = OPCIONES_MINUTOS.map((n) => ({ valor: String(n), etiqueta: textoMinutos(n) }));
@@ -36,7 +36,7 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
   const [errorPatente, setErrorPatente] = useState(null);
   const [errorBoton, setErrorBoton] = useState(null);
   const [confirmacion, setConfirmacion] = useState(null);   // { requestId, patente, minutos, zona, importe }
-  const [aprobado, setAprobado] = useState(null);           // { sesion, tarjeta, fecha }: último paso de la pasarela
+  const [aprobado, setAprobado] = useState(null);           // { sesion, pago, fecha }: último paso de la pasarela
 
   // La pasarela muestra "Procesando el pago…" al menos 1,5 s; la traza mide solo el registro.
   const inicio = useComando(conProcesamiento(iniciarEstacionamiento, TRAZAS.INICIO_ESTACIONAMIENTO), {
@@ -104,13 +104,14 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
       setTimeout(() => refMedios.current?.focus?.(), 0);
       return;
     }
-    const tarjeta = medio.tarjeta;
     const sesion = await inicio.ejecutar(
-      { zonaId: confirmacion.zona.id, patente: confirmacion.patente, minutos: confirmacion.minutos, tarjeta },
+      { zonaId: confirmacion.zona.id, patente: confirmacion.patente, minutos: confirmacion.minutos, tarjeta: medio.tarjeta },
       confirmacion.requestId,
     );
     if (!sesion) return;
-    setAprobado({ sesion, tarjeta, fecha: Date.now() });
+    // El comprobante muestra el pago registrado (sesion.pago), no la tarjeta elegida ahora: en un
+    // reintento del mismo requestId que ya se había cobrado, el vecino pudo haber elegido otra.
+    setAprobado({ sesion, pago: sesion.pago ?? null, fecha: sesion.pago?.creadoEn || Date.now() });
   };
 
   const cerrarConfirmacion = () => {
@@ -244,7 +245,7 @@ export default function FormularioInicio({ zona, config, ahora, alIniciar, paten
               { etiqueta: 'Tiempo', valor: textoMinutos(aprobado.sesion.minutos) },
               { etiqueta: 'Termina a las', valor: `${hora(aprobado.sesion.fin)} h` },
               { etiqueta: 'Importe', valor: dinero(aprobado.sesion.importe) },
-              { etiqueta: 'Medio de pago', valor: etiquetaTarjeta(aprobado.tarjeta), testID: 'comprobante-medio' },
+              { etiqueta: 'Medio de pago', valor: etiquetaMedio(aprobado.pago?.medio, aprobado.pago?.tarjeta), testID: 'comprobante-medio' },
               { etiqueta: 'Fecha y hora', valor: fechaHora(aprobado.fecha) },
             ]}
           />

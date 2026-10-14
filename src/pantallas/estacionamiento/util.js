@@ -2,7 +2,7 @@
 import { costoEstacionamiento, enHorario } from '../../../shared/dominio.mjs';
 import { recordatoriosEstacionamiento } from '../../../shared/recordatorios.mjs';
 import { LIMITES } from '../../../shared/constantes.mjs';
-import { dinero } from '../../../shared/formato.mjs';
+import { ESPACIO_DURO, dinero } from '../../../shared/formato.mjs';
 
 export const MS_MINUTO = 60_000;
 
@@ -12,13 +12,16 @@ export const OPCIONES_MINUTOS = [15, 30, 60, 90, 120, 180, 240];
 // Extensiones que ofrece cada sesión activa (E4).
 export const EXTENSIONES = [15, 30];
 
-/** "15 min", "1 h", "1 h 30 min", "4 h". */
+/**
+ * "15 min", "1 h", "1 h 30 min", "4 h". Con espacios duros: "1 h 30 min" pasa entero al renglón de
+ * abajo, nunca "1 h 30" en uno y "min" en el otro.
+ */
 export function textoMinutos(minutos) {
   const n = Number(minutos) || 0;
-  if (n < 60) return `${n} min`;
   const h = Math.floor(n / 60);
   const m = n % 60;
-  return m ? `${h} h ${m} min` : `${h} h`;
+  const partes = n < 60 ? [n, 'min'] : m ? [h, 'h', m, 'min'] : [h, 'h'];
+  return partes.join(ESPACIO_DURO);
 }
 
 /** Importe entero en pesos, o null si la tarifa o los minutos no son válidos. */

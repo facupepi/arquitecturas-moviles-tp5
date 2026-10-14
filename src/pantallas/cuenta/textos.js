@@ -6,7 +6,7 @@ export const PRIVACIDAD_BREVE = [
   {
     icono: 'usuario',
     titulo: 'Guardamos solo tus gestiones',
-    texto: 'Tus reclamos, pagos, estacionamientos y preferencias de avisos. Otros vecinos no los ven; el municipio, solo lo necesario para atenderlos.',
+    texto: 'Tus reclamos, pagos, estacionamientos, tarjetas guardadas (solo los últimos 4 dígitos) y preferencias de avisos. Otros vecinos no los ven; el municipio, solo lo necesario para atenderlos.',
   },
   {
     icono: 'ubicacion',
@@ -39,7 +39,7 @@ export const PRIVACIDAD_COMPLETA = [
     texto:
       'Tu ubicación, que usamos solo en el momento. Para avisarte de alarmas cercanas registramos qué alarmas '
       + 'están cerca durante 30 minutos, nunca tus coordenadas. Tampoco guardamos tu correo en nuestra base, '
-      + 'el número completo de tus tarjetas ni su código de seguridad, que solo usamos para validarla.',
+      + 'el número completo de tus tarjetas ni su código de seguridad, que solo usamos para validarlas.',
   },
   {
     titulo: 'Quién puede verlo',

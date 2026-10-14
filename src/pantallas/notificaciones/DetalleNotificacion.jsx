@@ -5,7 +5,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Boton, Dialogo, EtiquetaEstado, Texto } from '../../ui';
 import { colores, espacio } from '../../tema/tokens';
-import { fechaHora, tiempoPasado } from '../../../shared/formato.mjs';
+import { fechaHora, tiempoPasado, unirNumeroYUnidad } from '../../../shared/formato.mjs';
 import { esEnlaceValido } from '../../plataforma/enlaces';
 import { accionDestino, estiloTipo, etiquetaTipo, etiquetaZona } from './presentacion';
 
@@ -44,7 +44,7 @@ export default function DetalleNotificacion({ notificacion: n, noEncontrada, aho
   }
 
   return (
-    <Dialogo visible titulo={n.titulo} onCerrar={onCerrar} acciones={acciones} testID="detalle-notificacion">
+    <Dialogo visible titulo={unirNumeroYUnidad(n.titulo)} onCerrar={onCerrar} acciones={acciones} testID="detalle-notificacion">
       <View style={estilos.etiquetas}>
         <EtiquetaEstado texto={etiquetaTipo(n.tipo)} tono={estilo.tono} icono={estilo.icono} />
         {zona ? <EtiquetaEstado texto={zona} tono="neutro" icono="ubicacion" /> : null}
@@ -53,13 +53,13 @@ export default function DetalleNotificacion({ notificacion: n, noEncontrada, aho
       <Texto variante="chico" color={colores.textoSuave}>
         {cuando}
       </Texto>
-      {n.cuerpo ? <Texto variante="cuerpo">{n.cuerpo}</Texto> : null}
+      {n.cuerpo ? <Texto variante="cuerpo">{unirNumeroYUnidad(n.cuerpo)}</Texto> : null}
       {n.detalle ? (
         <View style={estilos.detalle}>
           <Texto variante="chico" peso="700" color={colores.textoSuave}>
             Más información
           </Texto>
-          <Texto variante="cuerpo">{n.detalle}</Texto>
+          <Texto variante="cuerpo">{unirNumeroYUnidad(n.detalle)}</Texto>
         </View>
       ) : null}
       {enlace ? (

@@ -110,6 +110,9 @@ function Dato({ icono, children }) {
 
 function TarjetaContacto({ c }) {
   const categoria = ETIQUETAS.categoriasContacto[c.categoria] ?? c.categoria;
+  // La etiqueta de categoría solo si agrega algo: un área que ya dice lo mismo ("Emergencias" en un
+  // catálogo cargado antes) no se repite al lado.
+  const repetida = String(c.area ?? '').trim().toLowerCase() === String(categoria).toLowerCase();
   return (
     <Tarjeta
       testID={`contacto-${c.id}`}
@@ -125,9 +128,11 @@ function TarjetaContacto({ c }) {
             {c.nombre}
           </Texto>
         </View>
-        <View style={estilos.etiqueta}>
-          <EtiquetaEstado texto={categoria} tono={TONO_CATEGORIA[c.categoria] ?? 'neutro'} />
-        </View>
+        {repetida ? null : (
+          <View style={estilos.etiqueta}>
+            <EtiquetaEstado texto={categoria} tono={TONO_CATEGORIA[c.categoria] ?? 'neutro'} testID={`etiqueta-${c.id}`} />
+          </View>
+        )}
       </View>
       {c.descripcion ? (
         <Texto variante="cuerpo" color={colores.texto}>

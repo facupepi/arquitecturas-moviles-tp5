@@ -1,7 +1,8 @@
 // Alta de tarjetas guardadas (medios de pago): validación del formulario. Va aparte de dominio.mjs
 // para que solo se descargue al abrir Mi cuenta o la pasarela, y no pese en la carga inicial.
 // El número completo solo pasa por estas funciones para validarlo y sacar la red y los últimos 4:
-// lo que devuelven nunca lo incluye. No se pide ni se acepta el código de seguridad.
+// lo que devuelven nunca lo incluye. El código de seguridad se pide y se valida (3 dígitos, 4 en
+// American Express), y se descarta: nunca se devuelve ni se guarda.
 import { LIMITES, MEDIOS_PAGO } from './constantes.mjs';
 import { ErrorDominio, PATRON_VENCE, luhnValido, partesCordoba, tarjetaVencida } from './dominio.mjs';
 
@@ -31,8 +32,8 @@ export function normalizarVence(texto) {
 
 /**
  * Revisa los datos del formulario de alta y devuelve TODOS los errores a la vez (uno por campo),
- * para mostrarlos debajo de cada campo.
- *   → { tarjeta: { tipo, red, ultimos4, titular, vence } | null, errores: { tipo?, numero?, titular?, vence? } }
+ * para mostrarlos debajo de cada campo. `codigo` (el de seguridad) se valida solo si llega.
+ *   → { tarjeta: { tipo, red, ultimos4, titular, vence } | null, errores: { tipo?, numero?, titular?, codigo?, vence? } }
  */
 export function revisarTarjeta({ tipo, numero, titular, vence, codigo } = {}, ahoraMs = Date.now()) {
   const errores = {};
@@ -53,11 +54,15 @@ export function revisarTarjeta({ tipo, numero, titular, vence, codigo } = {}, ah
 
   // Código de seguridad: se valida (3 dígitos, 4 en American Express) y se descarta; nunca se
   // devuelve ni se guarda. Solo se exige cuando llega el campo (el formulario siempre lo envía).
+  // El de American Express va en el frente, arriba del número; el de las demás, al dorso.
   if (codigo !== undefined) {
     const cvv = String(codigo ?? '').trim();
-    const largo = redTarjeta(digitos) === 'American Express' ? 4 : 3;
+    const amex = redTarjeta(digitos) === 'American Express';
+    const largo = amex ? 4 : 3;
     if (!cvv) errores.codigo = 'Ingresá el código de seguridad.';
-    else if (!new RegExp(`^[0-9]{${largo}}$`).test(cvv)) errores.codigo = `Son ${largo} números, al dorso de la tarjeta.`;
+    else if (!new RegExp(`^[0-9]{${largo}}$`).test(cvv)) {
+      errores.codigo = amex ? 'Son 4 números, en el frente de la tarjeta, arriba del número.' : 'Son 3 números, al dorso de la tarjeta.';
+    }
   }
 
   const venceNormalizado = normalizarVence(vence);
@@ -73,7 +78,7 @@ export function revisarTarjeta({ tipo, numero, titular, vence, codigo } = {}, ah
   };
 }
 
-/** Como revisarTarjeta, pero lanza ErrorDominio con el primer error (campo tipo, numero, titular o vence). */
+/** Como revisarTarjeta, pero lanza ErrorDominio con el primer error (campo tipo, numero, titular, codigo o vence). */
 export function validarTarjeta(datos, ahoraMs = Date.now()) {
   const { tarjeta, errores } = revisarTarjeta(datos, ahoraMs);
   if (tarjeta) return tarjeta;

@@ -16,8 +16,6 @@ export const OPCIONES_TIPO_TARJETA = [
   { valor: 'debito', etiqueta: 'Débito' },
 ];
 
-export const NOTA_SEGURIDAD_TARJETAS = 'Guardamos solo los últimos 4 dígitos. Nunca te pedimos el código de seguridad.';
-
 const VACIO = { tipo: null, numero: '', titular: '', vence: '', codigo: '' };
 
 /** "4242424242424242" → "4242 4242 4242 4242" (solo dígitos, hasta 19, en grupos de 4). */

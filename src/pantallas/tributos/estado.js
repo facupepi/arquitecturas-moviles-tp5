@@ -3,6 +3,7 @@
 // y los recordatorios: acá solo se traduce a etiquetas, tonos y frases para el vecino.
 import { diaCordoba, estadoTributo } from '../../../shared/dominio.mjs';
 import { ETIQUETAS } from '../../../shared/constantes.mjs';
+import { ESPACIO_DURO } from '../../../shared/formato.mjs';
 
 const MS_DIA = 24 * 60 * 60 * 1000;
 
@@ -25,11 +26,11 @@ export function cuandoVence(venceMs, ahoraMs) {
   if (venceMs <= ahoraMs) {
     if (dias >= 0) return 'venció hoy';
     if (dias === -1) return 'venció ayer';
-    return `venció hace ${-dias} días`;
+    return `venció hace ${-dias}${ESPACIO_DURO}días`;
   }
   if (dias <= 0) return 'vence hoy';
   if (dias === 1) return 'vence mañana';
-  return `vence en ${dias} días`;
+  return `vence en ${dias}${ESPACIO_DURO}días`;
 }
 
 /** Tributos con el estado recalculado al momento `ahora` (el almacén lo calcula al recibirlos). */

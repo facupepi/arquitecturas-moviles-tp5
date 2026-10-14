@@ -3,7 +3,8 @@
 // no crea usuarios ni escribe nada en producción.
 //
 // - La URL responde 200 por HTTPS con la pantalla estática y la nota académica, y carga sin errores graves.
-// - Política de seguridad: CSP y encabezados de Hosting (solo contra Hosting, no en vite preview).
+// - Política de seguridad: CSP y encabezados de Hosting (solo contra Hosting, no en vite preview),
+//   "/" sin caché y 404 para un archivo de /assets que no existe.
 // - Ingreso: columna centrada con "Continuar con Google", privacidad breve y sin ingreso como invitado.
 // - El manifiesto es válido (campos de 9.3 e íconos que responden).
 // - El service worker queda activo ya en Ingreso y controla la página al recargar.
@@ -69,7 +70,7 @@ test.describe('Sitio publicado, sin sesión', () => {
     expect(await usuarioGuardado(page)).toBeNull();
   });
 
-  test('la política de seguridad de Hosting viaja en los encabezados', async ({ page, baseURL }) => {
+  test('la política de seguridad de Hosting viaja en los encabezados', async ({ page, request, baseURL }) => {
     test.skip(esLocal(baseURL), 'vite preview no envía los encabezados de Hosting');
     await prepararPagina(page);
     const respuesta = await page.goto('/');
@@ -90,6 +91,12 @@ test.describe('Sitio publicado, sin sesión', () => {
     expect(h['referrer-policy']).toBe('strict-origin-when-cross-origin');
     expect(h['permissions-policy'] ?? '').toContain('microphone=()');
     if (new URL(baseURL).protocol === 'https:') expect(h['strict-transport-security'] ?? '').toContain('max-age=');
+    // La app siempre entra por "/" (con hash): ese HTML se revalida en cada visita, como /index.html.
+    expect(h['cache-control'] ?? '', 'Cache-Control de /').toContain('no-cache');
+    // Sin reescritura a index.html: un archivo de /assets que no existe (un fragmento de una versión
+    // anterior) responde 404, no HTML guardado como inmutable por un año.
+    const faltante = await request.get('/assets/no-existe-humo.js');
+    expect(faltante.status(), '/assets/no-existe-humo.js').toBe(404);
   });
 
   test('el manifiesto es válido y sus íconos responden', async ({ page, request, browserName, baseURL }) => {

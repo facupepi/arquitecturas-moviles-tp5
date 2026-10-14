@@ -1,6 +1,6 @@
 // Ayudantes de las pantallas de Bicicletas y Alarmas (S3). Funciones puras, sin plataforma.
 import { ETIQUETAS } from '../../../shared/constantes.mjs';
-import { tiempoRelativo } from '../../../shared/formato.mjs';
+import { ESPACIO_DURO, tiempoRelativo } from '../../../shared/formato.mjs';
 
 /** Texto sin tildes y en minúscula, para buscar "utn" o "plaza general paz" sin importar acentos. */
 export function normalizarBusqueda(texto) {
@@ -11,11 +11,11 @@ export function normalizarBusqueda(texto) {
     .trim();
 }
 
-/** "a 350 m" o "a 1,2 km" (coma decimal, como se lee en Argentina). */
+/** "a 350 m" o "a 1,2 km" (coma decimal, como se lee en Argentina; número y unidad con espacio duro). */
 export function distanciaTexto(km) {
   if (!Number.isFinite(km)) return '';
-  if (km < 1) return `a ${Math.max(10, Math.round((km * 1000) / 10) * 10)} m`;
-  return `a ${km.toFixed(1).replace('.', ',')} km`;
+  if (km < 1) return `a ${Math.max(10, Math.round((km * 1000) / 10) * 10)}${ESPACIO_DURO}m`;
+  return `a ${km.toFixed(1).replace('.', ',')}${ESPACIO_DURO}km`;
 }
 
 export function nombreZona(zona) {
@@ -40,9 +40,9 @@ export function estadoEstacion(estacion) {
   return { texto: 'Disponible', tono: 'exito', tonoMapa: 'normal', icono: 'check' };
 }
 
-/** "1 bicicleta" / "3 bicicletas". */
+/** "1 bicicleta" / "3 bicicletas" (con espacio duro: el número no queda solo al final de un renglón). */
 export function plural(n, singular, pluralTexto = `${singular}s`) {
-  return `${n} ${n === 1 ? singular : pluralTexto}`;
+  return `${n}${ESPACIO_DURO}${n === 1 ? singular : pluralTexto}`;
 }
 
 /**

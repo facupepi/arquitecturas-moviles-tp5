@@ -23,6 +23,25 @@ async function ordenVisible(page) {
   return page.locator('[data-testid^="estacion-b"]').evaluateAll((nodos) => nodos.map((n) => n.dataset.testid));
 }
 
+/**
+ * Centro de un marcador entero a la vista: dentro del mapa y del área que se desplaza, y sin otro
+ * marcador ni un botón encima (elementFromPoint devuelve el propio marcador). null si no hay.
+ */
+function marcadorALaVista(pantalla) {
+  return pantalla.evaluate((s) => {
+    const area = s.getBoundingClientRect();
+    const mapa = s.querySelector('[data-testid="mapa-estaciones"]').getBoundingClientRect();
+    for (const p of s.querySelectorAll('[data-testid="mapa-estaciones"] path.leaflet-interactive')) {
+      const r = p.getBoundingClientRect();
+      const x = r.left + r.width / 2;
+      const y = r.top + r.height / 2;
+      if (r.width > 0 && r.top > Math.max(area.top, mapa.top) + 4 && r.bottom < Math.min(area.bottom, mapa.bottom) - 4
+        && document.elementFromPoint(x, y) === p) return { x, y };
+    }
+    return null;
+  });
+}
+
 /** Deja una estación como en el catálogo (las pruebas corren de a una, pero no se asume nada). */
 async function restaurarEstacion(adminDb, id) {
   const e = porId(id);
@@ -75,7 +94,7 @@ test.describe('Bicicletas', () => {
     await expect(page.getByTestId('aviso-cercana')).toContainText(UTN.nombre);
     await expect.poll(() => ordenVisible(page)).toEqual(esperado);
     expect(esperado).not.toEqual(antes);
-    await expect(page.getByTestId('distancia-b5')).toHaveText(/^Estás a \d+ m$/);
+    await expect(page.getByTestId('distancia-b5')).toHaveText(/^Estás a \d+\sm$/);
     await expect(page.getByTestId('mapa-estaciones-seleccion')).toHaveText(UTN.nombre);
     await expect(page.getByRole('heading', { name: 'Estaciones por cercanía' })).toBeVisible();
   });
@@ -211,5 +230,41 @@ test.describe('Bicicletas', () => {
     await expect(page.getByTestId('mapa-estaciones-anuncio')).toHaveText(`Elegiste ${primera.nombre}.`);
     await expect.poll(() => aLaVista(orden[0]), { timeout: 5000 }).toBe(true);
     await expect.poll(() => aLaVista('mapa-estaciones')).toBe(true);
+  });
+
+  // El foco que Leaflet le da al mapa en el mousedown desplazaba la pantalla cuando el mapa no se veía
+  // entero, y el clic caía afuera del marcador: no elegía nada. Clic y toque reales, en el lugar.
+  test('escritorio: al pie de la lista, con el mapa fijo empujado arriba, un clic en un marcador lo elige', async ({ vecino }) => {
+    const { page } = vecino;
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await abrirBicicletas(page);
+    await expect(page.locator('[data-testid="mapa-estaciones"] path.leaflet-interactive')).toHaveCount(ESTACIONES.length);
+    const pantalla = page.getByTestId('pantalla-bicicletas');
+    // Al final de todo, el pie institucional empuja hacia arriba la columna del mapa.
+    await pantalla.evaluate((s) => { s.scrollTop = s.scrollHeight; });
+    await expect.poll(() => pantalla.evaluate((s) => s.querySelector('[data-testid="mapa-estaciones"]').getBoundingClientRect().top
+      < s.getBoundingClientRect().top)).toBe(true);
+    await expect.poll(() => marcadorALaVista(pantalla), 'un marcador entero a la vista').not.toBeNull();
+    const punto = await marcadorALaVista(pantalla);
+    await page.mouse.click(punto.x, punto.y);
+    await expect(page.getByTestId('mapa-estaciones-seleccion')).not.toHaveText('Seleccioná un punto en el mapa');
+    await expect(page.getByText('Elegida en el mapa')).toHaveCount(1);
+  });
+
+  test('celular: con parte del mapa tapada, tocar un marcador lo elige', async ({ vecino }) => {
+    const { page } = vecino;
+    await abrirBicicletas(page);
+    await expect(page.locator('[data-testid="mapa-estaciones"] path.leaflet-interactive')).toHaveCount(ESTACIONES.length);
+    const pantalla = page.getByTestId('pantalla-bicicletas');
+    // 40 px del mapa quedan arriba, fuera del área que se desplaza.
+    await pantalla.evaluate((s) => {
+      const mapa = s.querySelector('[data-testid="mapa-estaciones"]');
+      s.scrollTop += mapa.getBoundingClientRect().top - s.getBoundingClientRect().top + 40;
+    });
+    await expect.poll(() => marcadorALaVista(pantalla), 'un marcador entero a la vista').not.toBeNull();
+    const punto = await marcadorALaVista(pantalla);
+    await page.touchscreen.tap(punto.x, punto.y);
+    await expect(page.getByTestId('mapa-estaciones-seleccion')).not.toHaveText('Seleccioná un punto en el mapa');
+    await expect(page.getByText('Elegida en el mapa')).toHaveCount(1);
   });
 });

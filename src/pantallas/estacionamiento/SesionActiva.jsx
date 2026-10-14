@@ -18,7 +18,7 @@ import MediosDePago from '../pagos/MediosDePago';
 import Procesando from '../pagos/Procesando';
 import ComprobantePago from '../pagos/ComprobantePago';
 import AltaEnPago, { dialogoAlta } from '../pagos/AltaEnPago';
-import { conProcesamiento, etiquetaTarjeta, useMedioPago } from '../pagos/pasarela';
+import { conProcesamiento, etiquetaMedio, useMedioPago } from '../pagos/pasarela';
 import { EXTENSIONES, MS_MINUTO, importeSeguro, recordatorioPorVencer, textoMinutos } from './util';
 
 function textoRestante(ms) {
@@ -39,7 +39,7 @@ export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar =
   const refMedios = useRef(null);
   const medio = useMedioPago();
   const [extension, setExtension] = useState(null);   // { requestId, minutos, importe }
-  const [aprobada, setAprobada] = useState(null);     // { fin, tarjeta, fecha }: último paso de la pasarela
+  const [aprobada, setAprobada] = useState(null);     // { fin, pago, fecha }: último paso de la pasarela
   const [finalizando, setFinalizando] = useState(false);
 
   // La pasarela muestra "Procesando el pago…" al menos 1,5 s.
@@ -83,10 +83,11 @@ export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar =
       setTimeout(() => refMedios.current?.focus?.(), 0);
       return;
     }
-    const tarjeta = medio.tarjeta;
-    const nueva = await extender.ejecutar(sesion.id, extension.minutos, extension.requestId, tarjeta);
+    const nueva = await extender.ejecutar(sesion.id, extension.minutos, extension.requestId, medio.tarjeta);
     if (!nueva) return;
-    setAprobada({ fin: nueva.fin, tarjeta, fecha: Date.now() });
+    // El comprobante muestra el pago registrado (nueva.pago), no la tarjeta elegida ahora: en un
+    // reintento del mismo requestId que ya se había cobrado, el vecino pudo haber elegido otra.
+    setAprobada({ fin: nueva.fin, pago: nueva.pago ?? null, fecha: nueva.pago?.creadoEn || Date.now() });
   };
 
   const cerrarExtension = () => {
@@ -250,8 +251,8 @@ export default function SesionActiva({ sesion, zona, umbralMin, ahora, enfocar =
               { etiqueta: 'Patente', valor: sesion.patente },
               { etiqueta: 'Tiempo extra', valor: textoMinutos(extension.minutos) },
               { etiqueta: 'Ahora termina a las', valor: `${hora(aprobada.fin)} h` },
-              { etiqueta: 'Importe', valor: dinero(extension.importe) },
-              { etiqueta: 'Medio de pago', valor: etiquetaTarjeta(aprobada.tarjeta), testID: 'comprobante-medio' },
+              { etiqueta: 'Importe', valor: dinero(aprobada.pago?.importe ?? extension.importe) },
+              { etiqueta: 'Medio de pago', valor: etiquetaMedio(aprobada.pago?.medio, aprobada.pago?.tarjeta), testID: 'comprobante-medio' },
               { etiqueta: 'Fecha y hora', valor: fechaHora(aprobada.fecha) },
             ]}
           />

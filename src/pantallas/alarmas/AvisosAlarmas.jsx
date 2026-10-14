@@ -13,6 +13,7 @@ import { EVENTOS, registrarEvento } from '../../firebase/analytics';
 import { colores, espacio } from '../../tema/tokens';
 import { Aviso, Boton, Icono, Interruptor, Selector, Tarjeta, Texto } from '../../ui';
 import { ETIQUETAS, ZONAS } from '../../../shared/constantes.mjs';
+import { ESPACIO_DURO } from '../../../shared/formato.mjs';
 
 const OPCIONES_ZONAS = ZONAS.map((z) => ({ valor: z, etiqueta: ETIQUETAS.zonas[z] ?? z }));
 
@@ -28,9 +29,10 @@ function leerPush() {
   }
 }
 
+// "1 km" o "500 m", con espacio duro entre el número y la unidad.
 function radioTexto(km) {
-  if (!Number.isFinite(km)) return '1 km';
-  return km < 1 ? `${Math.round(km * 1000)} m` : `${String(km).replace('.', ',')} km`;
+  if (!Number.isFinite(km)) return `1${ESPACIO_DURO}km`;
+  return km < 1 ? `${Math.round(km * 1000)}${ESPACIO_DURO}m` : `${String(km).replace('.', ',')}${ESPACIO_DURO}km`;
 }
 
 // ---------- Zonas (A4) ----------
@@ -169,7 +171,7 @@ function Cercania({ alarmas }) {
       <View style={estilos.fila}>
         <Icono nombre="info" tamano={16} color={colores.textoSuave} />
         <Texto variante="chico" color={colores.textoSuave} estilo={estilos.flexible} testID="privacidad-cercania">
-          {`Tu ubicación no se guarda. Solo registramos qué alarmas están cerca durante ${intervaloCercaniaMin || 30} minutos.`}
+          {`Tu ubicación no se guarda. Solo registramos qué alarmas están cerca durante ${intervaloCercaniaMin || 30}${ESPACIO_DURO}minutos.`}
         </Texto>
       </View>
     </View>

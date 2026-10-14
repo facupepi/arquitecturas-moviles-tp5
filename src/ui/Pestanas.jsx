@@ -1,5 +1,6 @@
-// Pestañas (WP5, 7.2): role="tablist" y "tab" con aria-selected. Si no entran, se desplazan:
-// la pestaña elegida se lleva a la vista y un borde con flecha avisa que hay más hacia ese lado.
+// Pestañas (WP5, 7.2): role="tablist" y "tab" con aria-selected. Si no entran, primero se achica el
+// relleno de cada pestaña; si ni así entran, se desplazan: la pestaña elegida se lleva a la vista y un
+// borde con flecha avisa que hay más hacia ese lado.
 // testID: el contenedor lo recibe tal cual y cada pestaña `${testID}-${valor}`
 // (testID="panel-pestana" da "panel-pestana-reclamos").
 import React, { useEffect, useRef, useState } from 'react';
@@ -12,6 +13,14 @@ import { alPresionarEspacio } from './comun';
 const MARGEN_VISTA = 36; // lo que se deja a la vista de la pestaña vecina al llevar la elegida a la vista
 const ANCHO_FLECHA = 32; // estilos.borde: la flecha tapa ese ancho en cada lado donde hay más pestañas
 
+// Relleno lateral de cada pestaña, del más cómodo al más justo: se usa el mayor con el que entran
+// todas sin desplazar. Con los contadores de Reclamos y Estacionamiento, a 1024 px el panel no entraba
+// con el de 16: la fila se desplazaba y la flecha tapaba la primera o la última pestaña. Si no entran ni
+// con el más justo, se desplazan con el del celular.
+const RELLENOS = [espacio.l, espacio.m, espacio.s];
+const RELLENOS_ANGOSTA = [espacio.m, espacio.s];
+const RELLENO_DESPLAZABLE = espacio.m;
+
 export default function Pestanas({ opciones = [], valor, onCambio, testID, etiqueta }) {
   const { width } = useWindowDimensions();
   const angosta = width < cortes.tableta;
@@ -21,6 +30,20 @@ export default function Pestanas({ opciones = [], valor, onCambio, testID, etiqu
   const [anchoContenido, setAnchoContenido] = useState(0);
   const [desplazado, setDesplazado] = useState(0);
   const [medicion, setMedicion] = useState(0); // cambia cuando se miden las pestañas
+  const [relleno, setRelleno] = useState(null); // null: el primero de la lista hasta medir
+  const rellenos = angosta ? RELLENOS_ANGOSTA : RELLENOS;
+  const rellenoActual = rellenos.includes(relleno) ? relleno : rellenos[0];
+
+  // Elige el relleno con lo que miden las pestañas sin su relleno (cada una guarda el que tenía al
+  // medirse). No usa el ancho del contenido, que se estira hasta el de la vista: así no va y viene.
+  useEffect(() => {
+    const medidasPestanas = opciones.map((o) => posiciones.current[String(o.valor)]);
+    if (!anchoVista || !opciones.length || medidasPestanas.some((m) => m == null)) return;
+    const sinRelleno = medidasPestanas.reduce((t, m) => t + m.ancho - 2 * m.relleno, 0);
+    const elegido = rellenos.find((r) => sinRelleno + 2 * r * opciones.length <= anchoVista) ?? RELLENO_DESPLAZABLE;
+    if (elegido !== rellenoActual) setRelleno(elegido);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anchoVista, medicion, angosta, opciones.length]);
 
   const sobra = anchoContenido - anchoVista;
   const hayMasDerecha = sobra > 2 && desplazado < sobra - 2;
@@ -74,13 +97,13 @@ export default function Pestanas({ opciones = [], valor, onCambio, testID, etiqu
                 onKeyDown={alPresionarEspacio(elegir)}
                 onLayout={(e) => {
                   const { x, width: ancho } = e.nativeEvent.layout;
-                  posiciones.current[String(o.valor)] = { x, ancho };
+                  posiciones.current[String(o.valor)] = { x, ancho, relleno: rellenoActual };
                   setMedicion((n) => n + 1);
                 }}
                 testID={testID ? `${testID}-${o.valor}` : undefined}
                 style={({ hovered }) => [
                   estilos.pestana,
-                  angosta && estilos.pestanaAngosta,
+                  { paddingHorizontal: rellenoActual },
                   elegida && estilos.elegida,
                   hovered && !elegida && estilos.resaltada,
                 ]}
@@ -125,9 +148,9 @@ const estilos = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colores.borde,
   },
+  // El relleno lateral va aparte (RELLENOS): depende de si entran todas.
   pestana: {
     minHeight: medidas.toqueMinimo,
-    paddingHorizontal: espacio.l,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -136,7 +159,6 @@ const estilos = StyleSheet.create({
     marginBottom: -1,
     cursor: 'pointer',
   },
-  pestanaAngosta: { paddingHorizontal: espacio.m },
   elegida: { borderBottomColor: colores.accion },
   resaltada: { backgroundColor: 'rgba(0,119,174,0.06)' },
   contador: {

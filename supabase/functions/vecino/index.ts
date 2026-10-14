@@ -74,7 +74,8 @@ async function alta(id: Identidad): Promise<{ creado: boolean; tributos: number;
     if (r === "error") throw new Error("No se pudo actualizar el perfil");
   }
 
-  // Datos tributarios simulados, reclamo de ejemplo, bienvenida y recordatorios T4 inmediatos.
+  // Cedulones simulados, bienvenida y recordatorios T4 inmediatos. datosInicialesVecino no trae pagos
+  // ni reclamos (el vecino nuevo arranca solo con sus cedulones), pero se crean si alguna vez los trae.
   // batchWrite no es atómico: un documento que ya existía no impide crear los demás.
   const tributos = comoLista(iniciales.tributos);
   const recordatorios = recordatoriosTributos(
@@ -122,19 +123,24 @@ async function alta(id: Identidad): Promise<{ creado: boolean; tributos: number;
 
 async function baja(id: Identidad): Promise<{ borrados: number }> {
   const ruta = `usuarios/${id.uid}`;
-  const ahora = Date.now();
   const porColeccion = await Promise.all(SUBCOLECCIONES.map((c) => listar(`${ruta}/${c}`)));
   const documentos = porColeccion.flat();
 
-  // Bloqueos de patente de sus sesiones vigentes, solo si siguen apuntando a su sesión.
-  const sesiones = porColeccion[SUBCOLECCIONES.indexOf("estacionamiento")]
-    .filter((s) => Number(s.datos.fin) > ahora && typeof s.datos.patente === "string" && s.datos.patente);
-  const bloqueos = sesiones.length
-    ? await obtenerVarios([...new Set(sesiones.map((s) => `bloqueosPatente/${s.datos.patente}`))])
-    : new Map();
-  const bloqueosPropios = sesiones
-    .filter((s) => bloqueos.get(`bloqueosPatente/${s.datos.patente}`)?.datos.sesionId === s.id)
-    .map((s) => `bloqueosPatente/${s.datos.patente}`);
+  // Bloqueos de patente de cualquiera de sus sesiones (en curso, vencida o terminada antes), solo si
+  // siguen apuntando a una sesión suya: el de una sesión que ya terminó guarda sesionId y fin para
+  // siempre. También su documento en administradores, si lo tenía.
+  const sesiones = porColeccion[SUBCOLECCIONES.indexOf("estacionamiento")];
+  const sesionesPropias = new Set(sesiones.map((s) => s.id));
+  const rutasBloqueo = [...new Set(sesiones
+    .filter((s) => typeof s.datos.patente === "string" && s.datos.patente)
+    .map((s) => `bloqueosPatente/${s.datos.patente}`))];
+  const rutaAdmin = `administradores/${id.uid}`;
+  const existentes = await obtenerVarios([...rutasBloqueo, rutaAdmin]);
+  const bloqueosPropios = rutasBloqueo.filter((r) => {
+    const sesionId = existentes.get(r)?.datos.sesionId;
+    return typeof sesionId === "string" && sesionesPropias.has(sesionId);
+  });
+  const admin = existentes.get(rutaAdmin) ? [rutaAdmin] : [];
 
   // Eventos de la bandeja de salida que guardan su uid (avance de sus reclamos).
   const eventos: string[] = [];
@@ -152,7 +158,7 @@ async function baja(id: Identidad): Promise<{ borrados: number }> {
   const escrituras: Escritura[] = [
     ...documentos.map((d) => ({ tipo: "borrar" as const, ruta: d.ruta })),
     ...eventos.map((r) => ({ tipo: "borrar" as const, ruta: r })),
-    ...[...new Set(bloqueosPropios)].map((r) => ({ tipo: "borrar" as const, ruta: r })),
+    ...[...bloqueosPropios, ...admin].map((r) => ({ tipo: "borrar" as const, ruta: r })),
   ];
   const resultados = await escribirLote(escrituras);
   if (resultados.includes("error")) throw new Error("No se pudieron borrar todos los documentos");

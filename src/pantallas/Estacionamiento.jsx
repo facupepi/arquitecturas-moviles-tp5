@@ -105,14 +105,20 @@ export default function Estacionamiento({ ruta }) {
     if (zonas.length && !zonas.some((z) => z.id === zonaId)) setZonaId(zonas[0].id);
   }, [zonas, zonaId]);
 
+  // La zona tocada en el mapa: su opción lleva la etiqueta "Elegida en el mapa" hasta que se elija
+  // otra desde la lista (siempre hay una zona elegida, así que la etiqueta dice de dónde vino).
+  const [enMapa, setEnMapa] = useState(null);
+
   const elegirZona = (id) => {
     setZonaId(id);
+    setEnMapa(null);
     // Deja la zona en la dirección (se puede compartir), sin sumar entradas al historial.
     if (id !== idRuta) navegar('estacionamiento', id, null, { reemplazar: true });
   };
   // Una zona elegida en el mapa entra a la vista en la lista de zonas.
   const elegirEnMapa = (id) => {
     elegirZona(id);
+    setEnMapa(id);
     zonasALaVista.pedir(id);
   };
 
@@ -183,6 +189,7 @@ export default function Estacionamiento({ ruta }) {
       onCambio={elegirZona}
       ahora={ahoraLento}
       refOpcion={zonasALaVista.registrar}
+      elegidaEnMapa={enMapa}
     />
   );
   const formulario = (

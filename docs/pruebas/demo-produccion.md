@@ -1,6 +1,16 @@
 # Demostración en tiempo real sobre la versión publicada
 
-Registro de la demostración realizada el 12 de octubre de 2026, entre las 20:31 y las 20:43 (hora de Córdoba), sobre https://san-francisco-conecta-tp5.web.app en su versión final (commit 8f39e0a). No se modificó el código de la aplicación ni se desplegó nada.
+Registro histórico de la demostración realizada el 12 de octubre de 2026, entre las 20:31 y las 20:43 (hora de Córdoba), sobre https://san-francisco-conecta-tp5.web.app tal como estaba publicada ese día (commit 8f39e0a). No se modificó el código de la aplicación ni se desplegó nada.
+
+## Cambios posteriores
+
+El registro describe la aplicación de ese día y no se actualizó. Después cambió lo siguiente.
+
+- Las reglas y las Edge Functions solo aceptan sesiones de Google. Un token personalizado se admite únicamente para las cuentas de ejemplo (uid `ejemplo-…`), y lo emite la cuenta de servicio. El ingreso con tokens personalizados que se describe abajo, con el administrador real, hoy se rechaza.
+- Un vecino nuevo arranca con tres cedulones, la bienvenida y dos recordatorios de vencimiento, sin pagos ni reclamos. Ya no recibe los cuatro cedulones y las seis notificaciones iniciales que se mencionan abajo.
+- Los pagos pasan por la pasarela con tarjetas de crédito y de débito guardadas en Mi cuenta.
+- Las capturas actuales del informe son 19 y se tomaron en la aplicación publicada con las cuentas de ejemplo, no las 17 que se listan abajo.
+- La configuración municipal que se describe, con el simulador encendido y el horario estricto desactivado, es la de ese día.
 
 ## Entorno
 

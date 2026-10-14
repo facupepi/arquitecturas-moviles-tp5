@@ -3,6 +3,7 @@
 import { test, expect, irA } from './fixtures.mjs';
 import { revisarAccesibilidad } from './accesibilidad.mjs';
 import { catalogo } from '../../shared/catalogo.mjs';
+import { ETIQUETAS } from '../../shared/constantes.mjs';
 
 const CONTACTOS = catalogo().contactos;
 const DE = (categoria) => CONTACTOS.filter((c) => c.categoria === categoria).map((c) => c.id);
@@ -30,6 +31,13 @@ test.describe('Contactos', () => {
     const tarjetas = page.getByTestId('lista-contactos').locator('[data-testid^="contacto-"]');
     await expect(tarjetas).toHaveCount(CONTACTOS.length);
     await expect(page.getByTestId('contacto-destacado')).toContainText('Línea 147');
+    // Cada tarjeta muestra su área y la etiqueta de la categoría, sin repetir la misma palabra.
+    for (const c of CONTACTOS) {
+      const categoria = ETIQUETAS.categoriasContacto[c.categoria];
+      await expect(page.getByTestId(`contacto-${c.id}`)).toContainText(c.area);
+      await expect(page.getByTestId(`etiqueta-${c.id}`)).toHaveText(categoria);
+      expect(c.area.toLowerCase(), c.id).not.toBe(categoria.toLowerCase());
+    }
 
     await page.getByTestId('categoria-emergencias').click();
     await expect(page.getByTestId('categoria-emergencias')).toHaveAttribute('aria-checked', 'true');

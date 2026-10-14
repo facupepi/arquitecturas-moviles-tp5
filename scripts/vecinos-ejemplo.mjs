@@ -2,19 +2,31 @@
 // impagos, pagos con esas tarjetas, reclamos en cada estado, estacionamientos terminados y uno en
 // curso, y notificaciones. Sirven para que el panel municipal muestre movimiento y para las capturas
 // del informe. Las tarjetas salen de números de prueba: se guardan solo los últimos 4 dígitos.
+// También carga el administrador de ejemplo ejemplo-municipio, con administradores/{uid} a nombre de
+// "Municipio".
 //
 //   node scripts/vecinos-ejemplo.mjs --emulador            (FIRESTORE_EMULATOR_HOST y FIREBASE_AUTH_EMULATOR_HOST)
 //   node scripts/vecinos-ejemplo.mjs --produccion          (GOOGLE_APPLICATION_CREDENTIALS fuera del repositorio)
-//   node scripts/vecinos-ejemplo.mjs --produccion --borrar (quita los vecinos de ejemplo y sus datos)
+//   node scripts/vecinos-ejemplo.mjs --produccion --borrar (quita los vecinos y el administrador de ejemplo con sus datos)
 //   node scripts/vecinos-ejemplo.mjs --produccion --cuenta <uid>     (carga los datos de ejemplo en una cuenta real)
 //   node scripts/vecinos-ejemplo.mjs --produccion --reiniciar <uid>  (deja una cuenta como recién registrada)
 //
 // Los uid empiezan con "ejemplo-" y las cuentas no tienen proveedor de ingreso: nadie puede entrar
-// con ellas desde la app. Volver a correrlo reescribe los mismos documentos. El resto del uid es
-// opaco y fijo: el panel muestra el código de vecino (últimos 4 caracteres) y con "ejemplo-lucia"
-// mostraba "…UCIA", parte del nombre. Los uid anteriores se borran al cargar y con --borrar.
+// con ellas desde la app. Solo abren sesión con un token personalizado, que únicamente puede emitir
+// quien tiene la cuenta de servicio, y las reglas y las Edge Functions lo admiten solo para esos uid.
+// Volver a correrlo reescribe los mismos documentos. El resto del uid es opaco y fijo: el panel
+// muestra el código de vecino (últimos 4 caracteres) y con "ejemplo-lucia" mostraba "…UCIA", parte
+// del nombre. Los uid anteriores se borran al cargar y con --borrar.
+//
+// Al reescribir o borrar los datos de una cuenta también se quitan los eventos de la bandeja con su
+// uid, los bloqueos de patente de todas sus sesiones y los adjuntos de sus reclamos: con --emulador,
+// los del servidor simulado; en producción, los de Storage, solo si SUPABASE_SECRET_KEY tiene la clave
+// secreta de Supabase (fuera del repositorio). Sin esa clave los archivos quedan y el script lo avisa.
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve, sep } from 'node:path';
 import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
@@ -26,6 +38,13 @@ import { aFirestore, documentosVecino } from './sembrar.mjs';
 
 // Uid de una versión anterior (terminaban en el nombre del vecino): se borran para limpiar producción.
 const UID_ANTERIORES = ['ejemplo-lucia', 'ejemplo-martin', 'ejemplo-sofia', 'ejemplo-javier'];
+// Administrador de ejemplo: con la misma sesión de token personalizado abre el panel municipal.
+const ADMIN_EJEMPLO = { uid: 'ejemplo-municipio', nombre: 'Municipio' };
+
+// Adjuntos en producción: bucket privado de Supabase Storage (adjuntos-reclamos/{uid}/…).
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://qsxwsbdhlwyshqjfxaxw.supabase.co';
+const CLAVE_SUPABASE = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const BUCKET = process.env.ADJUNTOS_BUCKET || 'adjuntos-reclamos';
 
 const MIN = 60 * 1000;
 const HORA = 60 * MIN;
@@ -38,16 +57,17 @@ if (args.has('--emulador') === args.has('--produccion')) {
   console.error('Indicá --emulador o --produccion.');
   process.exit(1);
 }
-if (args.has('--produccion')) {
+const EMULADOR = args.has('--emulador');
+const proyecto = EMULADOR ? process.env.GCLOUD_PROJECT || 'demo-conecta-tp5' : 'san-francisco-conecta-tp5';
+if (!EMULADOR) {
   if (process.env.FIRESTORE_EMULATOR_HOST) throw new Error('FIRESTORE_EMULATOR_HOST está definido: abrí otra consola para producción.');
   const cred = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   if (!cred || !existsSync(cred)) throw new Error('Falta GOOGLE_APPLICATION_CREDENTIALS con la cuenta de servicio.');
-  initializeApp({ credential: applicationDefault(), projectId: 'san-francisco-conecta-tp5' });
+  initializeApp({ credential: applicationDefault(), projectId: proyecto });
 } else {
   process.env.FIRESTORE_EMULATOR_HOST ??= '127.0.0.1:8085';
   process.env.FIREBASE_AUTH_EMULATOR_HOST ??= '127.0.0.1:9099';
   process.env.METADATA_SERVER_DETECTION ??= 'none';
-  const proyecto = process.env.GCLOUD_PROJECT || 'demo-conecta-tp5';
   if (!proyecto.startsWith('demo-')) throw new Error('Con --emulador el proyecto tiene que ser demo-*.');
   initializeApp({ projectId: proyecto });
 }
@@ -216,15 +236,84 @@ function vecinos() {
 const sinId = ({ id, ...resto }) => resto;
 const DATOS = [C.tributos, C.pagos, C.reclamos, C.estacionamiento, C.notificaciones, C.avisosLeidos, C.tarjetas];
 
-// Borra los datos de una cuenta (y los bloqueos de patente de sus sesiones), sin tocar el perfil ni
-// los dispositivos registrados para las notificaciones.
+// ---------- Adjuntos de los reclamos ----------
+let avisoSinClave = false;
+
+async function pedirStorage(ruta, metodo, cuerpo) {
+  const r = await fetch(`${SUPABASE_URL}/storage/v1/${ruta}`, {
+    method: metodo,
+    headers: { apikey: CLAVE_SUPABASE, authorization: `Bearer ${CLAVE_SUPABASE}`, 'content-type': 'application/json' },
+    body: JSON.stringify(cuerpo),
+  });
+  const datos = await r.json().catch(() => null);
+  if (!r.ok) throw new Error(`Storage ${metodo} ${ruta}: ${r.status} ${datos?.message ?? datos?.error ?? ''}`.trim());
+  return datos;
+}
+
+// Rutas de todos los archivos bajo uid/ (uid/reclamoId/archivo), como listarArchivos de Supabase.
+async function archivosEnStorage(uid) {
+  const rutas = [];
+  const pendientes = [uid];
+  while (pendientes.length) {
+    const carpeta = pendientes.pop();
+    for (let desde = 0; ; desde += 1000) {
+      const items = await pedirStorage(`object/list/${BUCKET}`, 'POST', {
+        prefix: carpeta, limit: 1000, offset: desde, sortBy: { column: 'name', order: 'asc' },
+      });
+      for (const item of items ?? []) {
+        const ruta = `${carpeta}/${item.name}`;
+        // Las carpetas no tienen id; los archivos sí.
+        if (item.id) rutas.push(ruta);
+        else pendientes.push(ruta);
+      }
+      if (!items || items.length < 1000) break;
+    }
+  }
+  return rutas;
+}
+
+// Borra los archivos adjuntos de los reclamos de uid: los que guarda tests/e2e/edge-simulado.mjs con
+// --emulador, o los de Storage en producción (con la clave secreta de Supabase).
+async function borrarAdjuntos(uid) {
+  if (EMULADOR) {
+    const base = resolve(process.env.EDGE_SIMULADO_CARPETA || join(tmpdir(), 'conecta-edge-simulado'), proyecto);
+    const carpeta = resolve(base, uid);
+    if (!carpeta.startsWith(base + sep)) throw new Error(`uid inválido: ${uid}`);
+    await rm(carpeta, { recursive: true, force: true });
+    return;
+  }
+  if (!CLAVE_SUPABASE) {
+    if (!avisoSinClave) {
+      console.warn(`Sin SUPABASE_SECRET_KEY no se borran los adjuntos: quedan en ${BUCKET}/<uid>/ de Supabase Storage.`);
+      avisoSinClave = true;
+    }
+    return;
+  }
+  const rutas = await archivosEnStorage(uid);
+  for (let i = 0; i < rutas.length; i += 100) {
+    await pedirStorage(`object/${BUCKET}`, 'DELETE', { prefixes: rutas.slice(i, i + 100) });
+  }
+  if (rutas.length) console.log(`${uid}: ${rutas.length} adjuntos borrados de Storage.`);
+}
+
+// Borra los datos de una cuenta, sin tocar el perfil ni los dispositivos registrados para las
+// notificaciones: sus colecciones, los bloqueos de patente de todas sus sesiones (en curso o no),
+// los eventos de la bandeja con su uid (avances de sus reclamos) y los adjuntos de sus reclamos, que
+// si quedaran seguirían contando para el tope de archivos por vecino.
 async function limpiarDatos(uid) {
   const ref = db.doc(`${C.usuarios}/${uid}`);
   const sesiones = new Set((await ref.collection(C.estacionamiento).get()).docs.map((d) => d.id));
   for (const b of (await db.collection(C.bloqueos).get()).docs) {
     if (sesiones.has(b.get('sesionId'))) await b.ref.delete();
   }
+  const eventos = (await db.collection(C.eventos).where('uid', '==', uid).get()).docs;
+  for (let i = 0; i < eventos.length; i += 400) {
+    const lote = db.batch();
+    for (const e of eventos.slice(i, i + 400)) lote.delete(e.ref);
+    await lote.commit();
+  }
   for (const col of DATOS) await db.recursiveDelete(ref.collection(col));
+  await borrarAdjuntos(uid);
 }
 
 async function borrarVecino(uid) {
@@ -233,20 +322,32 @@ async function borrarVecino(uid) {
   try { await auth.deleteUser(uid); } catch { /* no existía */ }
 }
 
-// Escribe los datos de ejemplo de v. Con conPerfil, también el perfil (vecinos ficticios); en una
-// cuenta real se conserva su perfil y solo se actualizan nombre y preferencias.
+// Escribe los datos de ejemplo de v. Con conPerfil, también el perfil (vecinos ficticios). En una
+// cuenta real el perfil tiene que existir y se conserva: solo cambian el nombre y las zonas seguidas.
+// Los avisos push (preferencias.push), la frecuencia, los tipos y los dispositivos quedan como estaban:
+// si push pasara a false, el celular seguiría mostrando los avisos activos sin recibir ninguno.
 async function cargarVecino(v, { conPerfil = true } = {}) {
   const ref = db.doc(`${C.usuarios}/${v.uid}`);
+  const perfil = conPerfil ? null : await ref.get();
+  if (perfil && !perfil.exists) throw new Error(`La cuenta ${v.uid} no tiene perfil: tiene que entrar una vez a la app.`);
   await limpiarDatos(v.uid);
   const lote = db.batch();
   const alta = ahora - 30 * DIA;
-  const preferencias = { ...PREFERENCIAS_POR_DEFECTO, tipos: [...PREFERENCIAS_POR_DEFECTO.tipos], ...v.preferencias };
   if (conPerfil) {
+    const preferencias = { ...PREFERENCIAS_POR_DEFECTO, tipos: [...PREFERENCIAS_POR_DEFECTO.tipos], ...v.preferencias };
     lote.set(ref, aFirestore({
       nombre: v.nombre, anonimo: false, creadoEn: alta, actualizadoEn: ahora, altaEn: alta, privacidadAceptadaEn: alta, cercania: null, preferencias,
     }));
   } else {
-    lote.set(ref, aFirestore({ nombre: v.nombre, preferencias, actualizadoEn: ahora }), { merge: true });
+    // Las cuatro claves que exigen las reglas, con los valores que ya tenía la cuenta.
+    const actuales = perfil.get('preferencias') ?? {};
+    const preferencias = {
+      tipos: actuales.tipos ?? [...PREFERENCIAS_POR_DEFECTO.tipos],
+      zonas: v.preferencias?.zonas ?? actuales.zonas ?? [...PREFERENCIAS_POR_DEFECTO.zonas],
+      frecuencia: actuales.frecuencia ?? PREFERENCIAS_POR_DEFECTO.frecuencia,
+      push: actuales.push ?? PREFERENCIAS_POR_DEFECTO.push,
+    };
+    lote.update(ref, aFirestore({ nombre: v.nombre, preferencias, actualizadoEn: ahora }));
   }
   const escribir = (col, docs) => docs.forEach((d) => lote.set(ref.collection(col).doc(d.id), aFirestore(sinId(d))));
   escribir(C.tributos, v.base.tributos);
@@ -279,7 +380,11 @@ if (valor('--cuenta')) {
   console.log(`${usuario.email}: reiniciada con ${docs.length} documentos (cedulones, recordatorios y bienvenida).`);
 } else if (args.has('--borrar')) {
   for (const uid of [...lista.map((v) => v.uid), ...UID_ANTERIORES]) await borrarVecino(uid);
-  console.log(`Borrados ${lista.length} vecinos de ejemplo (y los ${UID_ANTERIORES.length} uid anteriores, si quedaban).`);
+  // El administrador de ejemplo: su permiso y lo que haya generado al entrar (vecino/alta le crea perfil).
+  await db.doc(`${C.administradores}/${ADMIN_EJEMPLO.uid}`).delete();
+  await borrarVecino(ADMIN_EJEMPLO.uid);
+  console.log(`Borrados ${lista.length} vecinos de ejemplo y el administrador ${ADMIN_EJEMPLO.uid} `
+    + `(y los ${UID_ANTERIORES.length} uid anteriores, si quedaban).`);
 } else {
   for (const uid of UID_ANTERIORES) await borrarVecino(uid);
   for (const v of lista) {
@@ -287,4 +392,11 @@ if (valor('--cuenta')) {
     await cargarVecino(v);
     console.log(`${v.uid}: ${resumen(v)}`);
   }
+  // Administrador de ejemplo, también sin proveedor de ingreso. Conserva la fecha de alta si ya existía.
+  const { uid, nombre } = ADMIN_EJEMPLO;
+  try { await auth.getUser(uid); } catch { await auth.createUser({ uid, displayName: nombre }); }
+  const refAdmin = db.doc(`${C.administradores}/${uid}`);
+  const altaAdmin = (await refAdmin.get()).get('alta') ?? Timestamp.fromMillis(ahora);
+  await refAdmin.set({ nombre, alta: altaAdmin });
+  console.log(`${uid}: administrador "${nombre}"`);
 }

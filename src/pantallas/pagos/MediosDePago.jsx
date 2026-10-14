@@ -1,8 +1,10 @@
 // Elección del medio de pago de la pasarela (T2, E2, E4): las tarjetas de crédito y de débito que
 // el vecino guardó en Mi cuenta ("Visa crédito •••• 4242", titular y vencimiento). Es un grupo de
 // radios: cada opción tiene role="radio", aria-checked, área táctil de 64 px y se elige con toque,
-// Enter, espacio o las flechas (como pide el patrón radiogroup de WAI-ARIA). El estado elegido no
-// depende solo del color: el círculo de la derecha se llena con un tilde y el borde se engrosa.
+// Enter, espacio o las flechas (como pide el patrón radiogroup de WAI-ARIA). El grupo es una sola
+// parada de Tab, como estacionamiento/SelectorZona.jsx: solo la tarjeta elegida (o, si no hay, la
+// primera que se puede usar) tiene tabIndex 0. El estado elegido no depende solo del color: el
+// círculo de la derecha se llena con un tilde y el borde se engrosa.
 // Una tarjeta vencida se muestra deshabilitada y las flechas la saltean.
 // Sin tarjetas, un aviso con "Agregar tarjeta" abre el alta en el mismo diálogo (useMedioPago).
 // Nunca hay campos de número ni de código de seguridad acá: solo se elige una tarjeta guardada.
@@ -13,7 +15,7 @@ import { Aviso, Boton, EtiquetaEstado, Icono, Texto } from '../../ui';
 import { alPresionarEspacio, useIdAccesible } from '../../ui/comun';
 import { LIMITES } from '../../../shared/constantes.mjs';
 import { tarjetaVencida } from '../../../shared/dominio.mjs';
-import { textoTarjeta } from '../../../shared/formato.mjs';
+import { enmascarada, textoTarjeta } from '../../../shared/formato.mjs';
 import { iconoMedio } from './pasarela';
 
 const SIGUIENTE = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
@@ -32,11 +34,12 @@ const MediosDePago = forwardRef(function MediosDePago({ medio, deshabilitado = f
   const ahora = Date.now();
   const vencidas = tarjetas.map((t) => tarjetaVencida(t.vence, ahora));
   const habilitadas = tarjetas.map((_, i) => i).filter((i) => !vencidas[i]);
+  // La única opción en el orden de tabulación: la elegida si se puede usar; si no, la primera habilitada.
+  const indiceElegida = tarjetas.findIndex((t) => t.id === valor);
+  const enfocable = indiceElegida >= 0 && !vencidas[indiceElegida] ? indiceElegida : habilitadas[0];
 
   const enfocar = () => {
-    const elegida = tarjetas.findIndex((t) => t.id === valor);
-    const destino = elegida >= 0 && !vencidas[elegida] ? elegida : habilitadas[0];
-    if (destino != null) opciones.current[destino]?.focus?.();
+    if (enfocable != null) opciones.current[enfocable]?.focus?.();
     else refAgregar.current?.focus?.();
   };
 
@@ -83,7 +86,8 @@ const MediosDePago = forwardRef(function MediosDePago({ medio, deshabilitado = f
             const elegido = valor === t.id;
             const vencida = vencidas[i];
             const inactiva = deshabilitado || vencida;
-            const detalle = [t.titular, vencida ? `venció ${t.vence}` : `vence ${t.vence}`].filter(Boolean).join(' · ');
+            // Espacio duro: "vence" y la fecha no se separan en dos renglones (como en Mi cuenta).
+            const detalle = [t.titular, vencida ? `venció\u00a0${t.vence}` : `vence\u00a0${t.vence}`].filter(Boolean).join(' · ');
             return (
               <Pressable
                 key={t.id}
@@ -92,6 +96,7 @@ const MediosDePago = forwardRef(function MediosDePago({ medio, deshabilitado = f
                 aria-checked={elegido}
                 aria-disabled={inactiva || undefined}
                 aria-label={`${nombreAccesibleTarjeta(t)}. ${detalle}${vencida ? '. Vencida' : ''}`}
+                tabIndex={!inactiva && i === enfocable ? 0 : -1}
                 disabled={inactiva}
                 onPress={() => elegir(t.id)}
                 onKeyDown={inactiva ? undefined : alTeclear(i)}
@@ -108,8 +113,10 @@ const MediosDePago = forwardRef(function MediosDePago({ medio, deshabilitado = f
                   <Icono nombre={iconoMedio(t.tipo)} tamano={22} color={elegido ? colores.blanco : colores.accionOscuro} />
                 </View>
                 <View style={estilos.textos}>
+                  {/* "•••• 8210" no se parte entre renglones, como en Mi cuenta. */}
                   <Texto variante="cuerpo" peso="700" color={elegido ? colores.accionOscuro : colores.texto}>
-                    {textoTarjeta(t)}
+                    {textoTarjeta(t).replace(enmascarada(t.ultimos4), '').trim()}
+                    {enmascarada(t.ultimos4) ? <Texto variante="cuerpo" peso="700" estilo={estilos.sinCorte}>{` ${enmascarada(t.ultimos4)}`}</Texto> : null}
                   </Texto>
                   <Texto variante="chico" color={colores.textoSuave}>
                     {detalle}
@@ -160,6 +167,7 @@ const MediosDePago = forwardRef(function MediosDePago({ medio, deshabilitado = f
 export default MediosDePago;
 
 const estilos = StyleSheet.create({
+  sinCorte: { whiteSpace: 'nowrap' },
   contenedor: { gap: espacio.s },
   // Una opción por fila también en el escritorio: en el diálogo (560 px) dos columnas cortan las etiquetas.
   opciones: { gap: espacio.s },

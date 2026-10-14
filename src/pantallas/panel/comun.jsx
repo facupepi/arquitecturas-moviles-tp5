@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { EVENTOS } from '../../firebase/analytics';
-import { colores, espacio, radios } from '../../tema/tokens';
+import { colores, espacio, radios, tipografia } from '../../tema/tokens';
 import { EtiquetaEstado, Grilla as GrillaUI, Icono, Tarjeta, Texto, useAnchoDisponible } from '../../ui';
 import { fecha, hora } from '../../../shared/formato.mjs';
 
@@ -140,7 +140,9 @@ export function DosColumnas({ principal, lateral, proporcion = [3, 2], estirar =
 
 /**
  * Cifra destacada (recaudación, sesiones, vencidos). Todas iguales: ícono y rótulo arriba, cifra y
- * una línea de detalle. Dentro de una Grilla quedan del mismo ancho y alto.
+ * una línea de detalle. Dentro de una Grilla quedan del mismo ancho y alto, y las cifras de una fila a
+ * la misma altura: el rótulo tiene lugar para dos renglones aunque use uno (a 1024 y 1280 px,
+ * "Recaudado hoy en estacionamiento" pasa a dos y bajaba su cifra respecto de las otras).
  */
 export function Indicador({ etiqueta, valor, detalle, icono, tono = 'info', cargando = false, testID }) {
   const t = TONOS_INDICADOR[tono] ?? TONOS_INDICADOR.info;
@@ -150,7 +152,9 @@ export function Indicador({ etiqueta, valor, detalle, icono, tono = 'info', carg
         <View style={[estilos.indicadorIcono, { backgroundColor: t.fondo }]}>
           <Icono nombre={icono} tamano={18} color={t.color} />
         </View>
-        <Texto variante="chico" peso="700" color={colores.textoSuave} estilo={estilos.flexible}>{etiqueta}</Texto>
+        <View style={estilos.indicadorRotulo}>
+          <Texto variante="chico" peso="700" color={colores.textoSuave}>{etiqueta}</Texto>
+        </View>
       </View>
       <Texto variante="numero" aria-live="polite" testID={testID ? `${testID}-valor` : undefined} numberOfLines={1}>
         {cargando ? '—' : valor}
@@ -300,6 +304,8 @@ const estilos = StyleSheet.create({
   unaColumna: { gap: espacio.l },
   indicador: { gap: espacio.xs },
   indicadorCabecera: { flexDirection: 'row', alignItems: 'center', gap: espacio.s, marginBottom: espacio.xs },
+  // Alto de dos renglones del rótulo, centrado junto al ícono: uno o dos renglones ocupan lo mismo.
+  indicadorRotulo: { flex: 1, minWidth: 0, minHeight: 2 * tipografia.chico.lineHeight, justifyContent: 'center' },
   indicadoresCompactos: { gap: 0, paddingVertical: espacio.s },
   renglonIndicador: { flexDirection: 'row', alignItems: 'center', gap: espacio.m, paddingVertical: espacio.s },
   renglonConBorde: { borderTopWidth: 1, borderTopColor: colores.borde },

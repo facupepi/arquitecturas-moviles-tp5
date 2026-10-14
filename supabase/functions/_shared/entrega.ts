@@ -82,7 +82,8 @@ async function entregarAlarma(eventoId: string, ev: Record<string, unknown>, aho
   const destino = `#/alarmas/${ev.refId}`;
   const nombre = String(a.nombre ?? "comunitaria");
   const titulo = `Alarma activada: ${nombre}`.slice(0, 100);
-  const cuerpo = `Se activó la alarma ${nombre}${a.referencia ? ` (${a.referencia})` : ""}. ` +
+  // El nombre ya va en el título ("Alarma UTN"): el cuerpo no lo repite, igual que el aviso de la app.
+  const cuerpo = `Se activó la alarma comunitaria${a.referencia ? ` (${a.referencia})` : ""}. ` +
     "Mantené la calma y seguí las indicaciones de las autoridades.";
 
   // Aviso público para el historial de quienes siguen la zona (idempotente por su id).

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   dinero, fecha, fechaHora, hora, tiempoRelativo, duracion, enmascarada, textoTarjeta, textoMedioPago,
-  codigoVecino, sinSuspensivos,
+  codigoVecino, sinSuspensivos, ESPACIO_DURO, unirNumeroYUnidad,
 } from '../../shared/formato.mjs';
 
 const MIN = 60 * 1000;
@@ -39,23 +39,36 @@ test('fecha, hora y fechaHora en la zona horaria de Córdoba', () => {
   }
 });
 
-test('tiempoRelativo en pasado y futuro', () => {
+test('tiempoRelativo en pasado y futuro, con espacio duro entre el número y la unidad', () => {
   const ahora = cordoba('2026-10-07T12:00:00');
   assert.equal(tiempoRelativo(ahora, ahora), 'recién');
   assert.equal(tiempoRelativo(ahora - 30 * 1000, ahora), 'recién');
-  assert.equal(tiempoRelativo(ahora - 3 * MIN, ahora), 'hace 3 min');
-  assert.equal(tiempoRelativo(ahora - 3 * MIN - 50 * 1000, ahora), 'hace 3 min');
-  assert.equal(tiempoRelativo(ahora - 59 * MIN, ahora), 'hace 59 min');
-  assert.equal(tiempoRelativo(ahora - 2 * HORA, ahora), 'hace 2 h');
-  assert.equal(tiempoRelativo(ahora - DIA, ahora), 'hace 1 día');
-  assert.equal(tiempoRelativo(ahora - 40 * DIA, ahora), 'hace 40 días');
-  assert.equal(tiempoRelativo(ahora + 20 * 1000, ahora), 'en menos de 1 min');
-  assert.equal(tiempoRelativo(ahora + 5 * MIN, ahora), 'en 5 min');
-  assert.equal(tiempoRelativo(ahora + 2 * DIA, ahora), 'en 2 días');
-  assert.equal(tiempoRelativo(ahora + 2 * DIA - 10 * MIN, ahora), 'en 2 días', 'redondea los días');
-  assert.equal(tiempoRelativo(ahora + 23.6 * HORA, ahora), 'en 1 día', 'sin "24 h"');
+  assert.equal(tiempoRelativo(ahora - 3 * MIN, ahora), 'hace 3\u00a0min');
+  assert.equal(tiempoRelativo(ahora - 3 * MIN - 50 * 1000, ahora), 'hace 3\u00a0min');
+  assert.equal(tiempoRelativo(ahora - 59 * MIN, ahora), 'hace 59\u00a0min');
+  assert.equal(tiempoRelativo(ahora - 2 * HORA, ahora), 'hace 2\u00a0h');
+  assert.equal(tiempoRelativo(ahora - DIA, ahora), 'hace 1\u00a0día');
+  assert.equal(tiempoRelativo(ahora - 40 * DIA, ahora), 'hace 40\u00a0días');
+  assert.equal(tiempoRelativo(ahora + 20 * 1000, ahora), 'en menos de 1\u00a0min');
+  assert.equal(tiempoRelativo(ahora + 5 * MIN, ahora), 'en 5\u00a0min');
+  assert.equal(tiempoRelativo(ahora + 2 * DIA, ahora), 'en 2\u00a0días');
+  assert.equal(tiempoRelativo(ahora + 2 * DIA - 10 * MIN, ahora), 'en 2\u00a0días', 'redondea los días');
+  assert.equal(tiempoRelativo(ahora + 23.6 * HORA, ahora), 'en 1\u00a0día', 'sin "24 h"');
   assert.equal(tiempoRelativo(null, ahora), '');
   assert.ok(tiempoRelativo(Date.now() - 5 * MIN).startsWith('hace'), 'ahora por defecto');
+  // El número nunca queda separado de su unidad por un espacio común (sí "hace" o "en" del número).
+  assert.equal(ESPACIO_DURO, '\u00a0');
+  for (const ms of [ahora - 3 * MIN, ahora - 2 * HORA, ahora - 40 * DIA, ahora + 5 * MIN, ahora + 20 * 1000]) {
+    assert.doesNotMatch(tiempoRelativo(ms, ahora), /\d (min|h|día|días)\b/);
+  }
+});
+
+test('unirNumeroYUnidad: une el número y la unidad de un texto ya armado (notificaciones guardadas)', () => {
+  const duro = (t) => t.replace(/\u00a0/g, '_');
+  assert.equal(duro(unirNumeroYUnidad('Tu Tasa 10/2026 vence en 2 días')), 'Tu Tasa 10/2026 vence en 2_días');
+  assert.equal(duro(unirNumeroYUnidad('Corte de 8 a 12 h. Hace 3 min, a 350 m (30 minutos).')), 'Corte de 8 a 12_h. Hace 3_min, a 350_m (30_minutos).');
+  assert.equal(unirNumeroYUnidad('En 2 meses, 8 hs y el 10/2026'), 'En 2 meses, 8 hs y el 10/2026', 'solo unidades enteras');
+  assert.equal(unirNumeroYUnidad(null), null);
 });
 
 test('duracion: HH:MM:SS para el temporizador', () => {

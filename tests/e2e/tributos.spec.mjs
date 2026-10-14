@@ -112,6 +112,10 @@ test.describe('Tributos', () => {
     expect(texto).toContain('Pagalo desde la app San Francisco Conecta.');
     expect(texto).not.toMatch(TEXTO_DEMO);
     expect(texto.replace(/\s/g, '')).toContain(esperado);
+    // La nota académica va al pie, en una línea discreta: es lo último del cedulón (no un recuadro arriba).
+    expect(await impreso.evaluate((n) => n.lastElementChild?.className)).toBe('leyenda');
+    await expect(impreso.locator('.leyenda')).toHaveText(/UTN FRSFCO/);
+    await expect(impreso.locator('.leyenda')).toHaveCount(1);
     // En pantalla el contenedor de impresión no se ve; al imprimir se ve solo él.
     await expect(impreso).toBeHidden();
     await page.emulateMedia({ media: 'print' });
@@ -152,6 +156,9 @@ test.describe('Tributos', () => {
     await page.getByTestId('agregar-tarjeta-pago').click();
     await expect(dialogo.getByRole('heading', { name: 'Agregar tarjeta' })).toBeVisible();
     await expect(page.getByTestId('tarjeta-tipo-credito')).toBeFocused();
+    // El alta empieza arriba aunque el pago había bajado hasta el error: la primera frase no queda
+    // cortada bajo el título.
+    await expect(dialogo.getByText('Se guarda en Mi cuenta y queda elegida.')).toBeInViewport({ ratio: 0.9 });
     await expect(dialogo.locator('input')).toHaveCount(4);
     await expect(page.getByTestId('confirmar-pago')).toHaveCount(0);
     // Vacío: un error debajo de cada campo y el foco en el primero.
@@ -197,6 +204,9 @@ test.describe('Tributos', () => {
     await page.keyboard.press('ArrowDown');
     await expect(page.getByTestId('medio-tarjeta-2')).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByTestId('medio-tarjeta-1')).toHaveAttribute('aria-checked', 'false');
+    // El grupo es una sola parada de Tab: solo la tarjeta elegida tiene tabindex 0.
+    await expect(page.getByTestId('medio-tarjeta-2')).toHaveAttribute('tabindex', '0');
+    await expect(page.getByTestId('medio-tarjeta-1')).toHaveAttribute('tabindex', '-1');
     await revisarAccesibilidad(page, 'confirmar-pago');
 
     // Pagar: "Procesando el pago…" con la tarjeta, sin poder cerrar el diálogo.

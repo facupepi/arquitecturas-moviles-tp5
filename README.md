@@ -2,7 +2,7 @@
 
 Aplicación móvil web de servicios municipales para la ciudad de San Francisco, Córdoba. Es el trabajo práctico 5 de Arquitecturas Móviles de la UTN Facultad Regional San Francisco.
 
-Es un proyecto académico de la UTN FRSFCO, sin vínculo oficial con la Municipalidad de San Francisco. Los pagos pasan por una pasarela simulada, sin dinero real, y el panel municipal reemplaza a los sistemas del municipio. La app lo aclara al pie de la pantalla de ingreso y en el pie institucional.
+Es un proyecto académico de la UTN FRSFCO, sin vínculo oficial con la Municipalidad de San Francisco. Los pagos pasan por una pasarela simulada, sin dinero real, y el panel municipal reemplaza a los sistemas del municipio. La app muestra la nota "Proyecto académico UTN FRSFCO" al pie de la pantalla de ingreso, en el pie institucional y al final del cedulón impreso.
 
 La aplicación se publica en https://san-francisco-conecta-tp5.web.app.
 
@@ -30,8 +30,8 @@ La interfaz está escrita con React Native y se ejecuta en el navegador mediante
 
 **Firebase, plan Spark**
 
-- Hosting sirve la aplicación desde su red de distribución.
-- Authentication administra las cuentas de Google (el único modo de ingreso).
+- Hosting sirve la aplicación desde su red de distribución. La raíz `/`, `index.html`, el service worker y el manifiesto se revalidan en cada visita, y los archivos de `assets/`, que llevan un hash en el nombre, se guardan un año. Como la app navega por hash, no hay reescrituras: una ruta o un archivo inexistente responde 404.
+- Authentication administra las cuentas de Google, el único modo de ingreso desde la app.
 - Firestore guarda el catálogo municipal y los datos de cada vecino, protegidos por reglas de seguridad que validan dueño, importes, estados y transiciones.
 - App Check, Remote Config, Analytics, Performance Monitoring y Cloud Messaging completan el conjunto.
 
@@ -105,13 +105,17 @@ En desarrollo, App Check necesita un token de depuración registrado en la conso
 
 La prueba de humo y la de carga solo miran lo público: no inician sesión ni crean cuentas en producción. La prueba de humo acepta el token de depuración de App Check en la variable `APPCHECK_TOKEN_HUMO`, que nunca se versiona.
 
-En la versión final, las pruebas de dominio dieron 98 de 98, las de reglas 148 de 148 y las de extremo a extremo 140 de 140, 70 en Pixel 7 y 70 en iPhone 13. El 12 de octubre de 2026, contra la dirección publicada, la prueba de humo dio 30 de 30 en los cinco navegadores y la de carga quedó por debajo de 3 segundos en las siete repeticiones. El detalle está en `docs/pruebas/`.
+En la última corrida, las pruebas de dominio dieron 100 de 100, las de reglas 148 de 148 y las de extremo a extremo 147 de 150 (75 en Pixel 7 y 75 en iPhone 13). Las tres que fallaron pasaron al repetirlas: eran demoras del emulador en una máquina cargada, que también aparecen con la versión anterior del código. El 14 de octubre de 2026, contra la dirección publicada, la prueba de humo dio 30 de 30 en los cinco navegadores.
 
-**Capturas para el informe.** `npm run capturas` genera las pantallas a 390 por 844 píxeles con escala 2. Con el modo compartido de los emuladores encendido (`npm run e2e:compartido`), recorre la aplicación con una cuenta de Google ficticia del emulador y usa un administrador ficticio para el panel, en un proyecto propio que se vacía al terminar. Con `node scripts/capturas.mjs --url <dirección>` solo captura la pantalla de ingreso de la aplicación publicada, porque entrar exige una cuenta de Google real. El modo compartido se apaga con `npm run e2e:compartido:apagar`.
+La prueba de carga del 13 de octubre de 2026, contra la dirección publicada, midió siete repeticiones con red móvil lenta y procesador limitado. En la primera visita, el contenido quedó visible en 1,27 s de mediana y el ingreso utilizable en 2,88 s de mediana, con un peor caso de 3,13 s, 0,13 s por encima del límite de 3 segundos. En la visita repetida, con la app guardada por el service worker, el ingreso quedó utilizable en 1,95 s de mediana. El detalle está en `docs/pruebas/`.
+
+**Capturas para el informe.** `npm run capturas` genera las pantallas a 390 por 844 píxeles con escala 2. Con el modo compartido de los emuladores encendido (`npm run e2e:compartido`), recorre la aplicación con una cuenta de Google ficticia del emulador y usa un administrador ficticio para el panel, en un proyecto propio que se vacía al terminar. Con `node scripts/capturas.mjs --url <dirección>` solo captura la pantalla de ingreso de la aplicación publicada, porque el script no abre sesiones en producción. Las capturas del informe se tomaron en la aplicación publicada con las cuentas de ejemplo, cuya sesión se abre con un token personalizado emitido con la cuenta de servicio (ver "Vecinos de ejemplo"). El modo compartido se apaga con `npm run e2e:compartido:apagar`.
 
 ## Cuentas administradoras
 
-El panel municipal solo se muestra a una cuenta de Google con un documento en la colección `administradores` de Firestore. Las reglas y las Edge Functions solo aceptan sesiones iniciadas con Google (`sign_in_provider` `google.com`) y rechazan cualquier otra (anónima, con contraseña o con token personalizado), aunque tenga ese documento, y ninguna cuenta puede crearlo desde la aplicación.
+El panel municipal solo se muestra a una cuenta con un documento en la colección `administradores` de Firestore, y ninguna cuenta puede crearlo desde la aplicación. Las reglas y las Edge Functions solo aceptan sesiones iniciadas con Google (`sign_in_provider` `google.com`) y rechazan las anónimas, las de correo y contraseña y las de token personalizado, aunque tengan ese documento. La única excepción son las cuentas de ejemplo, cuyo uid empieza con `ejemplo-`: no tienen proveedor de ingreso y solo abren sesión con un token personalizado emitido con la cuenta de servicio (ver "Vecinos de ejemplo"). Entre ellas, `ejemplo-municipio` tiene su documento en `administradores` y abre el panel.
+
+Una cuenta de Google real se habilita así:
 
 1. Ingresar a la aplicación publicada con "Continuar con Google" usando la cuenta que se quiere habilitar.
 2. En la consola de Firebase, abrir Authentication, ubicar esa cuenta por su correo y copiar el valor de la columna "UID de usuario".
@@ -119,28 +123,30 @@ El panel municipal solo se muestra a una cuenta de Google con un documento en la
 4. Cargar en el documento el campo `nombre`, de tipo string, con el nombre que se quiera mostrar, y el campo `alta`, de tipo timestamp, con la fecha del día.
 5. Recargar la aplicación. La pantalla Mi cuenta muestra "Abrir el panel municipal" y el menú suma el acceso al panel.
 
-Para quitar el permiso, se borra el documento desde la misma consola.
+Para quitar el permiso, se borra el documento desde la misma consola. "Borrar mis datos" también lo borra, junto con el resto de los datos de la cuenta.
 
 ## Vecinos de ejemplo
 
-`scripts/vecinos-ejemplo.mjs` carga cuatro vecinos ficticios con actividad, para que el panel municipal muestre movimiento desde el primer momento: cedulones pagos e impagos, pagos con distintos medios, reclamos en cada estado, estacionamientos terminados y uno en curso, y notificaciones.
+`scripts/vecinos-ejemplo.mjs` carga cuatro vecinos ficticios con actividad, para que el panel municipal muestre movimiento desde el primer momento: tarjetas guardadas de crédito y débito, cedulones pagos e impagos, pagos con esas tarjetas, reclamos en cada estado, estacionamientos terminados y uno en curso, y notificaciones. También carga el administrador de ejemplo `ejemplo-municipio`, con su documento en `administradores` a nombre de "Municipio".
 
 ```bash
-npm run ejemplos:produccion                                  # crea o reescribe los vecinos de ejemplo
+npm run ejemplos:produccion                                  # crea o reescribe los vecinos y el administrador de ejemplo
 node scripts/vecinos-ejemplo.mjs --produccion --borrar       # los quita con todos sus datos
 node scripts/vecinos-ejemplo.mjs --emulador                  # lo mismo contra los emuladores
 ```
 
-Sus uid empiezan con `ejemplo-` y sus cuentas no tienen proveedor de ingreso, así que nadie puede entrar con ellas desde la app.
+Sus uid empiezan con `ejemplo-` y sus cuentas no tienen proveedor de ingreso, así que nadie puede entrar con ellas desde la app. La única forma de abrir una sesión con ellas es un token personalizado (`createCustomToken` de `firebase-admin`), que solo puede emitir quien tiene la cuenta de servicio del proyecto. Las reglas de Firestore y las Edge Functions admiten esa sesión solo para los uid que empiezan con `ejemplo-`, y cada cuenta accede solo a lo suyo; `ejemplo-municipio`, además, al panel municipal. Con esas sesiones se tomaron las capturas del informe en la aplicación publicada.
 
 Un vecino que se registra arranca solo con sus cedulones, los recordatorios de vencimiento y la bienvenida. Para la demostración, los datos de ejemplo se pueden cargar en una cuenta de Google real, que primero tiene que haber entrado una vez a la app:
 
 ```bash
-node scripts/vecinos-ejemplo.mjs --produccion --cuenta <uid>      # le carga pagos, reclamos, estacionamientos y notificaciones
+node scripts/vecinos-ejemplo.mjs --produccion --cuenta <uid>      # le carga tarjetas, pagos, reclamos, estacionamientos y notificaciones
 node scripts/vecinos-ejemplo.mjs --produccion --reiniciar <uid>   # la deja como recién registrada
 ```
 
-Las dos opciones conservan el perfil y el celular registrado para las notificaciones.
+Las dos opciones conservan el perfil y el celular registrado para las notificaciones. Del perfil, `--cuenta` solo actualiza el nombre, con el de la cuenta de Google, y las zonas seguidas: los avisos push, la frecuencia y los tipos elegidos quedan como estaban.
+
+Cada vez que el script reescribe o borra los datos de una cuenta, quita también los eventos de la bandeja con su uid, los bloqueos de patente de todas sus sesiones y los adjuntos de sus reclamos, que si no seguirían contando para el tope de 30 archivos por vecino. Con `--emulador` borra los archivos del servidor simulado. En producción, los adjuntos de Storage solo se borran si la variable `SUPABASE_SECRET_KEY` tiene la clave secreta del proyecto de Supabase (Project Settings, API Keys), que nunca se versiona. Sin ella, el script avisa y los archivos quedan en `adjuntos-reclamos/<uid>/`.
 
 ## Despliegue
 
@@ -203,7 +209,7 @@ La demostración usa dos dispositivos.
 | 6 | A | En Reclamos, cargar uno con una foto y buscarlo por su código | El reclamo aparece como Recibido con su código y su adjunto |
 | 7 | B | En la pestaña Reclamos, avanzar ese reclamo a En proceso con una nota | La línea de tiempo de A cambia sola, muestra la respuesta de la Municipalidad y llega la notificación push |
 | 8 | A y B | En A, seguir la zona Parque y activar "Avisarme si se activa una alarma cerca". En B, pestaña Alarmas, activar la Alarma Parque Cincuentenario | A muestra el aviso en la aplicación y, con la aplicación cerrada, la notificación push, que al tocarla abre esa alarma en el mapa |
-| 9 | A y B | En A, estacionar 15 minutos en la zona Municipalidad. En B, pestaña Simulación, tocar "Enviar recordatorios ahora" | El temporizador corre, cerca de un minuto después aparece el aviso de sesión por vencer, y luego se extiende 15 minutos y se termina la sesión |
+| 9 | A | Estacionar 15 minutos en la zona Municipalidad y esperar el aviso. En B no hace falta tocar nada: "Enviar recordatorios ahora" solo envía los de cedulones | El temporizador corre y, cerca de un minuto después, llega el aviso de sesión por vencer, que envía sola la tarea programada de cada minuto con el umbral de 14 minutos de la preparación. Luego se extiende 15 minutos y se termina la sesión |
 | 10 | A | En Atención al vecino, tocar "Llamar al 147" y "WhatsApp" | Se abre el marcador del teléfono y una conversación de WhatsApp con el canal municipal |
 | 11 | A y B | En Notificaciones, revisar el historial y cambiar la frecuencia a Resumen diario. En B, tocar "Enviar resumen ahora" | Cada notificación lleva a su servicio, y el resumen llega a los vecinos que eligieron esa frecuencia |
 | 12 | A | En Mi cuenta, tocar "Borrar mis datos" | El borrado elimina del servidor la cuenta y todos sus datos, y vuelve a la pantalla de ingreso |
@@ -217,6 +223,7 @@ La demostración usa dos dispositivos.
 ## Seguridad y datos
 
 - No se guarda el correo del vecino ni su ubicación. Para las alarmas cercanas, el teléfono registra solo los identificadores de las alarmas próximas durante treinta minutos.
-- Las reglas de Firestore limitan cada documento a su dueño, validan importes, estados y transiciones, y exigen una cuenta de Google con documento en `administradores` para toda acción municipal.
-- "Borrar mis datos" elimina el perfil, los cedulones, los pagos, los reclamos con sus adjuntos, los estacionamientos, las notificaciones y el usuario de Authentication.
+- De cada tarjeta guardada, de crédito o de débito y hasta cinco por vecino, se guardan solo el tipo, la red, los últimos cuatro dígitos, el titular y el vencimiento. El número completo y el código de seguridad se validan al cargar la tarjeta y se descartan: no llegan a Firestore, y de la tarjeta usada cada pago guarda solo el tipo, la red y los últimos cuatro dígitos.
+- Las reglas de Firestore y las Edge Functions solo aceptan sesiones de Google, salvo las de las cuentas de ejemplo (uid `ejemplo-…`), que solo se abren con un token personalizado emitido con la cuenta de servicio. Las reglas limitan cada documento a su dueño, validan importes, estados y transiciones, y exigen una de esas sesiones con documento en `administradores` para toda acción municipal.
+- "Borrar mis datos" elimina el perfil, los cedulones, los pagos, las tarjetas guardadas, los reclamos con sus adjuntos, los estacionamientos y los bloqueos de patente de todas sus sesiones, las notificaciones y los avisos leídos, los celulares registrados para las notificaciones push, los eventos de la bandeja de salida con su uid, el documento de administrador si lo tenía y el usuario de Authentication.
 - La configuración web de Firebase es pública por diseño, pero no se versiona. Las claves privadas y los secretos de Supabase nunca se incluyen en el repositorio.

@@ -9,7 +9,7 @@ import { useAhora } from '../datos/useAhora';
 import { useRuta } from '../navegacion';
 import { coloresMapa, espacio, colores } from '../tema/tokens';
 import { Aviso, Cargando, ErrorCarga, Mapa, Pantalla, Seccion, Texto, Vacio } from '../ui';
-import { tiempoRelativo } from '../../shared/formato.mjs';
+import { ESPACIO_DURO, tiempoRelativo } from '../../shared/formato.mjs';
 import AvisosAlarmas from './alarmas/AvisosAlarmas';
 import TarjetaAlarma from './alarmas/TarjetaAlarma';
 import { llevarALaVista } from './bicicletas/llevarALaVista';
@@ -185,7 +185,7 @@ export default function Alarmas({ ruta }) {
         {activas.length ? (
           <Aviso
             tono="peligro"
-            titulo={activas.length === 1 ? `Alarma activada: ${activas[0].nombre}` : `${activas.length} alarmas activadas`}
+            titulo={activas.length === 1 ? `Alarma activada: ${activas[0].nombre}` : `${activas.length}${ESPACIO_DURO}alarmas activadas`}
             mensaje={activas.length === 1
               ? `${activas[0].referencia ?? ''}${activas[0].referencia ? '. ' : ''}Si estás cerca, mantené la calma. Ante una emergencia, llamá a la Policía al 101.`
               : `${activas.map((a) => a.nombre).join(', ')}. Ante una emergencia, llamá a la Policía al 101.`}

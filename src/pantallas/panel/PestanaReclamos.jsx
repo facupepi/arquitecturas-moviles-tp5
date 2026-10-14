@@ -39,12 +39,20 @@ function coincide(reclamo, texto) {
     .some((v) => typeof v === 'string' && sinSuspensivos(v).toLocaleLowerCase('es-AR').includes(t));
 }
 
+// Espacio duro (U+00A0): el renglón no se corta ahí.
+const DURO = '\u00a0';
+
+// "Recibido: 12/10 21:08  ·  En proceso: 13/10 02:08". Cada paso va entero en su renglón (espacios
+// duros adentro) y el "·" queda pegado al paso anterior: si no entran todos, el renglón se corta
+// después del separador, nunca entre la fecha y la hora ni antes del "·".
 function LineaTiempo({ cronologia }) {
   const pasos = ['recibido', 'en_proceso', 'resuelto'].filter((e) => typeof cronologia?.[e] === 'number');
   if (!pasos.length) return null;
   return (
     <Texto variante="chico" color={colores.textoSuave}>
-      {pasos.map((e) => `${ETIQUETAS.estadosReclamo[e]}: ${fechaCorta(cronologia[e])}`).join('  ·  ')}
+      {pasos
+        .map((e) => `${ETIQUETAS.estadosReclamo[e]}: ${fechaCorta(cronologia[e])}`.replace(/ /g, DURO))
+        .join(`${DURO}${DURO}·  `)}
     </Texto>
   );
 }

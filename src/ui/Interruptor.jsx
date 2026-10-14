@@ -1,4 +1,6 @@
 // Interruptor (WP5, 7.2): toda la fila es un control con role="switch" y aria-checked.
+// La fila tiene un poco de relleno a los lados para el fondo al pasar el puntero; un margen negativo
+// igual lo compensa, así el texto y la pista quedan alineados con el resto de la tarjeta.
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { colores, espacio, medidas, radios } from '../tema/tokens';
@@ -50,6 +52,7 @@ const estilos = StyleSheet.create({
     gap: espacio.m,
     paddingVertical: espacio.s,
     paddingHorizontal: espacio.xs,
+    marginHorizontal: -espacio.xs,
     borderRadius: radios.medio,
     cursor: 'pointer',
     alignSelf: 'stretch',

@@ -156,7 +156,7 @@ describe('sesión anónima: administración', () => {
 });
 
 describe('otros proveedores: solo se ingresa con Google', () => {
-  it('una sesión con contraseña o con token personalizado no lee sus datos ni administra', async () => {
+  it('una sesión con contraseña o con token personalizado no lee sus datos ni administra (salvo las cuentas de ejemplo)', async () => {
     for (const proveedor of ['password', 'custom']) {
       await assertFails(getDoc(doc(conProveedor(entorno, 'anon', proveedor), 'usuarios/anon')));
       await assertFails(getDocs(collection(conProveedor(entorno, 'anon', proveedor), 'usuarios/anon/tributos')));
@@ -169,6 +169,14 @@ describe('otros proveedores: solo se ingresa con Google', () => {
     await assertSucceeds(getDoc(doc(conProveedor(entorno, 'ejemplo-abc123', 'custom'), 'usuarios/ejemplo-abc123/tributos/T-1')));
     await assertFails(getDoc(doc(conProveedor(entorno, 'ejemplo-abc123', 'custom'), 'usuarios/anon/tributos/T-1')));
     await assertFails(getDoc(doc(conProveedor(entorno, 'ejemplo-abc123', 'password'), 'usuarios/ejemplo-abc123/tributos/T-1')));
+    // El administrador de ejemplo (ejemplo-municipio) administra con su token personalizado, como
+    // una cuenta de Google con documento en administradores; sin ese documento, no.
+    await sembrar(entorno, async (db) => { await setDoc(doc(db, 'administradores/ejemplo-municipio'), { nombre: 'Municipio', alta: ts(Date.now()) }); });
+    const municipio = conProveedor(entorno, 'ejemplo-municipio', 'custom');
+    await assertSucceeds(getDoc(doc(municipio, 'administradores/ejemplo-municipio')));
+    await assertSucceeds(getDocs(collection(municipio, 'eventos')));
+    await assertSucceeds(getDocs(query(collectionGroup(municipio, 'reclamos'), orderBy('creadoEn', 'desc'), limit(10))));
+    await assertFails(getDocs(collection(conProveedor(entorno, 'ejemplo-abc123', 'custom'), 'eventos')));
     await assertSucceeds(getDoc(doc(vecino(entorno, 'anon'), 'usuarios/anon')));
   });
 });

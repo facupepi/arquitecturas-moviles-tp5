@@ -1,10 +1,12 @@
 // useAdmin() (WP3, sección 4.5): suscripciones del panel municipal. Solo se monta en
 // PanelMunicipal: { reclamos (con uid, últimos 50), eventos (últimos 20), cargando, error }.
-// useControlAdmin() y useResumenAdmin(): lo que hacen los vecinos con tributos y estacionamiento.
-import { useEffect, useMemo, useState } from 'react';
+// useControlAdmin(), useResumenAdmin() y usePatentesPagos(): lo que hacen los vecinos con tributos y
+// estacionamiento.
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { suscribirEventos, suscribirReclamosAdmin } from './repositorio';
 import {
-  resumenControlAdmin, suscribirPagosAdmin, suscribirSesionesActivasAdmin, suscribirTributosVencidosAdmin,
+  patenteSesionAdmin, resumenControlAdmin, suscribirPagosAdmin, suscribirSesionesActivasAdmin,
+  suscribirTributosVencidosAdmin,
 } from './repositorioPanel';
 
 export function useAdmin() {
@@ -111,6 +113,61 @@ export function useResumenAdmin(senal) {
   }, [senal, vuelta]);
 
   return estado;
+}
+
+// Los pagos de estacionamiento y de extensión guardan en refId el id de la sesión.
+const esDeSesion = (pago) => (pago?.tipo === 'estacionamiento' || pago?.tipo === 'extension')
+  && typeof pago.uid === 'string' && pago.uid !== '' && typeof pago.refId === 'string' && pago.refId !== '';
+const claveSesion = (uid, sesionId) => `${uid}/${sesionId}`;
+
+/**
+ * Patente de cada pago de estacionamiento o de extensión, siga activa la sesión o no: la de la escucha
+ * de sesiones (`sesiones`, las activas del panel) o, si no está ahí, una lectura puntual por sesión
+ * (patenteSesionAdmin, en caché por id; nunca una escucha por fila).
+ * Devuelve patenteDe(pago): la patente; null si la sesión no existe o no se pudo leer; undefined
+ * mientras se lee y en los pagos que no son de estacionamiento.
+ */
+export function usePatentesPagos(pagos, sesiones) {
+  const [leidas, setLeidas] = useState(() => new Map());   // clave de la sesión → patente o null
+  const montado = useRef(false);
+  useEffect(() => {
+    montado.current = true;
+    return () => { montado.current = false; };
+  }, []);
+
+  const activas = useMemo(
+    () => new Map(sesiones.filter((s) => typeof s.patente === 'string').map((s) => [claveSesion(s.uid, s.id), s.patente])),
+    [sesiones],
+  );
+  // Las sesiones de los pagos que no están en la escucha y todavía no se leyeron (sin repetir).
+  const faltan = useMemo(() => {
+    const porClave = new Map();
+    for (const p of pagos) {
+      if (!esDeSesion(p)) continue;
+      const clave = claveSesion(p.uid, p.refId);
+      if (!activas.has(clave) && !leidas.has(clave)) porClave.set(clave, { clave, uid: p.uid, sesionId: p.refId });
+    }
+    return [...porClave.values()];
+  }, [pagos, activas, leidas]);
+  const firma = faltan.map((f) => f.clave).join('|');
+
+  useEffect(() => {
+    if (!faltan.length) return;
+    // Todas a la vez y un solo cambio de estado por tanda. Si mientras tanto llega otro pago, la tanda
+    // nueva repite las pendientes, pero patenteSesionAdmin devuelve la misma lectura (no lee dos veces).
+    Promise.all(faltan.map(({ clave, uid, sesionId }) => patenteSesionAdmin(uid, sesionId)
+      .then((patente) => [clave, patente], () => [clave, null])))
+      .then((pares) => {
+        if (montado.current) setLeidas((previas) => new Map([...previas, ...pares]));
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firma]);
+
+  return useCallback((pago) => {
+    if (!esDeSesion(pago)) return undefined;
+    const clave = claveSesion(pago.uid, pago.refId);
+    return activas.has(clave) ? activas.get(clave) : leidas.get(clave);
+  }, [activas, leidas]);
 }
 
 export default useAdmin;

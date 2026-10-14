@@ -3,7 +3,8 @@
 // pasarela de Tributos y Estacionamiento.
 // Seguridad: de cada tarjeta se guarda tipo, red, últimos 4 dígitos, titular y vencimiento. El
 // número completo y el código de seguridad viven solo en el formulario y se descartan al guardar o
-// cerrar.
+// cerrar. "Guardando…" dura como máximo 15 s (repositorioTarjetas.guardarTarjeta): después llega el
+// error, con el diálogo otra vez cerrable, o el aviso de que la tarjeta quedó en la cola.
 import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useMunicipal } from '../../datos/almacen';
@@ -86,7 +87,12 @@ export default function Tarjetas() {
   const alta = useAltaTarjeta({
     alGuardar: (t) => {
       setAgregando(false);
-      aviso.mostrar({ titulo: 'Tarjeta guardada', cuerpo: `${textoTarjeta(t)} ya está lista para pagar.` });
+      // pendiente: el servidor no confirmó a tiempo y la tarjeta quedó en la cola (ya está en la lista).
+      if (t.pendiente) {
+        aviso.mostrar({ titulo: 'Estamos guardando tu tarjeta', cuerpo: `${textoTarjeta(t)} se termina de guardar cuando vuelva la conexión.` }, 'info');
+      } else {
+        aviso.mostrar({ titulo: 'Tarjeta guardada', cuerpo: `${textoTarjeta(t)} ya está lista para pagar.` });
+      }
     },
   });
   const quitar = useComando(repositorio.quitarTarjeta, {

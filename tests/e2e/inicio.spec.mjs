@@ -42,6 +42,31 @@ test.describe('Inicio', () => {
     expect(anchos.documento).toBeLessThanOrEqual(anchos.ventana);
   });
 
+  test('la grilla no deja huecos: cada fila termina en el borde del buscador y sus títulos van parejos', async ({ vecino }) => {
+    const { page } = vecino;
+    // Accesos por fila: 2 + 2 + 2 + 1 en el celular, 4 + 3 a 1024 y los siete juntos desde 1280.
+    for (const [ancho, alto, esperadas] of [[360, 740, [2, 2, 2, 1]], [1024, 768, [4, 3]], [1280, 800, [7]]]) {
+      await page.setViewportSize({ width: ancho, height: alto });
+      await abrirInicio(page);
+      await expect(page.getByTestId('grilla-servicios').locator('[data-testid^="servicio-"]')).toHaveCount(RUTAS.length);
+      await expect.poll(() => page.getByTestId('grilla-servicios').evaluate((grilla) => {
+        const derechaBuscador = document.querySelector('[role="search"]').getBoundingClientRect().right;
+        const filas = new Map();
+        for (const acceso of grilla.querySelectorAll('[data-testid^="servicio-"]')) {
+          const caja = acceso.getBoundingClientRect();
+          const fila = filas.get(Math.round(caja.top)) ?? [];
+          fila.push({ derecha: caja.right, dato: acceso.querySelector('[data-testid^="dato-"]').getBoundingClientRect().top });
+          filas.set(Math.round(caja.top), fila);
+        }
+        return [...filas.values()].map((fila) => ({
+          accesos: fila.length,
+          alBorde: Math.abs(Math.max(...fila.map((a) => a.derecha)) - derechaBuscador) <= 1,
+          parejos: Math.max(...fila.map((a) => a.dato)) - Math.min(...fila.map((a) => a.dato)) <= 1,
+        }));
+      }), `filas a ${ancho} px`).toEqual(esperadas.map((accesos) => ({ accesos, alBorde: true, parejos: true })));
+    }
+  });
+
   test('datos vivos y resumen del vecino, que cambian sin recargar', async ({ vecino, adminDb, restablecerCatalogo }) => {
     const { page, uid } = vecino;
     await abrirInicio(page);
@@ -52,7 +77,8 @@ test.describe('Inicio', () => {
     await expect(page.getByTestId('dato-reclamos')).toHaveText('Sin reclamos abiertos');
     await expect(page.getByTestId('dato-estacionamiento')).toHaveText('Sin sesión activa');
     await expect(page.getByTestId('dato-alarmas')).toHaveText('Ninguna activada');
-    await expect(page.getByTestId('servicio-tributos')).toHaveAttribute('aria-label', /Mis tributos: .*a pagar, 1 vencido/);
+    // Número y unidad van unidos por un espacio duro: \s lo acepta (toHaveText ya lo normaliza).
+    await expect(page.getByTestId('servicio-tributos')).toHaveAttribute('aria-label', /Mis tributos: .*a pagar, 1\svencido/);
 
     await expect(page.getByTestId('resumen-deuda-valor')).toHaveText(dinero(DEUDA));
     await expect(page.getByTestId('resumen-reclamos')).toContainText('Ninguno');
@@ -69,7 +95,7 @@ test.describe('Inicio', () => {
         extensiones: 0, ultimoPagoId: 'e2e-sesion-inicio', avisoPorVencer: false, avisoFinalizado: false,
         actualizadoEn: Timestamp.fromMillis(ahora),
       });
-      await expect(page.getByTestId('dato-estacionamiento')).toContainText(/Activo\s*(29|30) min/);
+      await expect(page.getByTestId('dato-estacionamiento')).toContainText(/Activo\s*(29|30)\smin/);
       await expect(page.getByTestId('servicio-estacionamiento')).toHaveAttribute('aria-label', /Activo, quedan (29|30) min/);
       await expect(page.getByTestId('resumen-estacionamiento')).toContainText('AB123CD');
 

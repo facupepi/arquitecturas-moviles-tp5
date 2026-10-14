@@ -11,8 +11,10 @@
 // usuario Google del emulador con documento en administradores, igual que el fixture `admin`.
 //
 // Con emuladores, el vecino es una cuenta de Google nueva del emulador de Auth (como el fixture
-// `vecino`). Contra la URL publicada solo se captura Ingreso: la app solo admite cuentas de Google y
-// el ingreso con una cuenta real no se automatiza (no hay acceso anónimo).
+// `vecino`). Contra la URL publicada solo se captura Ingreso: este script no abre sesiones en
+// producción. Las capturas del informe con sesión se tomaron en la app publicada con las cuentas de
+// ejemplo (uid "ejemplo-…", ver scripts/vecinos-ejemplo.mjs), cuya sesión se abre con un token
+// personalizado que solo puede emitir quien tiene la cuenta de servicio del proyecto.
 import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { deflateSync, crc32 } from 'node:zlib';
@@ -216,7 +218,7 @@ try {
   await vecino.getByTestId('pantalla-ingreso').waitFor({ timeout: 60_000 });
   await foto(vecino, 'ingreso');
   if (!EMULADORES) {
-    console.log('App publicada: solo se captura Ingreso (el resto exige una cuenta de Google real).');
+    console.log('App publicada: solo se captura Ingreso (este script no abre sesiones en producción).');
     break recorrido;
   }
 

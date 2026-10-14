@@ -5,7 +5,7 @@
 
 import { LIMITES } from './constantes.mjs';
 import { diaCordoba, ErrorDominio } from './dominio.mjs';
-import { dinero, fecha, hora } from './formato.mjs';
+import { ESPACIO_DURO, dinero, fecha, hora } from './formato.mjs';
 
 const MS_MINUTO = 60 * 1000;
 const MS_DIA = 24 * 60 * MS_MINUTO;
@@ -15,10 +15,11 @@ function diasCalendario(desdeMs, hastaMs) {
   return Math.round((Date.parse(diaCordoba(hastaMs)) - Date.parse(diaCordoba(desdeMs))) / MS_DIA);
 }
 
+// "vence en 2 días" con espacio duro: el número no queda al final de un renglón y "días" en el otro.
 function cuandoVence(dias) {
   if (dias <= 0) return 'vence hoy';
   if (dias === 1) return 'vence mañana';
-  return `vence en ${dias} días`;
+  return `vence en ${dias}${ESPACIO_DURO}días`;
 }
 
 // id: tributo-<tributoId>-<AAAA-MM-DD del vencimiento en Córdoba>-<por_vencer|vencido>

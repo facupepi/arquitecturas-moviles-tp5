@@ -5,7 +5,7 @@ import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { colores, espacio, medidas, radios } from '../../tema/tokens';
 import { Icono, Texto } from '../../ui';
-import { tiempoRelativo } from '../../../shared/formato.mjs';
+import { tiempoRelativo, unirNumeroYUnidad } from '../../../shared/formato.mjs';
 
 /** "#/tributos/T-1001" → "T-1001" */
 export function tributoDeDestino(destino) {
@@ -35,7 +35,7 @@ export default function Recordatorios({ recordatorios, ahora, onAbrir }) {
             <Icono nombre="campana" tamano={20} color={acento} />
             <View style={estilos.textos}>
               <Texto variante="chico" peso="700" color={colores.texto}>
-                {n.titulo}
+                {unirNumeroYUnidad(n.titulo)}
               </Texto>
               <Texto variante="chico" color={colores.textoSuave}>
                 {n.leida ? 'Recordatorio' : 'Nuevo recordatorio'} · {tiempoRelativo(n.creadoEn, Math.max(ahora, n.creadoEn ?? 0))}

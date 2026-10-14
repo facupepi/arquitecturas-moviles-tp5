@@ -3,7 +3,8 @@
 // el usuario sigue existiendo; al volver a entrar con la misma cuenta están los mismos datos;
 // borrado con confirmación que borra el usuario y sus datos (también las tarjetas); medios de pago
 // (agregar tarjeta con sus errores, tope de 5, quitar con confirmación, nunca el número completo en
-// Firestore); avisos del dispositivo, instalación, privacidad; accesibilidad.
+// Firestore, y un alta que no queda trabada en "Guardando…" si Firestore no responde); avisos del
+// dispositivo, instalación, privacidad; accesibilidad.
 import {
   test, expect, irA, entrarConGoogleFalso, NOMBRE_VECINO, sembrarTarjeta, TARJETAS_PRUEBA,
 } from './fixtures.mjs';
@@ -106,7 +107,8 @@ test.describe('Mi cuenta', () => {
     const seccion = page.getByTestId('cuenta-medios-pago');
     await expect(seccion.getByRole('heading', { name: 'Medios de pago' })).toBeVisible();
     await expect(page.getByTestId('sin-tarjetas')).toContainText('Todavía no guardaste tarjetas');
-    await expect(page.getByTestId('nota-seguridad-tarjetas')).toHaveCount(0);
+    // El código de seguridad se pide (y se descarta): ningún texto dice lo contrario.
+    await expect(page.getByTestId('pantalla-cuenta')).not.toContainText(/nunca te pedimos el código/i);
     await expect(page.getByTestId('dato-tarjetas')).toContainText('0');
 
     // El diálogo de alta: tipo, número, titular, vencimiento y código de seguridad (oculto).
@@ -203,6 +205,32 @@ test.describe('Mi cuenta', () => {
     // Con un lugar libre vuelve "Agregar tarjeta" y recibe el foco.
     await expect(page.getByTestId('agregar-tarjeta')).toBeVisible();
     await expect(page.getByTestId('agregar-tarjeta')).toBeFocused();
+  });
+
+  test('alta de tarjeta con Firestore sin responder: "Guardando…" termina con un error y el diálogo se cierra', async ({ vecino, adminDb }) => {
+    const { page, uid, contexto } = vecino;
+    await abrirCuenta(page);
+    await page.getByTestId('agregar-tarjeta').click();
+    await dialogo(page, 'dialogo-tarjeta');
+    await page.getByTestId('tarjeta-tipo-credito').click();
+    await page.getByTestId('tarjeta-numero').fill('5555555555554444');
+    await page.getByTestId('tarjeta-titular').fill('Vecina Prueba');
+    await page.getByTestId('tarjeta-vence').fill('0931');
+    await page.getByTestId('tarjeta-codigo').fill('321');
+    // Firestore deja de contestar sin que el navegador lo note (navigator.onLine sigue en true).
+    const firestore = /google\.firestore\.v1\.Firestore\//;
+    await contexto.route(firestore, () => {});   // sin respuesta
+    await page.getByTestId('guardar-tarjeta').click();
+    await expect(page.getByTestId('guardar-tarjeta')).toContainText('Guardando');
+    // A los 15 s como máximo: el error en el pie y el diálogo otra vez se puede cerrar.
+    await expect(page.getByTestId('error-guardar-tarjeta')).toContainText('No se pudo guardar la tarjeta', { timeout: 25_000 });
+    await expect(page.getByTestId('guardar-tarjeta')).toHaveText('Guardar tarjeta');
+    await page.getByTestId('cancelar-tarjeta').click();
+    await expect(page.getByTestId('dialogo-tarjeta')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="tarjeta-guardada-"]')).toHaveCount(0);
+    await contexto.unroute(firestore);
+    // No se escribió nada: sin la lectura de las tarjetas guardadas, el alta no llega a escribir.
+    expect((await adminDb.collection(`usuarios/${uid}/tarjetas`).get()).size).toBe(0);
   });
 
   test('avisos del dispositivo, instalación y privacidad', async ({ vecino, adminDb }) => {

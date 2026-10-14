@@ -18,6 +18,23 @@ const CENTRO_POR_DEFECTO = [-31.429, -62.082]; // municipal/info.centroMapa
 const ATRIBUCION =
   '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>';
 
+// Al tocar el mapa, Leaflet le da el foco a su contenedor (para las flechas del teclado) y solo
+// restaura el desplazamiento de window. Acá la que se desplaza es la pantalla, no window: con el mapa
+// en parte fuera de la vista (fijo y empujado arriba al final de la lista, o en el celular), el foco
+// movía la pantalla entre el mousedown y el click, y el toque caía afuera del marcador. Se enfoca sin
+// desplazar. Lo mismo al usar los botones de zoom. Se aplica una vez, antes de crear cualquier mapa.
+L.Map.Keyboard.include({
+  _onMouseDown() {
+    if (!this._focused) this._map._container.focus({ preventScroll: true });
+  },
+});
+L.Control.include({
+  _refocusOnMap(e) {
+    // Como el original: solo con el puntero (un clic de teclado trae screenX en 0).
+    if (this._map && e && e.screenX > 0 && e.screenY > 0) this._map.getContainer().focus({ preventScroll: true });
+  },
+});
+
 // Botones de zoom de 44 × 44 (Leaflet los trae de 30 px, debajo del mínimo táctil). Se inyecta una
 // sola vez desde este archivo .web: el resto de la app no escribe CSS.
 let estiloInyectado = false;
@@ -90,7 +107,9 @@ export default function MapaLeaflet({ puntos = [], seleccionado, enfoque = 0, on
     nodo.setAttribute('aria-label', etiqueta || 'Mapa de San Francisco, Córdoba');
     anfitrion.appendChild(nodo);
 
-    const instancia = L.map(nodo, { scrollWheelZoom: false, zoomControl: false }).setView(CENTRO_POR_DEFECTO, 14);
+    // zoomSnap 0.25: el encuadre inicial puede quedar entre dos niveles. Con niveles enteros, a 360 px
+    // las estaciones no entraban en el 13 y el 12 las dejaba encimadas (un toque elegía la vecina).
+    const instancia = L.map(nodo, { scrollWheelZoom: false, zoomControl: false, zoomSnap: 0.25 }).setView(CENTRO_POR_DEFECTO, 14);
     L.control.zoom({ zoomInTitle: 'Acercar', zoomOutTitle: 'Alejar' }).addTo(instancia);
     instancia.setMinZoom(3);
     const teselas = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {

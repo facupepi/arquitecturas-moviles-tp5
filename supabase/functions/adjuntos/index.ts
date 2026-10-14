@@ -18,8 +18,10 @@ function adjuntoInvalido(estado: number, mensaje: string): ErrorHttp {
   return new ErrorHttp(estado, "adjunto-invalido", mensaje);
 }
 
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const h = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+// Recibe el ArrayBuffer del archivo: un Uint8Array cualquiera no siempre cumple con BufferSource en los
+// tipos de las versiones nuevas de TypeScript.
+async function sha256Hex(contenido: ArrayBuffer): Promise<string> {
+  const h = new Uint8Array(await crypto.subtle.digest("SHA-256", contenido));
   return Array.from(h, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
@@ -47,7 +49,8 @@ async function subir(req: Request) {
   if (archivo.size > BYTES_MAX) throw adjuntoInvalido(413, "El archivo supera los 2 MB.");
   if (archivo.size === 0) throw adjuntoInvalido(400, "El archivo está vacío.");
 
-  const bytes = new Uint8Array(await archivo.arrayBuffer());
+  const contenido = await archivo.arrayBuffer();
+  const bytes = new Uint8Array(contenido);
   if (bytes.length > BYTES_MAX) throw adjuntoInvalido(413, "El archivo supera los 2 MB.");
   const tipo = tipoPorFirma(bytes) as string | null;
   if (!tipo || !EXTENSIONES[tipo]) throw adjuntoInvalido(400, "Solo se admiten imágenes JPG o PNG y archivos PDF.");
@@ -58,7 +61,7 @@ async function subir(req: Request) {
 
   const extension = EXTENSIONES[tipo];
   const nombre = recortarNombreArchivo(archivo.name || `adjunto.${extension}`) as string;
-  const hash = (await sha256Hex(bytes)).slice(0, 12);
+  const hash = (await sha256Hex(contenido)).slice(0, 12);
   const ruta = `${id.uid}/${reclamoId}/${indice}-${hash}.${extension}`;
   // Tope por vecino; un reintento del mismo archivo (misma ruta) no suma.
   const propios = await listarArchivos(id.uid);

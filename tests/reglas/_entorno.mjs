@@ -35,7 +35,8 @@ export function anonimo(entorno, uid) {
   return entorno.authenticatedContext(uid, { firebase: { sign_in_provider: 'anonymous' } }).firestore();
 }
 
-// Sesión con otro proveedor ('password', 'custom', ...): tampoco es de Google, las reglas la rechazan.
+// Sesión con otro proveedor ('password', 'custom', ...): tampoco es de Google, las reglas la rechazan
+// (salvo 'custom' con uid "ejemplo-…": las cuentas de ejemplo).
 export function conProveedor(entorno, uid, proveedor) {
   return entorno.authenticatedContext(uid, { firebase: { sign_in_provider: proveedor } }).firestore();
 }

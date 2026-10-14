@@ -2,6 +2,12 @@
 // Alto mínimo 48. Con `cargando` muestra un indicador y queda deshabilitado.
 // Con `href` abre el enlace con abrirEnlace (tel:, mailto:, sms: en la misma ventana; https: aparte).
 // `ref` llega al Pressable (para llevarle el foco).
+// La variante texto se lee como un enlace: un margen negativo a la izquierda descuenta su relleno y su
+// borde, así el ícono o el texto quedan alineados con la columna ("‹ Mis reclamos", "Terminar
+// ahora") sin achicar el área táctil ni el fondo al pasar el puntero. A la derecha no cambia: al
+// final de una fila ("Quitar") queda donde estaba. Si va en una fila después de otro botón o de un
+// texto, `enLinea` conserva el relleno como separación. Con `href` es lo predeterminado: los enlaces
+// van dentro de una frase o de una fila de botones ("¿Necesitás ayuda? Llamar al 147", "Sitio web").
 import React, { forwardRef } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { colores, espacio, medidas, radios, tipografia } from '../tema/tokens';
@@ -30,6 +36,7 @@ const Boton = forwardRef(function Boton({
   href,
   externo,
   ancho = 'auto',
+  enLinea = Boolean(href),
   etiquetaAccesible,
   testID,
 }, ref) {
@@ -67,6 +74,7 @@ const Boton = forwardRef(function Boton({
           opacity: deshabilitado && !cargando ? 0.5 : 1,
         },
         variante === 'texto' && estilos.texto,
+        variante === 'texto' && !enLinea && estilos.textoAlineado,
         ancho === 'completo' ? estilos.completo : estilos.auto,
       ]}
     >
@@ -110,6 +118,8 @@ const estilos = StyleSheet.create({
     cursor: 'pointer',
   },
   texto: { paddingHorizontal: espacio.m },
+  // Relleno más el borde de 1 px.
+  textoAlineado: { marginLeft: -(espacio.m + 1) },
   textoSubrayado: { textDecorationLine: 'underline', fontFamily: tipografia.familia },
   auto: { alignSelf: 'flex-start' },
   completo: { alignSelf: 'stretch' },

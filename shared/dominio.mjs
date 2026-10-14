@@ -173,8 +173,8 @@ export function codigoPagoTributo(tributo) {
 }
 
 // ---------- Tarjetas guardadas (medios de pago) ----------
-// El número completo solo pasa por estas funciones para validarlo y sacar la red y los últimos 4:
-// lo que devuelven nunca lo incluye. No se pide ni se acepta el código de seguridad.
+// El alta (shared/tarjetas.mjs) valida el número completo y el código de seguridad (3 dígitos, 4 en
+// American Express) y los descarta: a estas funciones solo llegan tipo, red, últimos 4 y vencimiento.
 
 export const PATRON_VENCE = /^(0[1-9]|1[0-2])\/[0-9]{2}$/;   // el mismo de firestore.rules
 const PATRON_ULTIMOS4 = /^[0-9]{4}$/;

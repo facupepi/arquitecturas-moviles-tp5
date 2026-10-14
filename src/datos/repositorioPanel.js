@@ -1,12 +1,12 @@
 // Control municipal del panel: pagos y estacionamiento de todos los vecinos. Va en un módulo aparte
 // para que solo lo descargue el administrador al abrir el panel, y no pese en la carga inicial.
 import {
-  collectionGroup, count, doc, getAggregateFromServer, limit, orderBy, query, runTransaction, serverTimestamp, sum,
-  Timestamp, where,
+  collectionGroup, count, doc, getAggregateFromServer, getDoc, limit, orderBy, query, runTransaction, serverTimestamp,
+  sum, Timestamp, where,
 } from 'firebase/firestore';
 import { db } from '../firebase/firestore';
 import { ErrorApp } from './errores';
-import { pagoDeGrupoDesdeDoc, sesionDeGrupoDesdeDoc, tributoDeGrupoDesdeDoc } from './mapeadores';
+import { pagoDeGrupoDesdeDoc, patenteDesdeDoc, sesionDeGrupoDesdeDoc, tributoDeGrupoDesdeDoc } from './mapeadores';
 import { conErrores, escucharColeccion, exigirConexion, refDe, uidActual } from './repositorio';
 import { inicioDiaCordoba, inicioMesCordoba } from '../../shared/dominio.mjs';
 import { COLECCIONES as C } from '../../shared/constantes.mjs';
@@ -32,6 +32,27 @@ export function suscribirSesionesActivasAdmin(limite = 200, alCambiar, alFallar)
     query(collectionGroup(db, C.estacionamiento), where('fin', '>', Timestamp.now()), orderBy('fin', 'asc'), limit(limite)),
     sesionDeGrupoDesdeDoc, alCambiar, alFallar,
   );
+}
+
+// Patente de la sesión de un pago de estacionamiento o de extensión (refId), siga activa o no: el
+// administrador lee usuarios/{uid}/estacionamiento/{id} (match /{ruta=**}/estacionamiento de las reglas).
+// Lectura puntual, una sola vez por sesión: la patente no cambia en toda la sesión, así que queda en
+// memoria por id y la tabla de pagos no abre una escucha por fila. Resuelve null si la sesión no existe
+// o no se pudo leer; en ese caso se olvida, para volver a intentar la próxima vez que se pida.
+const patentesSesion = new Map();   // `${uid}/${sesionId}` → Promise<string | null>
+
+export function patenteSesionAdmin(uid, sesionId) {
+  if (typeof uid !== 'string' || !uid || typeof sesionId !== 'string' || !sesionId) return Promise.resolve(null);
+  const clave = `${uid}/${sesionId}`;
+  if (!patentesSesion.has(clave)) {
+    patentesSesion.set(clave, Promise.resolve()
+      .then(() => getDoc(refDe(uid, C.estacionamiento, sesionId)))
+      .then(patenteDesdeDoc, () => {
+        patentesSesion.delete(clave);
+        return null;
+      }));
+  }
+  return patentesSesion.get(clave);
 }
 
 // Cedulones sin pagar, del más atrasado al más reciente (índice pagadoEn + vence). No se corta por

@@ -15,12 +15,13 @@ import {
   Cargando, ErrorCarga, EtiquetaEstado, Icono, Pantalla, Seccion, Tarjeta, Texto, Vacio, anchoContenidoEstimado,
 } from '../ui';
 import { alPresionarEspacio, conFoco } from '../ui/comun';
-import { dinero, fecha, hora, tiempoRelativo, tiempoPasado } from '../../shared/formato.mjs';
+import {
+  ESPACIO_DURO, dinero, fecha, hora, tiempoRelativo, tiempoPasado, unirNumeroYUnidad,
+} from '../../shared/formato.mjs';
 import { ETIQUETAS } from '../../shared/constantes.mjs';
 
 const MIN = 60_000;
 const GAP = espacio.s;
-const GAP_ANCHO = espacio.m;
 const SALTO = '\n';
 
 // Palabras con las que un vecino busca cada servicio (sin tildes: se comparan normalizadas).
@@ -74,7 +75,8 @@ function coincide(texto, consulta) {
   return normalizar(consulta).split(/\s+/).filter(Boolean).every((palabra) => base.includes(palabra));
 }
 
-const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+// Con espacio duro: el número no queda al final de un renglón y lo que cuenta en el otro.
+const plural = (n, uno, varios) => `${n}${ESPACIO_DURO}${n === 1 ? uno : varios}`;
 
 // ---------- Datos derivados ----------
 
@@ -148,14 +150,16 @@ function datoDe(ruta, r) {
       if (r.consultandoTributos) return { texto: 'Consultando…', tono: 'normal' };
       if (!r.impagos.length) return { texto: 'Estás al día', tono: 'exito' };
       // Dos renglones cortos: entran en el acceso angosto sin cortar una frase a la mitad.
-      const aPagar = `${r.impagos.length} a pagar`;
+      const aPagar = `${r.impagos.length}${ESPACIO_DURO}a pagar`;
       if (r.vencidos.length) return { texto: [aPagar, plural(r.vencidos.length, 'vencido', 'vencidos')].join(SALTO), tono: 'peligro' };
       if (r.porVencer.length) return { texto: [aPagar, 'vence pronto'].join(SALTO), tono: 'alerta' };
       return { texto: aPagar, tono: 'normal' };
     }
     case 'reclamos':
+      // "1 abierto", como "Reclamos abiertos" del resumen: "1 en seguimiento" se partía en "1 en" y
+      // "seguimiento" en el acceso angosto.
       return conError('reclamos') ?? (r.abiertos.length
-        ? { texto: plural(r.abiertos.length, 'en seguimiento', 'en seguimiento'), tono: 'normal' }
+        ? { texto: plural(r.abiertos.length, 'abierto', 'abiertos'), tono: 'normal' }
         : { texto: 'Sin reclamos abiertos', tono: 'normal' });
     case 'contactos':
       return { texto: '147 y WhatsApp', tono: 'normal' };
@@ -170,7 +174,7 @@ function datoDe(ruta, r) {
       if (!sesion) return { texto: 'Sin sesión activa', tono: 'normal' };
       const minutos = Math.max(1, Math.ceil((sesion.fin - r.ahora) / MIN));
       // "quedan N min" no entra en el acceso angosto: se ve "Activo / N min" y se lee completo.
-      return { texto: ['Activo', `${minutos} min`].join(SALTO), accesible: `Activo, quedan ${minutos} min`, tono: 'exito' };
+      return { texto: ['Activo', `${minutos}${ESPACIO_DURO}min`].join(SALTO), accesible: `Activo, quedan ${minutos} min`, tono: 'exito' };
     }
     case 'notificaciones':
       return conError('notificaciones') ?? (r.noLeidas > 0
@@ -231,7 +235,7 @@ function Buscador({ valor, onCambio, onEnviar }) {
 
 // ---------- Grilla de servicios ----------
 
-function Acceso({ servicio, dato, ancho, completo, vertical, onPress }) {
+function Acceso({ servicio, dato, completo, vertical, onPress }) {
   const etiqueta = ETIQUETA_TILE[servicio.ruta] ?? servicio.corto;
   const textos = (
     <>
@@ -255,9 +259,8 @@ function Acceso({ servicio, dato, ancho, completo, vertical, onPress }) {
       onPress={onPress}
       etiquetaAccesible={`${servicio.nombre}: ${dato.accesible ?? dato.texto.split(SALTO).join(', ')}`}
       testID={`servicio-${servicio.ruta}`}
-      // En la fila única de escritorio cada acceso toma una parte igual del ancho (flex), sin
-      // anchos calculados que por un píxel de redondeo manden el último a otra fila.
-      estilo={[estilos.acceso, vertical ? estilos.accesoFlexible : { width: ancho }, vertical && estilos.accesoVertical]}
+      // Cada acceso toma una parte igual del ancho de su fila (flex), sin anchos calculados.
+      estilo={[estilos.acceso, vertical && estilos.accesoVertical]}
     >
       {vertical ? (
         // Escritorio: los siete accesos en una sola fila, con el ícono arriba.
@@ -279,51 +282,68 @@ function Acceso({ servicio, dato, ancho, completo, vertical, onPress }) {
   );
 }
 
-// Ancho desde el que los siete accesos entran en una fila (unos 130 px cada uno, con el ícono arriba).
-const ANCHO_FILA_UNICA = 980;
+// Columnas según el ancho de la grilla, para que ningún texto se corte (medido en Quicksand):
+// - Los siete en una fila, con el ícono arriba, desde que a cada acceso le quedan 106 px para el
+//   nombre: "Notificaciones", el más largo, mide 103 en 15 px negrita (7 × (106 + 2 × 10 de relleno
+//   + 2 de borde) + 6 separaciones de 8 = 944; entra en 1280 aunque haya barra de desplazamiento).
+// - Cuatro columnas (4 + 3), con el ícono al costado, desde que la primera fila deja 86 px para el
+//   dato, como en un celular de 360: "vence pronto" y "Consultando…" entran en un renglón
+//   (4 × (86 + 38 de ícono + 10 + 2 × 12 de relleno + 2 de borde) + 3 × 8 = 664).
+// - Si no, dos columnas.
+const ANCHO_FILA_UNICA = 944;
+const ANCHO_CUATRO_COLUMNAS = 664;
 
 function columnasPara(ancho, cantidad) {
   if (ancho >= ANCHO_FILA_UNICA) return Math.max(1, cantidad);
-  if (ancho >= 760) return 4;
-  if (ancho >= 500) return 3;
-  return 2;
+  return ancho >= ANCHO_CUATRO_COLUMNAS ? 4 : 2;
 }
 
+/**
+ * Cuántos accesos van en cada fila, parejos y sin huecos: 7 en 4 columnas, 4 + 3; en 2 columnas,
+ * 2 + 2 + 2 + 1 (el último, solo, ocupa la fila entera con su nombre completo).
+ */
+function repartir(cantidad, columnas) {
+  const filas = Math.ceil(cantidad / columnas);
+  return Array.from({ length: filas }, (_, i) => Math.floor(cantidad / filas) + (i < cantidad % filas ? 1 : 0));
+}
+
+// Cada fila reparte su ancho entre sus accesos (flex): todas terminan justo en el borde de la grilla,
+// como el buscador, sin anchos calculados que dejen píxeles de más o de menos.
 function Grilla({ servicios, resumen, onElegir }) {
   const { width } = useWindowDimensions();
   const [medido, setMedido] = useState(null);
   const ancho = medido ?? anchoContenidoEstimado(width);
-  const columnas = columnasPara(ancho, servicios.length);
   const vertical = ancho >= ANCHO_FILA_UNICA;
-  const gap = vertical ? GAP_ANCHO : GAP;
-  // Un píxel de margen: el redondeo del navegador no debe pasar un acceso a la fila siguiente.
-  const anchoAcceso = Math.floor((ancho - gap * (columnas - 1)) / columnas) - 1;
-  const sobrante = servicios.length % columnas;
+  let desde = 0;
+  const filas = repartir(servicios.length, columnasPara(ancho, servicios.length)).map((cantidad) => {
+    desde += cantidad;
+    return servicios.slice(desde - cantidad, desde);
+  });
 
   return (
     <View
       testID="grilla-servicios"
-      style={[estilos.grilla, { gap }, vertical && estilos.grillaFilaUnica]}
+      style={estilos.grilla}
       onLayout={(e) => {
-        const w = Math.round(e.nativeEvent.layout.width);
+        // Hacia abajo, como useAncho de Disposicion: el ancho solo elige cuántas columnas van.
+        const w = Math.floor(e.nativeEvent.layout.width);
         if (w > 0 && w !== medido) setMedido(w);
       }}
     >
-      {servicios.map((servicio, i) => {
-        // Con dos o tres columnas, el último acceso solo en su fila ocupa todo el ancho.
-        const completo = sobrante === 1 && columnas < 4 && i === servicios.length - 1;
-        return (
-          <Acceso
-            key={servicio.ruta}
-            servicio={servicio}
-            dato={datoDe(servicio.ruta, resumen)}
-            ancho={completo ? ancho : anchoAcceso}
-            completo={completo}
-            vertical={vertical}
-            onPress={() => onElegir(servicio.ruta)}
-          />
-        );
-      })}
+      {filas.map((fila) => (
+        <View key={fila[0].ruta} style={estilos.filaAccesos}>
+          {fila.map((servicio) => (
+            <Acceso
+              key={servicio.ruta}
+              servicio={servicio}
+              dato={datoDe(servicio.ruta, resumen)}
+              completo={fila.length === 1 && !vertical}
+              vertical={vertical}
+              onPress={() => onElegir(servicio.ruta)}
+            />
+          ))}
+        </View>
+      ))}
     </View>
   );
 }
@@ -456,7 +476,7 @@ function Resumen({ r, navegar }) {
     ? { valor: 'No disponible', detalle: 'No pudimos consultar tus sesiones.', tono: 'normal' }
     : sesion
       ? {
-        valor: `Quedan ${Math.max(1, Math.ceil((sesion.fin - r.ahora) / MIN))} min`,
+        valor: `Quedan ${Math.max(1, Math.ceil((sesion.fin - r.ahora) / MIN))}${ESPACIO_DURO}min`,
         detalle: `${sesion.patente} en ${sesion.zonaNombre}, hasta las ${hora(sesion.fin)}.${r.activas.length > 1 ? ` Y ${plural(r.activas.length - 1, 'sesión más', 'sesiones más')}.` : ''}`,
         tono: 'exito',
       }
@@ -466,7 +486,7 @@ function Resumen({ r, navegar }) {
   const avisos = errorDe('notificaciones')
     ? { valor: 'No disponible', detalle: 'No pudimos consultar tus avisos.', tono: 'normal' }
     : r.noLeidas > 0
-      ? { valor: String(r.noLeidas), detalle: `Último: ${r.primeraNoLeida?.titulo ?? 'tenés avisos nuevos'}.`, tono: 'alerta' }
+      ? { valor: String(r.noLeidas), detalle: `Último: ${unirNumeroYUnidad(r.primeraNoLeida?.titulo) ?? 'tenés avisos nuevos'}.`, tono: 'alerta' }
       : { valor: 'Ninguno', detalle: 'Estás al día con tus avisos.', tono: 'exito' };
 
   return (
@@ -540,9 +560,9 @@ function UltimoAviso({ r, navegar, estirar = false }) {
         {aviso.leida ? null : <EtiquetaEstado texto="Nuevo" tono="info" />}
         <EtiquetaEstado texto={zona ? `${tipo} · ${zona}` : tipo} tono="neutro" />
       </View>
-      <Texto variante="titulo3">{aviso.titulo}</Texto>
+      <Texto variante="titulo3">{unirNumeroYUnidad(aviso.titulo)}</Texto>
       <Texto variante="cuerpo" color={colores.textoSuave} numberOfLines={3}>
-        {aviso.cuerpo}
+        {unirNumeroYUnidad(aviso.cuerpo)}
       </Texto>
       {estirar ? <View style={estilos.flexible} /> : null}
       <View style={estilos.avisoPie}>
@@ -673,11 +693,27 @@ const estilos = StyleSheet.create({
     cursor: 'pointer',
   },
   borrarResaltado: { backgroundColor: colores.fondo },
-  grilla: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
-  grillaFilaUnica: { flexWrap: 'nowrap' },
-  accesoFlexible: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 },
-  acceso: { padding: espacio.m, gap: 0, alignSelf: 'auto', minHeight: 76, justifyContent: 'center' },
-  accesoVertical: { minHeight: 0, justifyContent: 'flex-start', alignItems: 'flex-start', gap: espacio.s, paddingVertical: espacio.l },
+  grilla: { gap: GAP },
+  filaAccesos: { flexDirection: 'row', gap: GAP },
+  acceso: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    padding: espacio.m,
+    gap: 0,
+    alignSelf: 'auto',
+    minHeight: 76,
+    justifyContent: 'center',
+  },
+  accesoVertical: {
+    minHeight: 0,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    gap: espacio.s,
+    paddingVertical: espacio.l,
+    paddingHorizontal: 10,
+  },
   accesoIconoVertical: { width: 42, height: 42 },
   accesoTextosVertical: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', alignSelf: 'stretch' },
   accesoFila: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -691,7 +727,9 @@ const estilos = StyleSheet.create({
   },
   accesoTextos: { flex: 1, minWidth: 0, gap: 1 },
   accesoNombre: { fontSize: 15, lineHeight: 20 },
-  accesoDato: { fontSize: 13, lineHeight: 17 },
+  // Siempre dos renglones para el dato: el nombre y el ícono quedan a la misma altura en toda la fila
+  // aunque un dato ocupe uno solo ("147 y WhatsApp" al lado de "1 a pagar / 1 vencido").
+  accesoDato: { fontSize: 13, lineHeight: 17, minHeight: 34 },
   atajos: { gap: espacio.s },
   atajo: { paddingVertical: espacio.m },
   resumen: { gap: espacio.m },

@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import {
   convertirFechas, desdeDoc, configDesdeDoc, estacionDesdeDoc, alarmaDesdeDoc, perfilDesdeDoc,
   tributoDesdeDoc, reclamoDesdeDoc, reclamoDeGrupoDesdeDoc, sesionDesdeDoc, notificacionDesdeDoc,
-  avisoDesdeDoc, contactoDesdeDoc, eventoDesdeDoc, metaDe, pagoDesdeDoc, tarjetaDesdeDoc, tarjetaEnmascarada,
+  avisoDesdeDoc, contactoDesdeDoc, eventoDesdeDoc, metaDe, pagoDesdeDoc, patenteDesdeDoc, tarjetaDesdeDoc,
+  tarjetaEnmascarada,
 } from '../../src/datos/mapeadores.js';
 
 // Timestamp falso con la misma interfaz que usa el mapeador.
@@ -117,6 +118,14 @@ test('sesión de estacionamiento', () => {
   }));
   assert.equal(s.fin, 1_800_000);
   assert.equal(s.avisoPorVencer, false);
+});
+
+test('patenteDesdeDoc: la patente de la sesión, o null si la sesión no existe o no la tiene', () => {
+  assert.equal(patenteDesdeDoc(snap('ses-1', { patente: 'AB123CD', fin: ts(9), minutos: 30 })), 'AB123CD');
+  assert.equal(patenteDesdeDoc(snap('ses-2', {}, { existe: false })), null);
+  assert.equal(patenteDesdeDoc(snap('ses-3', { patente: 123 })), null);
+  assert.equal(patenteDesdeDoc(snap('ses-4', { fin: ts(9) })), null);
+  assert.equal(patenteDesdeDoc(null), null);
 });
 
 test('notificación, aviso, contacto y evento', () => {

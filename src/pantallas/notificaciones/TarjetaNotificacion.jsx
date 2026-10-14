@@ -5,7 +5,7 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Icono, Tarjeta, Texto } from '../../ui';
 import { colores, espacio, radios } from '../../tema/tokens';
-import { tiempoPasado } from '../../../shared/formato.mjs';
+import { tiempoPasado, unirNumeroYUnidad } from '../../../shared/formato.mjs';
 import { estiloTipo, etiquetaTipo, etiquetaZona } from './presentacion';
 
 export default function TarjetaNotificacion({ notificacion: n, ahora, onAbrir }) {
@@ -30,11 +30,11 @@ export default function TarjetaNotificacion({ notificacion: n, ahora, onAbrir })
         </View>
         <View style={estilos.textos}>
           <Texto variante="cuerpo" peso="700" numberOfLines={2}>
-            {n.titulo}
+            {unirNumeroYUnidad(n.titulo)}
           </Texto>
           {n.cuerpo ? (
             <Texto variante="chico" color={colores.textoSuave} numberOfLines={2}>
-              {n.cuerpo}
+              {unirNumeroYUnidad(n.cuerpo)}
             </Texto>
           ) : null}
           <View style={estilos.meta}>

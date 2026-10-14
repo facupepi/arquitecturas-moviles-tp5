@@ -375,7 +375,13 @@ test('revisarTarjeta: el código de seguridad se valida y nunca se devuelve', ()
   const base = { tipo: 'credito', numero: '4242424242424242', titular: 'Ana Paz', vence: '12/30' };
   assert.equal(revisarTarjeta({ ...base, codigo: '' }, ahora).errores.codigo, 'Ingresá el código de seguridad.');
   assert.equal(revisarTarjeta({ ...base, codigo: '12' }, ahora).errores.codigo, 'Son 3 números, al dorso de la tarjeta.');
-  assert.equal(revisarTarjeta({ ...base, numero: '378282246310005', codigo: '123' }, ahora).errores.codigo, 'Son 4 números, al dorso de la tarjeta.');
+  assert.equal(revisarTarjeta({ ...base, codigo: '1234' }, ahora).errores.codigo, 'Son 3 números, al dorso de la tarjeta.');
+  // American Express: 4 números, impresos en el frente (no al dorso).
+  const amex = { ...base, numero: '3782 822463 10005' };
+  for (const codigo of ['123', '12', '12345']) {
+    assert.equal(revisarTarjeta({ ...amex, codigo }, ahora).errores.codigo, 'Son 4 números, en el frente de la tarjeta, arriba del número.');
+  }
+  assert.equal(revisarTarjeta({ ...amex, codigo: '1234' }, ahora).errores.codigo, undefined);
   const { tarjeta } = revisarTarjeta({ ...base, codigo: '123' }, ahora);
   assert.ok(tarjeta);
   assert.equal(JSON.stringify(tarjeta).includes('123'), false);

@@ -75,8 +75,15 @@ const estilos = StyleSheet.create({
   contenedor: { flexGrow: 1, minWidth: 0 },
   tarjeta: { flexGrow: 1, minWidth: 0 },
   // Borde de 3 px de contraste suficiente y etiqueta "Elegida en el mapa" (no solo color); el
-  // relleno baja lo que sube el borde, así el contenido no se mueve.
-  elegida: { borderColor: colores.alerta, borderWidth: 3, padding: espacio.l - 2 },
+  // relleno baja lo que sube el borde, así el contenido no se mueve. En una activada, el borde de la
+  // elegida reemplaza también al acento rojo de la izquierda: un solo borde, de un solo color.
+  elegida: {
+    borderColor: colores.alerta,
+    borderWidth: 3,
+    borderLeftColor: colores.alerta,
+    borderLeftWidth: 3,
+    padding: espacio.l - 2,
+  },
   cabecera: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.s },
   titulo: { flex: 1, minWidth: 0 },
   etiqueta: { flexShrink: 0, paddingTop: 1 },

@@ -1,5 +1,6 @@
 // Nota académica (WP5, 7.4). Ya no hay franja en cada pantalla: el texto se muestra solo en el pie
-// institucional, en la pantalla de ingreso y en el cedulón. Sale de Remote Config
+// institucional, en la pantalla de ingreso y, como una línea discreta al final, en el cedulón
+// impreso (plataforma/cedulon.web.js). Sale de Remote Config
 // (leyenda_prototipo) con su respaldo: si llega vacío o con menos de 20 caracteres se usa el valor
 // por defecto.
 import { useConfigRemota } from '../firebase/configRemota';

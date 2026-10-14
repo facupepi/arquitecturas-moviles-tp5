@@ -103,10 +103,13 @@ function patenteAlAzar() {
   return `${l()}${l()}${d()}${d()}${d()}${l()}${l()}`;
 }
 
-/** Sesión activa de un vecino como la deja iniciarEstacionamiento: sesión + bloqueo + pago. */
-async function crearSesion(adminDb, uid, { id, patente, minutos = 30 }) {
+/**
+ * Sesión activa de un vecino como la deja iniciarEstacionamiento: sesión + bloqueo + pago. Con
+ * terminadaHaceMin, una sesión que ya terminó hace esos minutos (con el bloqueo también vencido).
+ */
+async function crearSesion(adminDb, uid, { id, patente, minutos = 30, terminadaHaceMin = null }) {
   const zona = catalogo().zonasEstacionamiento[0];
-  const ahora = Date.now();
+  const ahora = Date.now() - (terminadaHaceMin == null ? 0 : (minutos + terminadaHaceMin) * 60_000);
   const fin = Timestamp.fromMillis(ahora + minutos * 60_000);
   const importe = Math.round((zona.tarifaHora * minutos) / 60);
   const lote = adminDb.batch();
@@ -381,6 +384,19 @@ test.describe('Panel municipal', () => {
     await expect(page.locator('[data-testid^="pago-panel-"]')).toHaveCount(1);
     await page.getByTestId('buscar-pagos-panel').fill(codigoVecino(vecino.uid));
     await expect(fila).toBeVisible();
+
+    // Estacionamiento: la patente sale de la sesión del pago (refId) aunque ya haya terminado y no esté en
+    // la escucha de sesiones activas. Si la sesión no existe, un texto neutro en lugar de la patente.
+    const idTerminada = `${Date.now().toString(36)}-e2e-ses`;
+    const patente = patenteAlAzar();
+    await crearSesion(adminDb, vecino.uid, { id: idTerminada, patente, minutos: 15, terminadaHaceMin: 1 });
+    await expect(page.getByTestId(`pago-panel-${idTerminada}`)).toContainText(patente, { timeout: 10_000 });
+    const idSinSesion = `${Date.now().toString(36)}-e2e-ext`;
+    await adminDb.doc(`usuarios/${vecino.uid}/pagos/${idSinSesion}`).set({
+      tipo: 'extension', refId: `${idSinSesion}-sin-sesion`, importe: 200, comprobante: comprobante('EXT', idSinSesion),
+      proveedor: 'pasarela-simulada', medio: 'credito', tarjeta: { red: 'Visa', ultimos4: '4242' }, creadoEn: Timestamp.now(),
+    });
+    await expect(page.getByTestId(`pago-panel-${idSinSesion}`)).toContainText('Patente no disponible', { timeout: 10_000 });
 
     // Cedulones vencidos: la lista muestra los más atrasados; uno vencido hace más de un año va primero.
     await adminDb.doc(`usuarios/${vecino.uid}/tributos/T-0900`).set({

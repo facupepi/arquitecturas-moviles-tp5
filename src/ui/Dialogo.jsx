@@ -8,7 +8,9 @@
 // `pie`: lo que va fijo arriba de los botones, fuera del área desplazable. Es el lugar de los
 // errores de la acción ("No se pudo completar el pago"): si fueran al final del contenido, en un
 // celular quedarían tapados por el pie y el vecino solo vería que el botón cambió.
-import React, { useState } from 'react';
+// Un paso nuevo del mismo diálogo (cambia el título: "Pagar cedulón" → "Agregar tarjeta" →
+// "Comprobante de pago") empieza arriba de todo.
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { colores, cortes, espacio, medidas, radios, sombras } from '../tema/tokens';
 import Boton from './Boton';
@@ -30,6 +32,13 @@ export default function Dialogo({ visible, titulo, children, onCerrar, acciones 
     if (cerrable) onCerrar?.();
   };
   useEscape(!!visible, cerrar);
+  // El ScrollView es el mismo en todos los pasos: sin esto, el paso nuevo abriría con el
+  // desplazamiento del anterior y su primera línea quedaría cortada bajo el título. Antes de
+  // pintar, para que no se vea el salto; el foco que pone el paso nuevo (setTimeout) viene después.
+  const refDesplazable = useRef(null);
+  useLayoutEffect(() => {
+    refDesplazable.current?.scrollTo?.({ x: 0, y: 0, animated: false });
+  }, [titulo]);
 
   return (
     <Modal
@@ -74,6 +83,7 @@ export default function Dialogo({ visible, titulo, children, onCerrar, acciones 
             ) : null}
           </View>
           <ScrollView
+            ref={refDesplazable}
             style={estilos.desplazable}
             contentContainerStyle={estilos.contenido}
             onLayout={(e) => setAltoVisible(e.nativeEvent.layout.height)}

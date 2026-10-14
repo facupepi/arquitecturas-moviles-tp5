@@ -6,7 +6,8 @@
 // - Avisos en este dispositivo e instalación de la app.
 // - Privacidad completa (aceptarPrivacidad), "Borrar mis datos" con confirmación y "Cerrar sesión".
 // - Desde 760 px de contenido (medido, no la ventana): dos columnas parejas que ocupan todo el ancho
-//   de <Pantalla>, como el resto de las pantallas. En el celular, una sola columna en el orden de siempre.
+//   de <Pantalla>, como el resto de las pantallas. En el celular, una sola columna en el orden de siempre;
+//   en dos columnas, ese mismo orden partido en dos (el foco y el lector recorren lo mismo).
 import React, { useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSesion } from '../firebase/auth';
@@ -242,7 +243,9 @@ export default function Cuenta() {
       antetitulo="TU CUENTA"
       titulo="Mi cuenta"
     >
-      {/* Columnas de alto parecido: a la izquierda lo de la cuenta, a la derecha avisos y privacidad. */}
+      {/* Columnas de alto parecido (medido de 1280 a 1920 px, con 0 y 2 tarjetas): a la izquierda la
+          cuenta, los medios de pago, los avisos y la instalación; a la derecha la privacidad, que es lo
+          más largo, y la sesión. */}
       <View onLayout={medir}>
       {dosColumnas ? (
         <View style={estilos.columnas}>
@@ -250,13 +253,13 @@ export default function Cuenta() {
             {perfil}
             {avisoAdmin}
             {guardado}
-            {instalar}
-            {sesionYDatos}
-          </View>
-          <View style={estilos.columnaDoble}>
             {mediosPago}
             {notificaciones}
+            {instalar}
+          </View>
+          <View style={estilos.columnaDoble}>
             {privacidad}
+            {sesionYDatos}
           </View>
         </View>
       ) : (

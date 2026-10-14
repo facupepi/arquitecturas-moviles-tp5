@@ -6,6 +6,10 @@ import { ETIQUETAS, ZONA_HORARIA } from './constantes.mjs';
 
 const SIN_DATO = '—';
 
+// Espacio duro (U+00A0) entre un número y su unidad: "hace 22 días", "en 5 min" o "1 h 30 min" no se
+// parten al cambiar de renglón (la unidad pasa abajo junto con el número).
+export const ESPACIO_DURO = '\u00a0';
+
 const formatoDinero = new Intl.NumberFormat('es-AR', {
   style: 'currency', currency: 'ARS', minimumFractionDigits: 0, maximumFractionDigits: 0,
 });
@@ -52,19 +56,29 @@ export function fechaHora(ms) {
 
 // "recién", "hace 3 min", "hace 2 h", "hace 1 día", "en menos de 1 min", "en 5 min", "en 2 días".
 // Minutos truncados; horas y días redondeados (2 días menos unos minutos sigue siendo "en 2 días").
+// Entre el número y la unidad va ESPACIO_DURO.
 export function tiempoRelativo(ms, ahora = Date.now()) {
   if (!valido(ms) || !valido(ahora)) return '';
   const diferencia = ms - ahora;
   const futuro = diferencia > 0;
   const abs = Math.abs(diferencia);
   const conSentido = (texto) => (futuro ? `en ${texto}` : `hace ${texto}`);
-  if (abs < 60 * 1000) return futuro ? 'en menos de 1 min' : 'recién';
+  const con = (n, unidad) => `${n}${ESPACIO_DURO}${unidad}`;
+  if (abs < 60 * 1000) return futuro ? `en menos de ${con(1, 'min')}` : 'recién';
   const minutos = Math.floor(abs / 60000);
-  if (minutos < 60) return conSentido(`${minutos} min`);
+  if (minutos < 60) return conSentido(con(minutos, 'min'));
   const horas = Math.round(abs / 3600000);
-  if (horas < 24) return conSentido(`${horas} h`);
+  if (horas < 24) return conSentido(con(horas, 'h'));
   const dias = Math.round(abs / 86400000);
-  return conSentido(dias === 1 ? '1 día' : `${dias} días`);
+  return conSentido(con(dias, dias === 1 ? 'día' : 'días'));
+}
+
+// Une con ESPACIO_DURO el número y la unidad dentro de un texto ya armado: títulos y cuerpos de
+// notificaciones guardados antes de este cambio, o que arma el servidor ("vence en 2 días",
+// "de 8 a 12 h"). Solo con la unidad entera (no toca "2 meses" ni "8 hs").
+const NUMERO_Y_UNIDAD = /(\d) (días|día|minutos|min|horas|h|km|m)(?=$|[\s.,;:)!?])/g;
+export function unirNumeroYUnidad(texto) {
+  return typeof texto === 'string' ? texto.replace(NUMERO_Y_UNIDAD, `$1${ESPACIO_DURO}$2`) : texto;
 }
 
 // Para algo que ya pasó (creado, activado, actualizado): si el reloj del servidor va unos segundos

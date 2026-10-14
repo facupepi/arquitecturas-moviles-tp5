@@ -12,4 +12,4 @@ El logo se obtuvo de la web pública de la Municipalidad de San Francisco el 7 d
 
 Colores contrastados en el CSS público: celeste #009ee2, azul oscuro #1e2939, verde #6aa435, naranja #f07e07 y amarillo #f4c000. Los botones y textos usan variantes más oscuras cuando hace falta contraste.
 
-La app se publica en Firebase Hosting como prototipo académico. No es un canal oficial de la Municipalidad: la leyenda de prototipo está visible en todas las pantallas y los pagos y avisos son simulados.
+La app se publica en Firebase Hosting como proyecto académico de la UTN FRSFCO, sin vínculo oficial con la Municipalidad. La única nota es "Proyecto académico UTN FRSFCO", al pie de la pantalla de Ingreso, en el pie institucional y al final del cedulón impreso. Los pagos pasan por una pasarela simulada, sin dinero real; las notificaciones push, en cambio, son reales.

@@ -1,10 +1,11 @@
 // Selector de zona de estacionamiento (S6, E1). Cada zona es una opción de radio con su tarifa,
 // el horario de cobro (horarioTexto) y la etiqueta "En horario" / "Fuera de horario" (enHorario).
 // testID de cada opción: zona-<id>. `refOpcion(id)` devuelve la ref de cada opción (para llevar a la
-// vista la zona que se eligió en el mapa).
-// Teclado como el patrón radiogroup de WAI-ARIA (igual que pagos/MediosDePago.jsx): solo la zona
-// elegida entra en el orden de tabulación y las flechas pasan a la anterior o a la siguiente
-// (eligiéndola y llevándole el foco); espacio o Enter eligen la enfocada.
+// vista la zona que se eligió en el mapa). `elegidaEnMapa`: id de la zona que se tocó en el mapa; si
+// sigue elegida, lleva la etiqueta "Elegida en el mapa", como las tarjetas de Bicicletas y Alarmas.
+// Teclado como el patrón radiogroup de WAI-ARIA: solo la zona elegida entra en el orden de
+// tabulación y las flechas pasan a la anterior o a la siguiente (eligiéndola y llevándole el foco);
+// espacio o Enter eligen la enfocada.
 import React, { useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { colores, espacio, medidas, radios } from '../../tema/tokens';
@@ -15,7 +16,7 @@ import { zonaEnHorario } from './util';
 
 const SIGUIENTE = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 };
 
-function OpcionZona({ zona, elegida, enfocable, cobra, onElegir, onTecla, refOpcion }) {
+function OpcionZona({ zona, elegida, enMapa, enfocable, cobra, onElegir, onTecla, refOpcion }) {
   const elegir = () => onElegir(zona.id);
   return (
     <Pressable
@@ -58,17 +59,23 @@ function OpcionZona({ zona, elegida, enfocable, cobra, onElegir, onTecla, refOpc
             </Texto>
           </View>
         </View>
-        <EtiquetaEstado
-          texto={cobra ? 'En horario' : 'Fuera de horario'}
-          tono={cobra ? 'exito' : 'neutro'}
-          testID={`horario-${zona.id}`}
-        />
+        {/* La de "Elegida en el mapa" va después: al aparecer no corre la del horario. */}
+        <View style={estilos.etiquetas}>
+          <EtiquetaEstado
+            texto={cobra ? 'En horario' : 'Fuera de horario'}
+            tono={cobra ? 'exito' : 'neutro'}
+            testID={`horario-${zona.id}`}
+          />
+          {enMapa ? (
+            <EtiquetaEstado texto="Elegida en el mapa" tono="alerta" icono="ubicacion" testID={`elegida-${zona.id}`} />
+          ) : null}
+        </View>
       </View>
     </Pressable>
   );
 }
 
-export default function SelectorZona({ zonas, valor, onCambio, ahora, refOpcion }) {
+export default function SelectorZona({ zonas, valor, onCambio, ahora, refOpcion, elegidaEnMapa = null }) {
   const idEtiqueta = useIdAccesible('zona-etiqueta');
   const opciones = useRef({});
   // Si ninguna está elegida (todavía), la primera es la que recibe el foco con Tab.
@@ -100,6 +107,7 @@ export default function SelectorZona({ zonas, valor, onCambio, ahora, refOpcion 
               key={z.id}
               zona={z}
               elegida={z.id === valor}
+              enMapa={z.id === valor && z.id === elegidaEnMapa}
               enfocable={i === enfocable}
               cobra={zonaEnHorario(z, ahora)}
               onElegir={onCambio}
@@ -150,4 +158,5 @@ const estilos = StyleSheet.create({
   textos: { flex: 1, minWidth: 0, gap: 2 },
   datos: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: espacio.m, rowGap: 2, paddingVertical: 2 },
   horario: { flexDirection: 'row', alignItems: 'center', gap: espacio.xs },
+  etiquetas: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.xs },
 });

@@ -75,6 +75,8 @@ test('contactos con categorías válidas y algún medio de contacto', () => {
     assert.ok(CATEGORIAS_CONTACTO.includes(k.categoria), k.id);
     assert.ok(k.telefono || k.correo || k.whatsapp || k.sitio, `${k.id} sin medio de contacto`);
     for (const campo of ['area', 'nombre', 'descripcion', 'horario', 'direccion']) assert.ok(texto(k[campo], 1, 200));
+    // En la tarjeta el área va al lado de la etiqueta de la categoría: no dicen lo mismo.
+    assert.notEqual(k.area.toLowerCase(), ETIQUETAS.categoriasContacto[k.categoria].toLowerCase(), `${k.id}: área igual a la categoría`);
     if (k.telefono) assert.match(k.telefono, /^\+?[0-9]{3,15}$/);
     if (k.whatsapp) assert.match(k.whatsapp, /^[0-9]{10,15}$/);
     if (k.sitio) assert.match(k.sitio, /^https:\/\//);

@@ -33,11 +33,12 @@ export function dialogoAlta(medio) {
   };
 }
 
+// La frase entra en un renglón a 360 px: así el alta entra sin desplazarse en un celular de 360 × 740.
 export default function AltaEnPago({ medio }) {
   return (
     <>
       <Texto variante="chico" color={colores.textoSuave}>
-        Queda guardada en Mi cuenta. Después volvés al pago con esta tarjeta elegida.
+        Se guarda en Mi cuenta y queda elegida.
       </Texto>
       <FormularioTarjeta alta={medio.alta} enfocar />
     </>

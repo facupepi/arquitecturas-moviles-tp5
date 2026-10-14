@@ -52,9 +52,9 @@ test.describe('Alarmas', () => {
       // mientras se reabre la consulta larga puede tardar ~3 s, sobre todo con varias pruebas a la vez.
       // Se comprueba que la escucha está en vivo con una marca visible propia ("hace 30 min"; la
       // pantalla refresca su reloj por minuto, por eso 29 o 30), se deja pasar el ciclo y recién ahí
-      // se mide el requisito de 2 s (integración).
+      // se mide el requisito de 2 s (integración). Entre el número y "min" va un espacio duro (\s).
       await adminDb.doc(`alarmas/${PARQUE.id}`).update({ actualizadoEn: Timestamp.fromMillis(Date.now() - 30 * 60_000) });
-      await expect(page.getByTestId(`alarma-${PARQUE.id}`)).toContainText(/Actualizada hace (29|30) min/, { timeout: 15_000 });
+      await expect(page.getByTestId(`alarma-${PARQUE.id}`)).toContainText(/Actualizada hace (29|30)\smin/, { timeout: 15_000 });
       await page.waitForTimeout(3000);
       await adminDb.doc(`alarmas/${PARQUE.id}`).update({
         activa: true,

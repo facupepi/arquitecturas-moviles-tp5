@@ -1,26 +1,15 @@
 // Formulario de alta de una tarjeta de crédito o de débito (Mi cuenta y pasarela de pagos):
-// tipo, número, titular y vencimiento MM/AA. Cada error va debajo de su campo (Campo y Selector);
-// el estado lo maneja useAltaTarjeta. El código de seguridad se valida y se descarta: nunca se guarda.
+// tipo, número, titular, vencimiento MM/AA y código de seguridad. Cada error va debajo de su campo
+// (Campo y Selector); el estado lo maneja useAltaTarjeta. El código de seguridad se pide y se valida
+// (3 dígitos, 4 en American Express), y se descarta: nunca se devuelve ni se guarda.
 // La red (Visa, Mastercard, American Express) se muestra como ayuda mientras se escribe el número.
 import React, { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { colores, espacio } from '../../tema/tokens';
-import { Campo, Icono, Selector, Texto } from '../../ui';
+import { espacio } from '../../tema/tokens';
+import { Campo, Selector } from '../../ui';
 import { useIdAccesible } from '../../ui/comun';
 import { digitosTarjeta, redTarjeta } from '../../../shared/tarjetas.mjs';
-import { NOTA_SEGURIDAD_TARJETAS, OPCIONES_TIPO_TARJETA, formatearNumero, formatearVence } from './tarjetas';
-
-/** Nota con el candado: qué se guarda de una tarjeta y qué no se pide nunca. */
-export function NotaSeguridadTarjetas({ testID = 'nota-seguridad-tarjetas' }) {
-  return (
-    <View style={estilos.nota}>
-      <Icono nombre="candado" tamano={16} color={colores.textoSuave} />
-      <Texto variante="chico" color={colores.textoSuave} estilo={estilos.flexible} testID={testID}>
-        {NOTA_SEGURIDAD_TARJETAS}
-      </Texto>
-    </View>
-  );
-}
+import { OPCIONES_TIPO_TARJETA, formatearNumero, formatearVence } from './tarjetas';
 
 function ayudaNumero(numero) {
   const digitos = digitosTarjeta(numero);
@@ -131,6 +120,4 @@ const estilos = StyleSheet.create({
   // caja de ancho fijo por la base: un mensaje de error largo no cambia el ancho del campo.
   vence: { flexDirection: 'row', flexWrap: 'wrap', gap: espacio.m },
   mitad: { flexGrow: 1, flexBasis: 140, minWidth: 0 },
-  nota: { flexDirection: 'row', alignItems: 'flex-start', gap: espacio.xs, paddingTop: 2 },
-  flexible: { flex: 1, minWidth: 0 },
 });

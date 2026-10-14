@@ -4,7 +4,7 @@
 // pagar. El vecino se muestra con su código corto, nunca con nombre ni correo.
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useResumenAdmin, vencidosAl } from '../../datos/useAdmin';
+import { usePatentesPagos, useResumenAdmin, vencidosAl } from '../../datos/useAdmin';
 import { useAhora } from '../../datos/useAhora';
 import { colores, espacio } from '../../tema/tokens';
 import {
@@ -35,10 +35,15 @@ const medioCorto = (pago) => (pago.medio && pago.tarjeta?.ultimos4
   ? textoTarjeta({ tipo: pago.medio, red: pago.tarjeta.red, ultimos4: pago.tarjeta.ultimos4 }) || medioDe(pago)
   : medioDe(pago));
 
-// Qué se pagó: el cedulón (T-1001) o la patente de la sesión si sigue activa.
-function detalle(pago, patentes) {
+// Si la sesión de un pago de estacionamiento no se encuentra (o no se pudo leer).
+const SIN_PATENTE = 'Patente no disponible';
+
+// Qué se pagó: el cedulón (T-1001) o la patente de la sesión, siga activa o ya haya terminado
+// (vacío mientras se lee).
+function detalle(pago, patenteDe) {
   if (pago.tipo === 'tributo') return pago.refId ?? '';
-  return patentes.get(pago.refId) ?? '';
+  const patente = patenteDe(pago);
+  return patente === null ? SIN_PATENTE : patente ?? '';
 }
 
 function coincide(pago, texto) {
@@ -79,7 +84,7 @@ function Resumen({ resumen, cargando, ahora }) {
   );
 }
 
-function UltimosPagos({ pagos, cargando, error, patentes, ahora, onReintentar }) {
+function UltimosPagos({ pagos, cargando, error, patenteDe, ahora, onReintentar }) {
   const [filtro, setFiltro] = useState('todos');
   const [busqueda, setBusqueda] = useState('');
   const [mostrar, setMostrar] = useState(POR_PAGINA);
@@ -102,14 +107,26 @@ function UltimosPagos({ pagos, cargando, error, patentes, ahora, onReintentar })
       titulo: 'Concepto',
       flex: 2.2,
       // Si la patente no entra al lado de la etiqueta, baja al renglón de abajo entera (no se corta).
-      celda: (p) => (
-        <View style={estilos.concepto}>
-          <TipoPago tipo={p.tipo} />
-          <Texto variante="chico" peso="700" numberOfLines={1} estilo={estilos.detalleConcepto}>{detalle(p, patentes)}</Texto>
-        </View>
-      ),
+      celda: (p) => {
+        const texto = detalle(p, patenteDe);
+        const neutro = texto === SIN_PATENTE;
+        return (
+          <View style={estilos.concepto}>
+            <TipoPago tipo={p.tipo} />
+            <Texto
+              variante="chico"
+              peso={neutro ? '500' : '700'}
+              color={neutro ? colores.textoSuave : colores.texto}
+              numberOfLines={1}
+              estilo={estilos.detalleConcepto}
+            >
+              {texto}
+            </Texto>
+          </View>
+        );
+      },
     },
-    { clave: 'medio', titulo: 'Medio de pago', flex: 1.9, celda: (p) => medioCorto(p) ?? '' },
+    { clave: 'medio', titulo: 'Medio de pago', flex: 1.9, celda: (p) => medioCorto(p) ?? '—' },
     { clave: 'comprobante', titulo: 'Comprobante', flex: 1.4, celda: (p) => p.comprobante ?? '—' },
     {
       clave: 'importe',
@@ -127,10 +144,10 @@ function UltimosPagos({ pagos, cargando, error, patentes, ahora, onReintentar })
         <Texto variante="cuerpo" peso="700">{dinero(p.importe)}</Texto>
       </View>
       <Texto variante="chico" peso="700" numberOfLines={1}>
-        {[detalle(p, patentes), p.comprobante].filter(Boolean).join(' · ')}
+        {[detalle(p, patenteDe), p.comprobante].filter(Boolean).join(' · ')}
       </Texto>
       <Texto variante="chico" color={colores.textoSuave}>
-        {[medioDe(p), `vecino ${codigoVecino(p.uid)}`, tiempoPasado(p.creadoEn, ahora)].filter(Boolean).join(' · ')}
+        {[medioDe(p), `vecino ${codigoVecino(p.uid)}`, tiempoPasado(p.creadoEn, ahora)].filter(Boolean).join(' · ')}
       </Texto>
     </>
   );
@@ -253,7 +270,7 @@ function Vencidos({ vencidos, cortada, cargando, error, total, ahora, onReintent
       </View>
       <Texto variante="chico" numberOfLines={1}>{t.concepto ?? 'Cedulón'}</Texto>
       <Texto variante="chico" color={colores.textoSuave}>
-        {`Venció ${tiempoPasado(t.vence, ahora)} · vecino ${codigoVecino(t.uid)}`}
+        {`Venció ${tiempoPasado(t.vence, ahora)} · vecino ${codigoVecino(t.uid)}`}
       </Texto>
     </>
   );
@@ -302,7 +319,8 @@ export default function PestanaPagos({ control, onReintentar }) {
   // Cada pago nuevo (o un cedulón que vence o deja de estar vencido) recalcula los totales del servidor.
   const senal = `${pagos[0]?.id ?? ''}|${vencidos.lista.length}`;
   const { resumen, cargando: calculando, error: errorResumen } = useResumenAdmin(senal);
-  const patentes = useMemo(() => new Map(sesiones.map((s) => [s.id, s.patente])), [sesiones]);
+  // La patente de cada pago de estacionamiento: de la escucha de sesiones o leída una vez por sesión.
+  const patenteDe = usePatentesPagos(pagos, sesiones);
 
   return (
     <View style={estilos.contenedor}>
@@ -314,7 +332,7 @@ export default function PestanaPagos({ control, onReintentar }) {
         pagos={pagos}
         cargando={cargando.pagos}
         error={errores.pagos}
-        patentes={patentes}
+        patenteDe={patenteDe}
         ahora={ahora}
         onReintentar={onReintentar}
       />

@@ -209,6 +209,13 @@ export function sesionDesdeDoc(snap) {
   };
 }
 
+// Solo la patente de una sesión (el panel la muestra en los pagos de estacionamiento y de extensión):
+// el texto, o null si la sesión no existe o no tiene patente.
+export function patenteDesdeDoc(snap) {
+  const d = desdeDoc(snap);
+  return d ? textoONull(d.patente) : null;
+}
+
 export function notificacionDesdeDoc(snap) {
   const d = desdeDoc(snap);
   if (!d) return null;

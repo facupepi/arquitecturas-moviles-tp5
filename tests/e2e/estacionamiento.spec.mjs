@@ -112,6 +112,39 @@ test.describe('Estacionamiento medido', () => {
     await revisarAccesibilidad(page, 'estacionamiento', { excluir: EXCLUIR_AXE });
   });
 
+  test('E1: la zona tocada en el mapa lleva "Elegida en el mapa" y elegir otra en la lista la quita', async ({ vecino }) => {
+    const { page } = vecino;
+    await abrirEstacionamiento(page);
+    await expect(page.getByTestId('zona-p1')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('[data-testid^="elegida-"]')).toHaveCount(0);
+
+    // El marcador de la Terminal (p2): el que muestra su nombre al pasar el puntero.
+    const mapa = page.getByTestId('mapa-estacionamiento');
+    await mapa.scrollIntoViewIfNeeded();
+    const marcadores = mapa.locator('path.leaflet-interactive');
+    const terminal = zona('p2');
+    let punto = null;
+    for (let i = 0; i < (await marcadores.count()) && !punto; i += 1) {
+      await marcadores.nth(i).dispatchEvent('mouseover');
+      const nombre = (await mapa.locator('.leaflet-tooltip').last().textContent({ timeout: 2000 }).catch(() => ''))?.trim();
+      await marcadores.nth(i).dispatchEvent('mouseout');
+      if (nombre === terminal.nombre) {
+        const caja = await marcadores.nth(i).boundingBox();
+        punto = { x: caja.x + caja.width / 2, y: caja.y + caja.height / 2 };
+      }
+    }
+    expect(punto, `marcador de ${terminal.nombre}`).not.toBeNull();
+    await page.touchscreen.tap(punto.x, punto.y);
+    await expect(page.getByTestId('zona-p2')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByTestId('elegida-p2')).toHaveText('Elegida en el mapa');
+    await expect(page).toHaveURL(/#\/estacionamiento\/p2$/);
+
+    // Elegida desde la lista ya no vino del mapa: sin etiqueta.
+    await page.getByTestId('zona-p1').click();
+    await expect(page.getByTestId('zona-p1')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('[data-testid^="elegida-"]')).toHaveCount(0);
+  });
+
   test('E2: inicia con el importe correcto y deja sesión, pago y bloqueo sin uid', async ({ vecino, adminDb }) => {
     const { page, uid } = vecino;
     const patente = patenteAlAzar();

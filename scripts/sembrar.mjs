@@ -9,7 +9,8 @@
 //               repositorio) sobre san-francisco-conecta-tp5. Crea solo lo que falta.
 // --forzar      Reescribe los documentos que ya existen (incluido municipal/config).
 // --vecino uid  (solo emulador) Carga los datos iniciales de un vecino como lo haría vecino/alta.
-// --admin uid   (solo emulador) Crea administradores/{uid}. En producción se hace desde la consola.
+// --admin uid   (solo emulador) Crea administradores/{uid}. En producción se hace desde la consola
+//               (el administrador de ejemplo ejemplo-municipio lo crea scripts/vecinos-ejemplo.mjs).
 //
 // El contenido sale de shared/catalogo.mjs: este script no inventa datos.
 import { existsSync, readFileSync } from 'node:fs';
@@ -83,8 +84,9 @@ export function documentosCatalogo({ ahora = Date.now(), e2e = false } = {}) {
   return docs;
 }
 
-// Datos de un vecino como los deja vecino/alta (2.4): perfil, tributos, pagos, reclamo,
-// bienvenida y los recordatorios inmediatos de T4.
+// Datos de un vecino como los deja vecino/alta (2.4): perfil, cedulones, bienvenida y los
+// recordatorios inmediatos de T4. datosInicialesVecino no trae pagos ni reclamos (el vecino nuevo
+// arranca solo con sus cedulones); si alguna vez los trae, también se escriben.
 export function documentosVecino(uid, { ahora = Date.now(), nombre = 'Vecino de prueba' } = {}) {
   const base = datosInicialesVecino(ahora);
   const raiz = `${C.usuarios}/${uid}`;
