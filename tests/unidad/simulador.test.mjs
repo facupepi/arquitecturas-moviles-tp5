@@ -1,3 +1,5 @@
+// Simulador de shared/simulador.mjs: pasos reproducibles con una semilla que mueven bicicletas y
+// reclamos respetando capacidades, máximos y esperas (WP2).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

@@ -1,3 +1,5 @@
+// Catálogo municipal de shared/catalogo.mjs: identificadores únicos, coordenadas dentro de San
+// Francisco, zonas con estaciones y alarmas, y los datos iniciales de un vecino nuevo (WP2).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';

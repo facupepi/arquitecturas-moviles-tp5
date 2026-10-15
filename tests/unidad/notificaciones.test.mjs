@@ -1,3 +1,5 @@
+// Lógica de entrega de shared/notificaciones.mjs: qué alertas ve cada vecino según su zona, tipo y
+// frecuencia, y cómo se unen las notificaciones personales con los avisos públicos (WP2).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

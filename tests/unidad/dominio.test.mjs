@@ -1,3 +1,5 @@
+// Dominio compartido de shared/dominio.mjs: validaciones, tarifas, horarios, estados de cedulones y
+// reclamos, tarjetas y comprobantes. Comprueba también que shared/ sea puro, sin nada del navegador (WP2).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';

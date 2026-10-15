@@ -1,3 +1,5 @@
+// Recordatorios de shared/recordatorios.mjs: cedulones por vencer y vencidos (T4) y aviso de
+// estacionamiento por vencer (E3), con su umbral y sin duplicados (WP2).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

@@ -1,3 +1,5 @@
+// Rutas de shared/rutas.mjs: interpretación y construcción de los enlaces por hash, enlaces
+// profundos y destinos válidos de una notificación (WP2).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { RUTAS, parsearHash, construirHash, rutaSegura, destinoValido } from '../../shared/rutas.mjs';

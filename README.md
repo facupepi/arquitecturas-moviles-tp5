@@ -55,6 +55,15 @@ Supabase no tiene usuarios propios. La identidad es siempre la de Firebase Authe
 | `tests/` | Pruebas de unidad, de reglas, extremo a extremo, de humo y de carga |
 | `firestore.rules`, `firestore.indexes.json`, `remoteconfig.template.json` | Configuración desplegable de Firebase |
 
+## Documentación
+
+| Documento | Para qué sirve |
+|---|---|
+| [docs/GUIA-DEL-CODIGO.md](docs/GUIA-DEL-CODIGO.md) | Punto de partida para entender el código: mapa de carpetas, capas, modelo de datos, reglas, funciones del servidor, flujos, pruebas y trampas conocidas |
+| [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) | Especificación técnica inicial. Los comentarios del código citan sus apartados (`sección 6.8`) y sus paquetes (`WP3`) |
+| [docs/marca.md](docs/marca.md) | Identidad visual y nota institucional |
+| [docs/pruebas/](docs/pruebas/) | Resultados de la prueba de humo, de la carga y de la demostración en tiempo real sobre la versión publicada |
+
 ## Requisitos
 
 - Node.js 22.12 o posterior.
@@ -102,6 +111,21 @@ En desarrollo, App Check necesita un token de depuración registrado en la conso
 | Todo lo local | `npm run test:todo` | Dominio, reglas, compilación y extremo a extremo en secuencia |
 
 `npm run test:e2e` levanta por su cuenta emuladores separados de los de desarrollo (Authentication 9098, Firestore 8086), el servidor simulado de Supabase y Vite en el puerto 5176, y los apaga al terminar. Los resultados quedan en `docs/pruebas/e2e-junit.xml`.
+
+Comandos de apoyo para las pruebas y el desarrollo:
+
+| Comando | Para qué sirve |
+|---|---|
+| `npm run preview` | Sirve el paquete compilado con Vite para revisarlo antes de publicar |
+| `npm run sembrar:emulador` | Vuelve a sembrar el catálogo en los emuladores de desarrollo |
+| `npm run e2e:puertos` | Muestra qué proceso ocupa cada puerto de las pruebas. Sirve cuando un emulador quedó abierto y el siguiente arranque da `TIMEOUT` |
+| `npm run e2e:compartido` y `npm run e2e:compartido:apagar` | Levantan y apagan un solo juego de emuladores compartido, con un proyecto de datos por agente, sin Vite |
+| `npm run e2e:vite -- <agente>` y `npm run e2e:vite:apagar -- <agente>` | Levantan y cierran el servidor de desarrollo de un agente contra los emuladores compartidos |
+| `npm run e2e:agente -- <agente> <argumentos>` | Corre Playwright para ese agente, sin levantar servidores propios |
+
+Tres scripts de `scripts/` se ejecutan solos dentro de otros comandos: `verificar-rn.mjs` (parte de
+`npm test`), `presupuesto.mjs` (parte de `npm run build`) y `con-emuladores.mjs` (envuelve
+`npm run test:reglas`).
 
 La prueba de humo y la de carga solo miran lo público: no inician sesión ni crean cuentas en producción. La prueba de humo acepta el token de depuración de App Check en la variable `APPCHECK_TOKEN_HUMO`, que nunca se versiona.
 
@@ -228,3 +252,18 @@ La demostración usa dos dispositivos.
 - "Borrar mis datos" elimina el perfil, los cedulones, los pagos, las tarjetas guardadas, los reclamos con sus adjuntos, los estacionamientos, su bloqueo de sesión vigente y los bloqueos de patente de todas sus sesiones, las notificaciones y los avisos leídos, los celulares registrados para las notificaciones push, los eventos de la bandeja de salida con su uid, el documento de administrador si lo tenía y el usuario de Authentication.
 - La configuración web de Firebase es pública por diseño, pero no se versiona. Las claves privadas y los secretos de Supabase nunca se incluyen en el repositorio.
 - La clave de API del navegador ("Browser key (auto created by Firebase)" en Google Cloud, Credenciales) está restringida en dos niveles. Solo acepta pedidos que vengan de `https://san-francisco-conecta-tp5.web.app/*` y `https://san-francisco-conecta-tp5.firebaseapp.com/*`, y solo puede llamar a las APIs de Firebase que usa la aplicación (Identity Toolkit, Secure Token, Firestore, Installations, Cloud Messaging, Remote Config y App Check, entre otras). Un pedido sin dominio o desde otro sitio recibe 403 "Requests from referer … are blocked". Si se publica la aplicación en otro dominio hay que agregarlo en esa lista, y la restricción se puede cambiar en la consola o con la API de claves (`apikeys.googleapis.com`).
+
+## Para continuar el trabajo
+
+1. Leer la [guía del código](docs/GUIA-DEL-CODIGO.md). Los comentarios citan requisitos (`B1`, `T2`…),
+   paquetes (`WP3`) y apartados de la especificación (`sección 6.8`), y la guía explica cada uno.
+2. Instalar con `npm install` y comprobar que todo pasa antes de cambiar nada: `npm test`,
+   `npm run test:reglas` y `npm run build`. El emulador de Firestore necesita Java 21.
+3. Cada cambio de reglas, de una función del servidor o de una pantalla lleva su prueba y mantiene el
+   presupuesto de 350 KB. Antes de publicar, `npm run test:todo`.
+4. Publicar en este orden: reglas, funciones de Supabase y Hosting (ver "Despliegue"). Después
+   `npm run test:humo` contra la versión publicada.
+5. Las credenciales no se versionan ni se pegan en ningún texto. Si una prueba necesita datos en
+   producción, usar los vecinos de ejemplo (ver "Vecinos de ejemplo") y dejarlos como estaban.
+6. Actualizar esta documentación en el mismo cambio. Si una decisión contradice la especificación
+   inicial, anotarla en la sección 11 de la guía.

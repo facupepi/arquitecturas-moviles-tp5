@@ -1,3 +1,5 @@
+// Formato de shared/formato.mjs: dinero, fechas en la zona horaria de Córdoba, tiempos relativos y
+// el espacio duro entre un número y su unidad (WP2).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
