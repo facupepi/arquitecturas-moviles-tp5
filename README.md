@@ -84,7 +84,7 @@ Si un puerto queda ocupado por una ejecución anterior, `node scripts/emuladores
 ## Ejecución local contra los servicios reales
 
 1. Copiar `.env.example` como `.env.local` y completar la configuración web de Firebase, la clave del sitio de reCAPTCHA y la clave VAPID. El archivo no se versiona.
-2. Para desarrollar desde `localhost`, crear `.env.development.local` con `VITE_FIREBASE_AUTH_DOMAIN=san-francisco-conecta-tp5.firebaseapp.com`.
+2. Para desarrollar desde `localhost`, crear `.env.development.local` con `VITE_FIREBASE_AUTH_DOMAIN=san-francisco-conecta-tp5.firebaseapp.com`, y agregar el origen local (por ejemplo `http://localhost:5173/*`) a los sitios permitidos de la clave de API del navegador, que hoy solo acepta los dos dominios publicados (ver "Seguridad y datos").
 3. Ejecutar `npm run dev`.
 
 En desarrollo, App Check necesita un token de depuración registrado en la consola de Firebase, que se carga en `VITE_APPCHECK_DEBUG_TOKEN` dentro de `.env.local`.
@@ -227,3 +227,4 @@ La demostración usa dos dispositivos.
 - Las reglas de Firestore y las Edge Functions solo aceptan sesiones de Google, salvo las de las cuentas de ejemplo (uid `ejemplo-…`), que solo se abren con un token personalizado emitido con la cuenta de servicio. Las reglas limitan cada documento a su dueño, validan importes, estados y transiciones, y exigen una de esas sesiones con documento en `administradores` para toda acción municipal.
 - "Borrar mis datos" elimina el perfil, los cedulones, los pagos, las tarjetas guardadas, los reclamos con sus adjuntos, los estacionamientos, su bloqueo de sesión vigente y los bloqueos de patente de todas sus sesiones, las notificaciones y los avisos leídos, los celulares registrados para las notificaciones push, los eventos de la bandeja de salida con su uid, el documento de administrador si lo tenía y el usuario de Authentication.
 - La configuración web de Firebase es pública por diseño, pero no se versiona. Las claves privadas y los secretos de Supabase nunca se incluyen en el repositorio.
+- La clave de API del navegador ("Browser key (auto created by Firebase)" en Google Cloud, Credenciales) está restringida en dos niveles. Solo acepta pedidos que vengan de `https://san-francisco-conecta-tp5.web.app/*` y `https://san-francisco-conecta-tp5.firebaseapp.com/*`, y solo puede llamar a las APIs de Firebase que usa la aplicación (Identity Toolkit, Secure Token, Firestore, Installations, Cloud Messaging, Remote Config y App Check, entre otras). Un pedido sin dominio o desde otro sitio recibe 403 "Requests from referer … are blocked". Si se publica la aplicación en otro dominio hay que agregarlo en esa lista, y la restricción se puede cambiar en la consola o con la API de claves (`apikeys.googleapis.com`).
